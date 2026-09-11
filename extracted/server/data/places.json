@@ -1,0 +1,598 @@
+[
+  {
+    "id": "akchour-bridge-of-god",
+    "name": "God's Bridge & Akchour Waterfalls",
+    "arabicName": "قنطرة ربي وشلالات أقشور",
+    "frenchName": "Pont de Dieu et Cascades d'Akchour",
+    "category": "tourist_poi",
+    "subCategory": "Natural Arch & Waterfalls",
+    "region": "Northern Morocco",
+    "area": "Akchour, Rif Mountains",
+    "coordinates": [35.2392, -5.1764],
+    "address": "Talassemtane National Park, Akchour 91000, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "A magnificent natural stone bridge suspended 25 meters over a turquoise mountain river gorge, leading into hidden tiered waterfalls in the heart of the Rif mountains.",
+    "formationInfo": "Carved over millions of years through limestone karst by the Oued Farda river. Historically known only to local Jebala Berber villagers and goat herders until backpackers mapped the remote footpaths.",
+    "rating": 4.9,
+    "reviewCount": 142,
+    "ratingsBreakdown": {
+      "cleanliness": 4.7,
+      "scenery": 5.0,
+      "accessibility": 3.8,
+      "valueForMoney": 4.9,
+      "safety": 4.6
+    },
+    "reviews": [
+      {
+        "id": "rev-ak-1",
+        "authorName": "Youssef El Amrani",
+        "authorRole": "local_resident",
+        "rating": 5,
+        "date": "2026-03-02",
+        "text": "Start early around 8:00 AM before the weekend day-trippers arrive from Tangier. The right-hand trail leads to the natural bridge while the left follows the river to the grand waterfall.",
+        "tags": ["Scenery", "Hiking", "Hidden Gem"]
+      },
+      {
+        "id": "rev-ak-2",
+        "authorName": "Clara Dupont",
+        "authorRole": "traveler",
+        "rating": 5,
+        "date": "2026-02-14",
+        "text": "Google Maps does not show the true trail markers, but local boys guiding the trail are very kind. Sitting with feet in the cold river eating fresh tagine was the highlight of our Morocco trip!",
+        "tags": ["Tagine by the river", "Crystal Water"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": false,
+      "wifi": false,
+      "parking": true,
+      "cashOnly": true
+    },
+    "priceLevel": "$",
+    "openingHours": "Open sunrise to sunset (recommended daylight only)",
+    "contactPhone": "+212 539 986012",
+    "isUnderDocumentedGem": true,
+    "source": "community_traveler",
+    "ownerVerified": false,
+    "checkInsCount": 894,
+    "aiConfidenceScore": 96,
+    "lastActivityTimestamp": "2026-03-09T11:20:00Z"
+  },
+  {
+    "id": "riad-cherifa-chefchaouen",
+    "name": "Riad Cherifa",
+    "arabicName": "رياض الشريفة",
+    "frenchName": "Riad Cherifa",
+    "category": "accommodation",
+    "subCategory": "Traditional Blue Medina Riad",
+    "region": "Northern Morocco",
+    "area": "Chefchaouen Medina",
+    "coordinates": [35.1689, -5.2633],
+    "address": "3 Rue Ibn Askar, Chefchaouen Medina, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1548013146-72479768bada?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "An authentic restored Andalusian-Moroccan riad featuring cobalt blue courtyards, handcrafted zellij tiles, traditional hammam, and a panoramic rooftop overlooking the blue city and Jebel El Kelaa peak.",
+    "formationInfo": "Constructed in 1912 by a master craftsman of Andalusian lineage; lovingly preserved and run with organic mountain herbs and home-baked Berber breakfast breads.",
+    "rating": 4.8,
+    "reviewCount": 98,
+    "ratingsBreakdown": {
+      "cleanliness": 4.9,
+      "scenery": 4.9,
+      "accessibility": 4.2,
+      "valueForMoney": 4.7,
+      "safety": 4.9
+    },
+    "reviews": [
+      {
+        "id": "rev-rc-1",
+        "authorName": "Elena Rostova",
+        "authorRole": "traveler",
+        "rating": 5,
+        "date": "2026-02-28",
+        "text": "The quietest refuge in the blue labyrinth. The staff met us at Bab Souk gate with luggage wheelbarrows so we did not get lost in the steep stairways.",
+        "tags": ["Rooftop Breakfast", "Quiet", "Clean"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": false,
+      "wifi": true,
+      "parking": false
+    },
+    "priceLevel": "$$",
+    "openingHours": "24/7 Front Desk",
+    "contactPhone": "+212 539 987858",
+    "isUnderDocumentedGem": false,
+    "source": "business_owner",
+    "ownerVerified": true,
+    "businessOwnerName": "Fatima Zahra Bennani",
+    "checkInsCount": 612,
+    "aiConfidenceScore": 94,
+    "lastActivityTimestamp": "2026-03-08T19:40:00Z"
+  },
+  {
+    "id": "gite-rural-talassemtane",
+    "name": "Gîte Rural Talassemtane & Eco-Lodge",
+    "arabicName": "المأوى القروي تلاسمطان",
+    "frenchName": "Gîte Rural Talassemtane",
+    "category": "accommodation",
+    "subCategory": "Rural Mountain Eco-Lodge",
+    "region": "Northern Morocco",
+    "area": "Bab Taza / Akchour Rural Valley",
+    "coordinates": [35.2154, -5.1983],
+    "address": "Douar Zaouiya Habteene, Talassemtane National Park, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1587061949409-02df41d5e562?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1510798831971-661eb04b3739?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "An off-grid mountain refuge powered by solar energy, serving farm-to-table goat cheese, wild thyme tea, and providing guided access to the rare Moroccan fir (Abies pinsapo) forest trails.",
+    "formationInfo": "Established by a cooperative of local mountain guides to prevent rural depopulation and preserve the UNESCO Intercontinental Biosphere Reserve of the Mediterranean.",
+    "rating": 4.9,
+    "reviewCount": 64,
+    "ratingsBreakdown": {
+      "cleanliness": 4.6,
+      "scenery": 5.0,
+      "accessibility": 3.4,
+      "valueForMoney": 5.0,
+      "safety": 4.9
+    },
+    "reviews": [
+      {
+        "id": "rev-grt-1",
+        "authorName": "Marc Vanhoutte",
+        "authorRole": "guide",
+        "rating": 5,
+        "date": "2026-01-20",
+        "text": "True hidden gem! You cannot reach it with low clearance sedans; call Hassan ahead and he will pick you up at the Bab Taza crossroad in his 4WD.",
+        "tags": ["Eco-Tourism", "Fireplace", "Stargazing"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": false,
+      "wifi": true,
+      "parking": true,
+      "cashOnly": true
+    },
+    "priceLevel": "$",
+    "openingHours": "Check-in 14:00 - 20:00",
+    "contactPhone": "+212 662 134590",
+    "isUnderDocumentedGem": true,
+    "source": "business_owner",
+    "ownerVerified": true,
+    "businessOwnerName": "Hassan Habteene",
+    "checkInsCount": 275,
+    "aiConfidenceScore": 92,
+    "lastActivityTimestamp": "2026-03-05T14:15:00Z"
+  },
+  {
+    "id": "restaurant-chez-hassan-akchour",
+    "name": "Chez Hassan Creek-side Tagines",
+    "arabicName": "مطعم حسن على ضفاف الوادي",
+    "frenchName": "Chez Hassan au bord de l'eau",
+    "category": "restaurant",
+    "subCategory": "Berber River Cafe & Grill",
+    "region": "Northern Morocco",
+    "area": "Akchour River Path",
+    "coordinates": [35.2341, -5.1798],
+    "address": "KM 1.5 Hiking Trail, Akchour River Valley, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "Famous local dining experience where colorful plastic tables and chairs are set directly inside the ankle-deep flowing cool stream. Slow-cooked goat meat and prune tagines served with fresh wood-fired bread.",
+    "formationInfo": "Started 14 years ago with just two charcoal kanoun stoves and a wooden shade tarp; now beloved by travelers seeking genuine hospitality without tourist markups.",
+    "rating": 4.8,
+    "reviewCount": 189,
+    "ratingsBreakdown": {
+      "cleanliness": 4.4,
+      "scenery": 5.0,
+      "accessibility": 3.7,
+      "valueForMoney": 4.9,
+      "safety": 4.8
+    },
+    "reviews": [
+      {
+        "id": "rev-ch-1",
+        "authorName": "Tariq Mansouri",
+        "authorRole": "traveler",
+        "rating": 5,
+        "date": "2026-02-18",
+        "text": "Eating boiling hot kefta tagine with our bare feet dipping in freezing cold mountain runoff was pure bliss after hiking 4 kilometers!",
+        "tags": ["Fresh Tagine", "Stream Seating", "Under-the-radar"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": false,
+      "wifi": false,
+      "parking": false,
+      "cashOnly": true
+    },
+    "priceLevel": "$",
+    "openingHours": "10:30 AM - 18:00 PM Daily",
+    "contactPhone": "+212 671 889201",
+    "isUnderDocumentedGem": true,
+    "source": "community_traveler",
+    "ownerVerified": false,
+    "checkInsCount": 1120,
+    "aiConfidenceScore": 95,
+    "lastActivityTimestamp": "2026-03-09T15:10:00Z"
+  },
+  {
+    "id": "restaurant-bab-ssour-chefchaouen",
+    "name": "Restaurant Bab Ssour",
+    "arabicName": "مطعم باب السور",
+    "frenchName": "Restaurant Bab Ssour",
+    "category": "restaurant",
+    "subCategory": "Authentic Moroccan Cuisine",
+    "region": "Northern Morocco",
+    "area": "Chefchaouen Old Town",
+    "coordinates": [35.1698, -5.2612],
+    "address": "Rue Rue Chrif El Idrissi, Chefchaouen Medina, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "Multi-level rustic blue eatery serving northern Moroccan culinary specialties: Zaalouk, steaming Bissara bean soup with virgin olive oil, and lemon chicken with candied olives.",
+    "formationInfo": "Family-run kitchen operating with ancestral recipes from northern Jbala tribes.",
+    "rating": 4.7,
+    "reviewCount": 215,
+    "ratingsBreakdown": {
+      "cleanliness": 4.6,
+      "scenery": 4.5,
+      "accessibility": 4.3,
+      "valueForMoney": 4.8,
+      "safety": 4.9
+    },
+    "reviews": [
+      {
+        "id": "rev-bs-1",
+        "authorName": "Nadia Chraibi",
+        "authorRole": "traveler",
+        "rating": 5,
+        "date": "2026-01-30",
+        "text": "The rooftop view at sunset is breathtaking. Do not miss the Friday couscous or the lamb with plums.",
+        "tags": ["Authentic", "Vegetarian Friendly", "Rooftop"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": false,
+      "wifi": true,
+      "parking": false
+    },
+    "priceLevel": "$$",
+    "openingHours": "12:00 PM - 22:30 PM",
+    "contactPhone": "+212 660 261128",
+    "isUnderDocumentedGem": false,
+    "source": "business_owner",
+    "ownerVerified": true,
+    "businessOwnerName": "Abdelali Cherkaoui",
+    "checkInsCount": 1420,
+    "aiConfidenceScore": 91,
+    "lastActivityTimestamp": "2026-03-07T20:15:00Z"
+  },
+  {
+    "id": "spanish-mosque-bouzaafar",
+    "name": "Spanish Mosque & Bouzaafar Lookout",
+    "arabicName": "المسجد الإسباني وإطلالة بوزعافر",
+    "frenchName": "Mosquée Espagnole de Chefchaouen",
+    "category": "tourist_poi",
+    "subCategory": "Panoramic Sunset Vantage Point",
+    "region": "Northern Morocco",
+    "area": "Chefchaouen Foothills",
+    "coordinates": [35.1668, -5.2539],
+    "address": "Bouzaafar Hill Trail, Chefchaouen, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1539020140153-e479b8c22e70?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1548013146-72479768bada?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "An abandoned 1920s mosque perched atop a solitary hill facing the entire amphitheater of blue Chefchaouen houses. The definitive golden hour viewpoint in northern Morocco.",
+    "formationInfo": "Built in the 1920s during the Spanish protectorate era; rarely used for prayer by locals, becoming an iconic gathering hill where local musicians play Andalusian lute as the sun sinks into the Rif valley.",
+    "rating": 4.9,
+    "reviewCount": 310,
+    "ratingsBreakdown": {
+      "cleanliness": 4.6,
+      "scenery": 5.0,
+      "accessibility": 4.0,
+      "valueForMoney": 5.0,
+      "safety": 4.8
+    },
+    "reviews": [
+      {
+        "id": "rev-sm-1",
+        "authorName": "Karim Tazi",
+        "authorRole": "local_resident",
+        "rating": 5,
+        "date": "2026-03-01",
+        "text": "Walk up from Ras El Maa spring along the paved trail. It takes 20 minutes. Bring a light jacket because the mountain breeze gets chilly as soon as the sun dips.",
+        "tags": ["Sunset", "Free Entry", "Panoramic"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": false,
+      "wifi": false,
+      "parking": false
+    },
+    "priceLevel": "$",
+    "openingHours": "Open 24/7 (Best at 17:30 - 19:30)",
+    "isUnderDocumentedGem": false,
+    "source": "community_traveler",
+    "ownerVerified": false,
+    "checkInsCount": 2480,
+    "aiConfidenceScore": 98,
+    "lastActivityTimestamp": "2026-03-09T18:45:00Z"
+  },
+  {
+    "id": "camping-azilan-chefchaouen",
+    "name": "Camping Azilan Chefchaouen",
+    "arabicName": "مخيم أزيلان شفشاون",
+    "frenchName": "Camping Caravaning Azilan",
+    "category": "campsite",
+    "subCategory": "Pine Forest Campsite & Vanpark",
+    "region": "Northern Morocco",
+    "area": "Chefchaouen Upper Ridge",
+    "coordinates": [35.1746, -5.2651],
+    "address": "Boulevard Sidi Abdelhamid, Chefchaouen 91000, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "Perched on a forested pine ridge above the medina, offering level campervan parking, tent pitches, hot showers, electricity hookups, and sweeping sunrise views over the mountain valley.",
+    "formationInfo": "Created to cater to overland campervans exploring the Rif mountain route from Tangier Port to Fes.",
+    "rating": 4.4,
+    "reviewCount": 78,
+    "ratingsBreakdown": {
+      "cleanliness": 4.2,
+      "scenery": 4.8,
+      "accessibility": 3.9,
+      "valueForMoney": 4.7,
+      "safety": 4.9
+    },
+    "reviews": [
+      {
+        "id": "rev-ca-1",
+        "authorName": "Lukas Weber",
+        "authorRole": "traveler",
+        "rating": 4,
+        "date": "2026-02-11",
+        "text": "Great base for campers. It is a steep 15-minute downhill walk into the medina (and a good workout coming back up, or a 15-dirham petit taxi).",
+        "tags": ["Vanlife", "Showers", "Pine Trees"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": true,
+      "wifi": true,
+      "parking": true,
+      "petFriendly": true
+    },
+    "priceLevel": "$",
+    "openingHours": "Open 24/7 for Arrivals",
+    "contactPhone": "+212 539 986979",
+    "isUnderDocumentedGem": false,
+    "source": "business_owner",
+    "ownerVerified": true,
+    "businessOwnerName": "Mohamed Azilan",
+    "checkInsCount": 420,
+    "aiConfidenceScore": 89,
+    "lastActivityTimestamp": "2026-03-07T12:00:00Z"
+  },
+  {
+    "id": "hopital-mohammed-v-chefchaouen",
+    "name": "Chefchaouen Provincial Hospital (Emergency & Trauma)",
+    "arabicName": "المستشفى الإقليمي محمد الخامس شفشاون (المستعجلات)",
+    "frenchName": "Hôpital Provincial Mohammed V - Urgences",
+    "category": "emergency",
+    "subCategory": "24/7 Emergency Hospital & Pharmacy",
+    "region": "Northern Morocco",
+    "area": "Chefchaouen City",
+    "coordinates": [35.1712, -5.2715],
+    "address": "Avenue Allal Ben Abdellah, Chefchaouen, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "Primary public medical facility in the province with 24-hour emergency room, triage clinic, antivenom bank, and ambulance dispatch for hikers injured in the Talassemtane trails.",
+    "formationInfo": "Provincial healthcare hub serving Chefchaouen, Bab Taza, and remote Rif communities.",
+    "rating": 4.1,
+    "reviewCount": 45,
+    "ratingsBreakdown": {
+      "cleanliness": 3.9,
+      "scenery": 3.5,
+      "accessibility": 4.8,
+      "valueForMoney": 4.9,
+      "safety": 4.9
+    },
+    "reviews": [
+      {
+        "id": "rev-hosp-1",
+        "authorName": "Dr. Hamza B.",
+        "authorRole": "local_resident",
+        "rating": 5,
+        "date": "2026-01-15",
+        "text": "Emergency room (Urgences) is staffed 24 hours. For English or French assistance ask for the duty emergency intern.",
+        "tags": ["24/7", "Ambulance", "Emergency"]
+      }
+    ],
+    "features": {
+      "accessible": true,
+      "parking": true,
+      "openNowOnly": true
+    },
+    "priceLevel": "$",
+    "openingHours": "24 Hours / 7 Days a Week",
+    "contactPhone": "+212 539 986227",
+    "isUnderDocumentedGem": false,
+    "source": "initial_seed",
+    "ownerVerified": true,
+    "checkInsCount": 180,
+    "aiConfidenceScore": 99,
+    "lastActivityTimestamp": "2026-03-09T08:00:00Z"
+  },
+  {
+    "id": "gendarmerie-akchour-post",
+    "name": "Gendarmerie Royale & Mountain Safety Post",
+    "arabicName": "مركز الدرك الملكي للإنقاذ الجبلي بأقشور",
+    "frenchName": "Poste de la Gendarmerie Royale Akchour",
+    "category": "emergency",
+    "subCategory": "Mountain Police & Search and Rescue",
+    "region": "Northern Morocco",
+    "area": "Akchour Valley Gateway",
+    "coordinates": [35.2415, -5.1742],
+    "address": "Route P4105, Akchour Checkpoint, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "Essential mountain emergency post providing police assistance, trail search coordination, and road safety check-ins for the national park valley.",
+    "formationInfo": "Stationed to ensure traveler safety and prevent hikers from getting lost off-trail during flash rains.",
+    "rating": 4.6,
+    "reviewCount": 29,
+    "ratingsBreakdown": {
+      "cleanliness": 4.5,
+      "scenery": 4.2,
+      "accessibility": 4.7,
+      "valueForMoney": 5.0,
+      "safety": 5.0
+    },
+    "reviews": [
+      {
+        "id": "rev-gen-1",
+        "authorName": "Amine S.",
+        "authorRole": "local_resident",
+        "rating": 5,
+        "date": "2026-02-05",
+        "text": "Very polite officers. If hiking late into the canyon, inform them before departing so they know your expected return time.",
+        "tags": ["Safety", "Helpful", "Emergency Contact"]
+      }
+    ],
+    "features": {
+      "accessible": true,
+      "parking": true
+    },
+    "priceLevel": "$",
+    "openingHours": "24/7 Security Coverage",
+    "contactPhone": "177 (Emergency toll-free) / +212 539 986005",
+    "isUnderDocumentedGem": false,
+    "source": "initial_seed",
+    "ownerVerified": true,
+    "checkInsCount": 95,
+    "aiConfidenceScore": 99,
+    "lastActivityTimestamp": "2026-03-08T00:00:00Z"
+  },
+  {
+    "id": "selene-restaurant-santorini",
+    "name": "Selene Restaurant",
+    "arabicName": "مطعم سيلين الراقي",
+    "frenchName": "Restaurant Selene",
+    "category": "restaurant",
+    "subCategory": "Fine Dining Cycladic Gastronomy",
+    "region": "Santorini",
+    "area": "Fira, Santorini",
+    "coordinates": [36.4172, 25.4318],
+    "address": "Fira Central Promenade, Santorini 84700, Greece",
+    "photos": [
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "Award-winning clifftop restaurant championing volcanic Aegean terroir, fresh fava purees, white eggplant delicacies, and native Assyrtiko pairings.",
+    "formationInfo": "Founded in 1986 in Fira; celebrated for putting indigenous volcanic Santorini ingredients on the world Michelin stage.",
+    "rating": 4.9,
+    "reviewCount": 380,
+    "ratingsBreakdown": {
+      "cleanliness": 5.0,
+      "scenery": 4.9,
+      "accessibility": 4.5,
+      "valueForMoney": 4.2,
+      "safety": 4.9
+    },
+    "reviews": [
+      {
+        "id": "rev-sel-1",
+        "authorName": "Sophie Laurent",
+        "authorRole": "traveler",
+        "rating": 5,
+        "date": "2026-02-12",
+        "text": "Every course was poetry. Be sure to reserve 3 weeks in advance for a front caldera table.",
+        "tags": ["Caldera Sunset", "Michelin Guide", "Wine Pairing"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": true,
+      "wifi": true,
+      "parking": false
+    },
+    "priceLevel": "$$$$",
+    "openingHours": "18:00 - 23:30 (Reservations required)",
+    "contactPhone": "+30 2286 022249",
+    "isUnderDocumentedGem": false,
+    "source": "business_owner",
+    "ownerVerified": true,
+    "businessOwnerName": "Eleni & Giorgos",
+    "checkInsCount": 3100,
+    "aiConfidenceScore": 98,
+    "lastActivityTimestamp": "2026-03-08T22:00:00Z"
+  },
+  {
+    "id": "hotel-royal-mansour-marrakech",
+    "name": "Hotel Royal Mansour",
+    "arabicName": "فندق رويال منصور",
+    "frenchName": "Hôtel Royal Mansour",
+    "category": "accommodation",
+    "subCategory": "Palatial Historic Riad Hotel",
+    "region": "Marrakech",
+    "area": "Marrakech City Center",
+    "coordinates": [31.6248, -7.9984],
+    "address": "Rue Abou Abbas El Sebti, Marrakech 40000, Morocco",
+    "photos": [
+      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&auto=format&fit=crop&q=80"
+    ],
+    "description": "An exquisite palace compound within Marrakech medina walls consisting of 53 private multi-story riads connected by fragrant orange blossom courtyards and discreet underground tunnels.",
+    "formationInfo": "Commissioned by the royal family as a showcase of Moroccan artisan zellij tiling, hand-chiseled plaster, cedar woodwork, and world-class North African hospitality.",
+    "rating": 5.0,
+    "reviewCount": 420,
+    "ratingsBreakdown": {
+      "cleanliness": 5.0,
+      "scenery": 5.0,
+      "accessibility": 4.9,
+      "valueForMoney": 4.5,
+      "safety": 5.0
+    },
+    "reviews": [
+      {
+        "id": "rev-rm-1",
+        "authorName": "Alexander Wright",
+        "authorRole": "traveler",
+        "rating": 5,
+        "date": "2026-03-01",
+        "text": "The pinnacle of world hospitality. Private rooftop plunge pool overlooking the Koutoubia minaret was unforgettable.",
+        "tags": ["Luxury", "Private Riad", "Spa"]
+      }
+    ],
+    "features": {
+      "familyFriendly": true,
+      "accessible": true,
+      "wifi": true,
+      "parking": true
+    },
+    "priceLevel": "$$$$",
+    "openingHours": "24/7 Concierge & Reception",
+    "contactPhone": "+212 529 808080",
+    "isUnderDocumentedGem": false,
+    "source": "business_owner",
+    "ownerVerified": true,
+    "businessOwnerName": "Royal Mansour Management",
+    "checkInsCount": 4800,
+    "aiConfidenceScore": 99,
+    "lastActivityTimestamp": "2026-03-09T17:00:00Z"
+  }
+]
