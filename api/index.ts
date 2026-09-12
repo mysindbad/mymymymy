@@ -2,7 +2,7 @@ let appPromise: Promise<any> | undefined;
 
 export default async function handler(req: any, res: any) {
   try {
-    appPromise ??= import('../server').then((module) => module.default);
+    appPromise ??= import('../server.ts').then((module) => module.default);
     const app = await appPromise;
     return app(req, res);
   } catch (error) {
