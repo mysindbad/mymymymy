@@ -8,6 +8,7 @@ import {
   Plus,
   Compass,
   Filter,
+  Search,
   TrendingUp,
   ShieldCheck,
   Building2,
@@ -33,6 +34,7 @@ interface ExploreFeedProps {
   onToggleSave: (id: string) => void;
   language?: SupportedLanguage;
   currency?: string;
+  initialQuery?: string;
 }
 
 export const ExploreFeed: React.FC<ExploreFeedProps> = ({
@@ -45,9 +47,11 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   onToggleSave,
   language = 'en',
   currency = 'MAD',
+  initialQuery = '',
 }) => {
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'hidden_gems' | 'accommodations' | 'tourist' | 'emergency'>('all');
   const [insights, setInsights] = useState<AiMemoryInsights | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,6 +59,10 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+
+  useEffect(() => {
+    setSearchQuery(initialQuery);
+  }, [initialQuery]);
 
   const loadExploreData = async () => {
     setIsLoading(true);
@@ -75,6 +83,11 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   }, []);
 
   const filteredPlaces = places.filter((p) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesQuery = !query || [p.name, p.area, p.arabicName, p.description, p.formationInfo]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query));
+    if (!matchesQuery) return false;
     if (selectedFilter === 'hidden_gems' && !p.isUnderDocumentedGem) return false;
     if (selectedFilter === 'accommodations' && p.category !== 'accommodation') return false;
     if (selectedFilter === 'tourist' && p.category !== 'tourist_poi') return false;
@@ -145,6 +158,17 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
             <span>{isAr ? 'إضافة مكان' : 'Add Listing'}</span>
           </button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs">
+        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={isAr ? 'ابحث عن مدينة أو مكان...' : 'Search cities and places...'}
+          className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
+        />
       </div>
 
       {/* Filter Tabs: Feature 2 (Distinct Accommodations vs Tourist POIs vs Hidden Gems) */}
