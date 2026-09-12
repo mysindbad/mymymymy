@@ -23,6 +23,7 @@ import { BrandLogo } from './BrandLogo';
 import santoriniBg from '../assets/images/santorini_bg.jpg';
 import { SupportedLanguage } from '../data/translations';
 import { LanguageFlagSelector } from './LanguageFlagSelector';
+import { supabase } from '../lib/supabase';
 
 export type AuthScreenType =
   | 'welcome'
@@ -67,6 +68,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
 
   // Feedback states
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -89,38 +91,52 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     }
   };
 
-  const handleSocialAuth = (provider: 'Google' | 'Facebook' | 'Apple') => {
-    setStatusMessage(`Connecting with ${provider}...`);
-    setTimeout(() => {
-      const mockName = provider === 'Google' ? 'Ahmed Benali' : 'Traveler';
-      const mockEmail = `${provider.toLowerCase()}.user@mysindbad.ai`;
-      onAuthSuccess?.({
-        name: mockName,
-        email: mockEmail,
-        avatar: '🧔',
-      });
-      onClose();
-    }, 600);
+  const completeAuth = (user: { email?: string; user_metadata?: Record<string, unknown> }) => {
+    const metadata = user.user_metadata || {};
+    onAuthSuccess?.({
+      name: typeof metadata.full_name === 'string' && metadata.full_name.trim()
+        ? metadata.full_name
+        : user.email?.split('@')[0] || 'Traveler',
+      email: user.email || '',
+      avatar: typeof metadata.avatar_url === 'string' && metadata.avatar_url ? metadata.avatar_url : '🧔',
+    });
+    onClose();
   };
 
-  const handleEmailSignIn = (e: React.FormEvent) => {
+  const handleSocialAuth = async (provider: 'Google' | 'Facebook' | 'Apple') => {
+    if (provider !== 'Google') {
+      setStatusMessage(isAr ? 'تسجيل الدخول متاح حالياً عبر Google أو البريد الإلكتروني.' : 'Sign in is currently available with Google or email.');
+      return;
+    }
+    setIsLoading(true);
+    setStatusMessage(null);
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    setIsLoading(false);
+    if (error) {
+      setStatusMessage(error.message);
+      return;
+    }
+    if (data.user) completeAuth(data.user);
+  };
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setStatusMessage('Please fill in both email and password.');
       return;
     }
-    setStatusMessage('Signing in...');
-    setTimeout(() => {
-      onAuthSuccess?.({
-        name: fullName || email.split('@')[0] || 'Traveler',
-        email,
-        avatar: '🧔',
-      });
-      onClose();
-    }, 600);
+    setIsLoading(true);
+    setStatusMessage(null);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    setIsLoading(false);
+    if (error) {
+      setStatusMessage(error.message);
+      return;
+    }
+    if (data.user) completeAuth(data.user);
   };
 
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !fullName) {
       setStatusMessage('Please enter your full name, email, and password.');
@@ -134,30 +150,39 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
       setStatusMessage('Passwords do not match.');
       return;
     }
-    setStatusMessage('Account created! Welcome to My Sindbad.');
-    setTimeout(() => {
-      onAuthSuccess?.({
-        name: fullName,
-        email,
-        avatar: '🧔',
-      });
-      onClose();
-    }, 700);
+    setIsLoading(true);
+    setStatusMessage(null);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName, country, preferred_language: selectedLang } },
+    });
+    setIsLoading(false);
+    if (error) {
+      setStatusMessage(error.message);
+      return;
+    }
+    if (data.user && data.session) {
+      completeAuth(data.user);
+    } else {
+      setStatusMessage(isAr ? 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.' : 'Account created. Check your email to confirm it.');
+    }
   };
 
-  const handleSendResetLink = (e: React.FormEvent) => {
+  const handleSendResetLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setStatusMessage('Please enter your email address.');
       return;
     }
-    setStatusMessage('Reset link sent! Check your email inbox or test reset below.');
-    setTimeout(() => {
-      navigateTo('reset-password');
-    }, 1000);
+    setIsLoading(true);
+    setStatusMessage(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    setIsLoading(false);
+    setStatusMessage(error?.message || (isAr ? 'تم إرسال رابط إعادة التعيين إلى بريدك.' : 'Reset link sent. Check your email inbox.'));
   };
 
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
       setStatusMessage('Password must be at least 6 characters.');
@@ -167,10 +192,16 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
       setStatusMessage('Passwords do not match.');
       return;
     }
-    setStatusMessage('Password updated successfully! You can now sign in.');
-    setTimeout(() => {
-      navigateTo('sign-in-email');
-    }, 1000);
+    setIsLoading(true);
+    setStatusMessage(null);
+    const { error } = await supabase.auth.updateUser({ password });
+    setIsLoading(false);
+    if (error) {
+      setStatusMessage(error.message);
+      return;
+    }
+    setStatusMessage(isAr ? 'تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.' : 'Password updated successfully. You can now sign in.');
+    navigateTo('sign-in-email');
   };
 
   // Password validation checks for Screen 6

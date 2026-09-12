@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import L from 'leaflet';
 import confetti from 'canvas-confetti';
 import {
   Navigation,
@@ -36,7 +37,7 @@ interface NavigationFlowProps {
   language?: SupportedLanguage;
 }
 
-type NavStepState = 'route_selection' | 'active_nav' | 'off_route' | 'arrived';
+type NavStepState = 'route_selection' | 'active_nav' | 'arrived';
 
 export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   destination,
@@ -49,72 +50,83 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const [navState, setNavState] = useState<NavStepState>('route_selection');
   const [travelMode, setTravelMode] = useState<TravelMode>('driving');
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const [routeData, setRouteData] = useState<NavigationRouteData | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
-  const [speed, setSpeed] = useState(48);
-  const [speedLimit] = useState(50);
+  const [speed, setSpeed] = useState<number | null>(null);
   const [showTurnList, setShowTurnList] = useState(false);
-  const [isOfflineSaved, setIsOfflineSaved] = useState(true);
   const [photoUploaded, setPhotoUploaded] = useState<string | null>(null);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number]>([35.1695, -5.2625]);
+  const routeMapRef = React.useRef<HTMLDivElement | null>(null);
+  const routeMapInstanceRef = React.useRef<L.Map | null>(null);
+  const routePolylineRef = React.useRef<L.Polyline | null>(null);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
-  const isFr = language === 'fr';
 
-  // Load AI Guided Route from Backend
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setUserLocation([coords.latitude, coords.longitude]);
+        setSpeed(coords.speed === null ? null : Math.round(coords.speed * 3.6));
+      },
+      () => setUserLocation([35.1695, -5.2625]),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  }, []);
+
+  // Load the route from the backend using the current browser location.
   const loadRoute = async (mode: TravelMode) => {
     setIsLoadingRoute(true);
+    setRouteError(null);
     try {
-      const data = await fetchNavigationGuidance(destination.id, mode, language);
+      const data = await fetchNavigationGuidance(destination.id, mode, language, userLocation[0], userLocation[1]);
       setRouteData(data);
     } catch (err) {
-      // Fallback local calculation
-      setRouteData({
-        destination,
-        travelMode: mode,
-        totalDistanceKm: 2.8,
-        durationMinutes: mode === 'walking' ? 35 : 12,
-        trafficCondition: 'Clear & Flowing',
-        aiSummary: isAr
-          ? 'المسار مخصص بالذكاء الاصطناعي مع مراعاة التضاريس الجبلية والأزقة العتيقة.'
-          : 'AI-customized route generated with terrain sensitivity and pedestrian guidance.',
-        steps: [
-          {
-            id: 'st-1',
-            distanceMeters: 400,
-            instruction: isAr ? 'انطلق للأمام عبر الطريق الرئيسي' : 'Head forward on main access route',
-            roadName: 'Main Access Road',
-            iconType: 'straight',
-            aiTip: isAr ? 'توجيه ذكي: طريق آمن وممهد.' : 'AI Advisory: Paved road with clear visibility.',
-          },
-          {
-            id: 'st-2',
-            distanceMeters: 250,
-            instruction: isAr ? 'انعطف يميناً عند البوابة التاريخية' : 'Turn right at the historic gateway',
-            roadName: 'Historic Gate Entrance',
-            iconType: 'right',
-            aiTip: isAr ? 'توجيه ذكي: أزقة مشاة تبدأ بعد البوابة.' : 'AI Advisory: Pedestrian zone begins ahead.',
-          },
-          {
-            id: 'st-3',
-            distanceMeters: 100,
-            instruction: isAr ? `لقد وصلت إلى وجهتك: ${destination.name}` : `Arrive at destination: ${destination.name}`,
-            roadName: destination.name,
-            iconType: 'arrive',
-            aiTip: isAr ? 'وصلت بحمد الله!' : 'You have arrived!',
-          },
-        ],
-      });
+      setRouteData(null);
+      setRouteError(isAr ? 'خدمة الملاحة غير متاحة مؤقتاً' : 'Navigation service temporarily unavailable');
     } finally {
       setIsLoadingRoute(false);
     }
   };
 
   useEffect(() => {
-    loadRoute(travelMode);
-  }, [destination, travelMode, language]);
+    void loadRoute(travelMode);
+  }, [destination, travelMode, language, userLocation]);
+
+  useEffect(() => {
+    const geometry = (routeData as NavigationRouteData & {
+      geometry?: { coordinates?: Array<[number, number]> };
+    } | null)?.geometry;
+    const coordinates = geometry?.coordinates;
+    if (!routeMapRef.current || !coordinates?.length) return;
+
+    if (!routeMapInstanceRef.current) {
+      routeMapInstanceRef.current = L.map(routeMapRef.current, { zoomControl: false }).setView(coordinates[0].slice().reverse() as [number, number], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(routeMapInstanceRef.current);
+      L.control.zoom({ position: 'bottomright' }).addTo(routeMapInstanceRef.current);
+    }
+
+    routePolylineRef.current?.remove();
+    const leafletCoordinates = coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
+    routePolylineRef.current = L.polyline(leafletCoordinates, { color: '#3b82f6', weight: 6, opacity: 0.9 }).addTo(routeMapInstanceRef.current);
+    routeMapInstanceRef.current.fitBounds(routePolylineRef.current.getBounds(), { padding: [24, 24] });
+    routeMapInstanceRef.current.invalidateSize();
+  }, [routeData, navState]);
+
+  useEffect(() => {
+    return () => {
+      routePolylineRef.current?.remove();
+      routeMapInstanceRef.current?.remove();
+      routeMapInstanceRef.current = null;
+    };
+  }, []);
 
   // Voice Guidance with Web Speech API
   const speakInstruction = (text: string) => {
@@ -135,53 +147,28 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const steps = routeData?.steps || [];
   const currentStep = steps[currentStepIndex] || steps[0];
 
-  // Active Navigation Step Simulation
   useEffect(() => {
-    if (navState !== 'active_nav' || !routeData || steps.length === 0) return;
-
-    speakInstruction(currentStep.instruction);
-
-    const interval = setInterval(() => {
-      setSpeed((prev) => Math.min(52, Math.max(38, prev + (Math.random() > 0.5 ? 2 : -2))));
-
-      setCurrentStepIndex((prev) => {
-        if (prev < steps.length - 1) {
-          const next = prev + 1;
-          speakInstruction(steps[next].instruction);
-          return next;
-        } else {
-          clearInterval(interval);
-          setNavState('arrived');
-          try {
-            confetti({
-              particleCount: 100,
-              spread: 70,
-              origin: { y: 0.6 },
-            });
-          } catch {
-            // safe fallback
-          }
-          return prev;
-        }
-      });
-    }, 6000);
-
-    return () => clearInterval(interval);
-  }, [navState, routeData, steps]);
+    if (navState === 'active_nav' && currentStep) speakInstruction(currentStep.instruction);
+  }, [navState, currentStep]);
 
   const handleStartNav = () => {
     setNavState('active_nav');
     setCurrentStepIndex(0);
   };
 
-  const handleSimulateOffRoute = () => {
-    setNavState('off_route');
-    const msg = isAr
-      ? 'أنت خارج المسار، جاري إعادة التوجيه الذكي وفق التضاريس'
-      : isFr
-      ? 'Vous avez quitté le trajet, recalcul intelligent en cours'
-      : "You're off route. Recalculating AI smart path...";
-    speakInstruction(msg);
+  const handleAdvanceStep = () => {
+    if (currentStepIndex < steps.length - 1) {
+      const next = currentStepIndex + 1;
+      setCurrentStepIndex(next);
+      speakInstruction(steps[next].instruction);
+      return;
+    }
+    setNavState('arrived');
+    try {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    } catch {
+      // safe fallback
+    }
   };
 
   const handleCheckIn = async () => {
@@ -269,7 +256,14 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           {isLoadingRoute ? (
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center gap-2 text-slate-400 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-              <span>{isAr ? 'جاري حساب المسار الذكي والظروف الحية...' : 'Calculating AI-guided route...'}</span>
+              <span>{isAr ? 'جاري حساب المسار الحقيقي...' : 'Calculating real route...'}</span>
+            </div>
+          ) : routeError ? (
+            <div className="p-5 rounded-2xl bg-rose-950/60 border border-rose-800 flex items-center justify-between gap-3 text-xs text-rose-200">
+              <span>{routeError}</span>
+              <button onClick={() => void loadRoute(travelMode)} className="rounded-lg bg-rose-600 px-3 py-1.5 font-bold text-white">
+                {isAr ? 'إعادة المحاولة' : 'Retry'}
+              </button>
             </div>
           ) : routeData ? (
             <div className="mb-4 p-4 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-md">
@@ -293,9 +287,9 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>{isAr ? 'الخريطة متوفرة أوفلاين دون إنترنت' : 'Saved for offline mountain navigation'}</span>
+                  <span>{isAr ? 'تم استلام هندسة المسار من خدمة الملاحة' : 'Route geometry received from the navigation service'}</span>
                 </span>
-                <span className="text-[11px] font-bold text-emerald-400">READY</span>
+                <span className="text-[11px] font-bold text-emerald-400">LIVE</span>
               </div>
             </div>
           ) : null}
@@ -365,44 +359,13 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             )}
           </div>
 
-          {/* Real-time Visual Path Canvas with Live Arrow Tracker */}
-          <div className="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center">
-            <div className="absolute inset-0 opacity-35 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px]" />
-
-            {/* Simulated Road Path */}
-            <svg className="w-full h-full absolute inset-0" viewBox="0 0 400 600" preserveAspectRatio="none">
-              <path
-                d="M 200 600 Q 200 380 240 280 T 210 60"
-                stroke="#1e293b"
-                strokeWidth="32"
-                fill="none"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 200 600 Q 200 380 240 280 T 210 60"
-                stroke="#3b82f6"
-                strokeWidth="14"
-                fill="none"
-                strokeLinecap="round"
-                strokeDasharray="10 5"
-              />
-            </svg>
-
-            {/* Moving Indicator */}
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-16 h-16 rounded-full bg-blue-500/30 flex items-center justify-center animate-ping absolute" />
-              <div className="w-13 h-13 rounded-full bg-blue-600 border-3 border-white shadow-2xl flex items-center justify-center text-white relative z-10">
-                <Navigation className="w-7 h-7 fill-current -rotate-45" />
-              </div>
-            </div>
+          {/* Real route geometry from OSRM rendered by Leaflet */}
+          <div ref={routeMapRef} className="relative flex-1 bg-slate-950 overflow-hidden" />
 
             {/* Speed & Speed Limit Widget */}
             <div className="absolute top-4 left-4 rtl:left-auto rtl:right-4 z-20 flex flex-col items-center bg-slate-900/90 backdrop-blur-md rounded-2xl p-2.5 border border-slate-800 shadow-xl">
-              <div className="text-2xl font-black text-white">{speed}</div>
+              <div className="text-2xl font-black text-white">{speed === null ? '—' : speed}</div>
               <div className="text-[10px] text-slate-400 font-bold uppercase">{t.speedUnit}</div>
-              <div className="w-6 h-6 rounded-full border-2 border-red-500 text-[10px] font-bold text-white flex items-center justify-center mt-1">
-                {speedLimit}
-              </div>
             </div>
 
             {/* Mascot Real-time Cheers */}
@@ -411,23 +374,12 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                 <MascotSindbad size="sm" mood="navigating" />
                 <p className="text-[11px] text-slate-200 font-medium leading-tight">
                   {isAr
-                    ? 'أداء ممتاز! الإشارة دقيقة ومحدثة مع تضاريس المسار.'
-                    : 'Pristine GPS lock. Tracking tailored to live road conditions.'}
+                    ? 'يُعرض المسار وفق بيانات موقعك وهندسته الحقيقية.'
+                    : 'Showing the real route geometry from your location.'}
                 </p>
               </div>
             </div>
 
-            {/* Test Off-route Recalculation Button */}
-            <div className="absolute bottom-24 right-4 rtl:right-auto rtl:left-4 z-20">
-              <button
-                onClick={handleSimulateOffRoute}
-                className="px-3.5 py-1.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold backdrop-blur-md flex items-center gap-1.5 transition"
-                title="Test off-route detour & AI recalculation"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>{isAr ? 'تجربة انحراف المسار' : 'Test Off-Route'}</span>
-              </button>
-            </div>
           </div>
 
           {/* Bottom Floating Control Bar */}
@@ -459,6 +411,12 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                   {showTurnList ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                 </button>
                 <button
+                  onClick={handleAdvanceStep}
+                  className="py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition active:scale-95"
+                >
+                  {currentStepIndex < steps.length - 1 ? (isAr ? 'التالي' : 'Next') : (isAr ? 'وصلت' : 'Arrived')}
+                </button>
+                <button
                   onClick={() => setNavState('route_selection')}
                   className="py-3 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md transition active:scale-95"
                 >
@@ -488,59 +446,6 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                 ))}
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* 3. OFF-ROUTE RE-ROUTING SCREEN */}
-      {navState === 'off_route' && (
-        <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full p-6 text-center animate-in zoom-in-95">
-          <div className="mx-auto mb-4">
-            <MascotSindbad size="lg" mood="warning" />
-          </div>
-
-          <span className="inline-block px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold mb-2 border border-amber-500/40 self-center">
-            {t.recalculating}
-          </span>
-
-          <h2 className="text-xl font-black text-white">{t.youAreOffRoute}</h2>
-          <p className="text-xs text-slate-400 mt-1 mb-6 leading-relaxed">
-            {t.offRouteDesc}
-          </p>
-
-          <div className="space-y-2.5 text-left rtl:text-right mb-6">
-            {[
-              {
-                title: isAr ? 'المسار الذكي الموصى به' : 'Recommended Path Return',
-                time: '8 min',
-                desc: isAr ? 'الانعطاف يميناً عند الممر الحجري القادم' : 'Turn right at the upcoming stone footbridge',
-              },
-              {
-                title: isAr ? 'مسار ريفي بديل' : 'Scenic Riverbank Alternate',
-                time: '11 min',
-                desc: isAr ? 'متابعة السير بمحاذاة الوادي' : 'Continue along the lower river trail',
-              },
-            ].map((opt, i) => (
-              <div
-                key={i}
-                onClick={() => setNavState('active_nav')}
-                className="p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 cursor-pointer flex items-center justify-between transition"
-              >
-                <div>
-                  <div className="text-sm font-bold text-white">{opt.title}</div>
-                  <div className="text-xs text-slate-400">{opt.desc}</div>
-                </div>
-                <div className="text-sm font-black text-blue-400">{opt.time}</div>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setNavState('active_nav')}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md transition"
-          >
-            {t.followRecommended}
-          </button>
         </div>
       )}
 

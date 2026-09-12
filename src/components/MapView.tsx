@@ -20,8 +20,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { Place, PlaceCategory, FilterSettings } from '../types';
-import { fetchPlaces } from '../services/api';
-import { SEED_PLACES } from '../data/mockData';
+import { fetchTracesSummary } from '../services/api';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
 import { AddPlaceModal } from './AddPlaceModal';
@@ -29,6 +28,7 @@ import { PassiveDataModal } from './PassiveDataModal';
 import { RatePlaceModal } from './RatePlaceModal';
 
 interface MapViewProps {
+  places: Place[];
   onSelectPlace: (place: Place) => void;
   onStartRoute: (place: Place) => void;
   onOpenMultiStopPlanner: () => void;
@@ -38,6 +38,7 @@ interface MapViewProps {
 }
 
 export const MapView: React.FC<MapViewProps> = ({
+  places,
   onSelectPlace,
   onStartRoute,
   onOpenMultiStopPlanner,
@@ -54,13 +55,15 @@ export const MapView: React.FC<MapViewProps> = ({
   const isAr = language === 'ar';
 
   // State
-  const [places, setPlaces] = useState<Place[]>(SEED_PLACES);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedRegion, setSelectedRegion] = useState<string>('Northern Morocco');
   const [onlyHiddenGems, setOnlyHiddenGems] = useState<boolean>(false);
-  const [showCrowdHeatmap, setShowCrowdHeatmap] = useState<boolean>(true);
-  const [activeNearbyPlace, setActiveNearbyPlace] = useState<Place | null>(SEED_PLACES[0]);
+  const [showCrowdHeatmap, setShowCrowdHeatmap] = useState<boolean>(false);
+  const [activeNearbyPlace, setActiveNearbyPlace] = useState<Place | null>(null);
+  const [realTraces, setRealTraces] = useState<Array<{ coordinates: [number, number] }>>([]);
+  const [tracesLoading, setTracesLoading] = useState(false);
+  const [tracesError, setTracesError] = useState<string | null>(null);
 
   // Modals
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
@@ -69,28 +72,23 @@ export const MapView: React.FC<MapViewProps> = ({
   const [placeToRate, setPlaceToRate] = useState<Place | null>(null);
   const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(true);
 
-  // User simulated location (Chefchaouen / Akchour)
+  // Use the browser location when available; this is only a fallback.
   const [userLocation, setUserLocation] = useState<[number, number]>([35.1695, -5.2625]);
 
-  // Load places from backend database
-  const loadPlaces = async () => {
-    const fetched = await fetchPlaces({
-      category: selectedCategory !== 'All' ? selectedCategory : undefined,
-      region: selectedRegion !== 'All' ? selectedRegion : undefined,
-      query: searchQuery || undefined,
-      hiddenGemsOnly: onlyHiddenGems,
-    });
-    if (fetched && fetched.length > 0) {
-      setPlaces(fetched);
-      if (!activeNearbyPlace || !fetched.some((p) => p.id === activeNearbyPlace.id)) {
-        setActiveNearbyPlace(fetched[0]);
-      }
-    }
-  };
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setUserLocation([coords.latitude, coords.longitude]),
+      () => setUserLocation([35.1695, -5.2625]),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  }, []);
 
   useEffect(() => {
-    loadPlaces();
-  }, [selectedCategory, selectedRegion, searchQuery, onlyHiddenGems]);
+    if (!activeNearbyPlace || !places.some((place) => place.id === activeNearbyPlace.id)) {
+      setActiveNearbyPlace(places[0] || null);
+    }
+  }, [places, activeNearbyPlace]);
 
   // Initialize Map
   useEffect(() => {
@@ -125,13 +123,10 @@ export const MapView: React.FC<MapViewProps> = ({
     if (!mapInstanceRef.current) return;
     if (selectedRegion === 'Northern Morocco') {
       mapInstanceRef.current.flyTo([35.175, -5.26], 12);
-      setUserLocation([35.1695, -5.2625]);
     } else if (selectedRegion === 'Marrakech') {
       mapInstanceRef.current.flyTo([31.625, -7.99], 13);
-      setUserLocation([31.6248, -7.9984]);
     } else if (selectedRegion === 'Santorini') {
       mapInstanceRef.current.flyTo([36.435, 25.41], 12);
-      setUserLocation([36.4326, 25.4228]);
     }
   }, [selectedRegion]);
 
@@ -194,35 +189,23 @@ export const MapView: React.FC<MapViewProps> = ({
     if (tracesLayerRef.current) {
       tracesLayerRef.current.clearLayers();
       if (showCrowdHeatmap) {
-        // Draw simulated crowdsourced path trails along Akchour & Chefchaouen
-        const sampleTracePolyline1 = L.polyline(
-          [
-            [35.1689, -5.2633],
-            [35.1682, -5.261],
-            [35.1675, -5.258],
-            [35.1668, -5.2539],
-          ],
-          { color: '#38bdf8', weight: 4, opacity: 0.75, dashArray: '6, 6' }
-        ).bindTooltip(
-          isAr ? 'مسار مجتمعي مكتشف (درب بوزعافر)' : 'Crowdsourced Trail: Bouzaafar Sunset Route',
-          { sticky: true }
-        );
-
-        const sampleTracePolyline2 = L.polyline(
-          [
-            [35.2415, -5.1742],
-            [35.2392, -5.1764],
-            [35.2341, -5.1798],
-            [35.228, -5.184],
-          ],
-          { color: '#10b981', weight: 5, opacity: 0.8 }
-        ).bindTooltip(
-          isAr ? 'مسار مجتمعي حي: وادي أقشور وقنطرة ربي' : 'Active Community Trail: Akchour River Walk',
-          { sticky: true }
-        );
-
-        tracesLayerRef.current.addLayer(sampleTracePolyline1);
-        tracesLayerRef.current.addLayer(sampleTracePolyline2);
+        const coordinates = realTraces.map((trace) => trace.coordinates);
+        if (coordinates.length > 1) {
+          tracesLayerRef.current.addLayer(
+            L.polyline(coordinates, { color: '#38bdf8', weight: 4, opacity: 0.75 })
+              .bindTooltip(isAr ? 'مسارات حقيقية من المجتمع' : 'Real community traces', { sticky: true })
+          );
+        }
+        coordinates.forEach((coordinate) => {
+          tracesLayerRef.current?.addLayer(
+            L.circleMarker(coordinate, {
+              radius: 4,
+              color: '#10b981',
+              fillColor: '#10b981',
+              fillOpacity: 0.8,
+            })
+          );
+        });
       }
     }
 
@@ -280,7 +263,25 @@ export const MapView: React.FC<MapViewProps> = ({
 
       markersRef.current.push(marker);
     });
-  }, [places, activeNearbyPlace, userLocation, showCrowdHeatmap, isAr]);
+  }, [places, activeNearbyPlace, userLocation, showCrowdHeatmap, realTraces, isAr]);
+
+  const handleToggleTraces = async () => {
+    if (showCrowdHeatmap) {
+      setShowCrowdHeatmap(false);
+      return;
+    }
+    setTracesLoading(true);
+    setTracesError(null);
+    try {
+      const summary = await fetchTracesSummary();
+      setRealTraces(summary.recent.map((trace) => ({ coordinates: trace.coordinates })));
+      setShowCrowdHeatmap(true);
+    } catch (error) {
+      setTracesError(error instanceof Error ? error.message : 'Failed to load traces');
+    } finally {
+      setTracesLoading(false);
+    }
+  };
 
   const handleRecenter = () => {
     if (mapInstanceRef.current) {
@@ -383,7 +384,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
         {/* Heatmap Trail Toggle */}
         <button
-          onClick={() => setShowCrowdHeatmap(!showCrowdHeatmap)}
+            onClick={() => void handleToggleTraces()}
           className={`w-10 h-10 rounded-2xl shadow-lg border flex items-center justify-center transition active:scale-95 ${
             showCrowdHeatmap
               ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/25'
@@ -391,8 +392,13 @@ export const MapView: React.FC<MapViewProps> = ({
           }`}
           title={isAr ? 'عرض مسارات المجتمع الحية' : 'Toggle Crowdsourced GPS Trails'}
         >
-          <Layers className="w-5 h-5" />
+          <Layers className={`w-5 h-5 ${tracesLoading ? 'animate-pulse' : ''}`} />
         </button>
+        {tracesError && (
+          <div className="max-w-[180px] rounded-xl bg-rose-50 px-2.5 py-2 text-[10px] font-bold text-rose-700 shadow-lg">
+            {isAr ? 'تعذر تحميل المسارات الحقيقية' : 'Could not load real traces'}
+          </div>
+        )}
 
         {/* Passive GPS Opt-in Status Indicator (Feature 4) */}
         <button
@@ -510,6 +516,13 @@ export const MapView: React.FC<MapViewProps> = ({
                 {t.ratePlace}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {places.length === 0 && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="rounded-2xl bg-white/95 px-5 py-4 text-center text-xs font-bold text-slate-600 shadow-xl border border-slate-200">
+            {isAr ? 'لا توجد أماكن متاحة بهذه الفلاتر' : 'No places match these filters'}
           </div>
         </div>
       )}

@@ -18,8 +18,7 @@ import {
   Radio
 } from 'lucide-react';
 import { Place, PlaceCategory } from '../types';
-import { fetchPlaces, fetchAiMemoryInsights } from '../services/api';
-import { SEED_PLACES } from '../data/mockData';
+import { AiMemoryInsights, fetchPlaces, fetchAiMemoryInsights } from '../services/api';
 import { NorthernMoroccoBanner } from './NorthernMoroccoBanner';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
@@ -47,21 +46,32 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   language = 'en',
   currency = 'MAD',
 }) => {
-  const [places, setPlaces] = useState<Place[]>(SEED_PLACES);
+  const [places, setPlaces] = useState<Place[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'hidden_gems' | 'accommodations' | 'tourist' | 'emergency'>('all');
-  const [insights, setInsights] = useState<any>(null);
+  const [insights, setInsights] = useState<AiMemoryInsights | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
 
+  const loadExploreData = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const [loadedPlaces, loadedInsights] = await Promise.all([fetchPlaces(), fetchAiMemoryInsights()]);
+      setPlaces(loadedPlaces);
+      setInsights(loadedInsights);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to load explore data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchPlaces().then((res) => {
-      if (res && res.length > 0) setPlaces(res);
-    });
-    fetchAiMemoryInsights().then((data) => {
-      if (data) setInsights(data);
-    });
+    void loadExploreData();
   }, []);
 
   const filteredPlaces = places.filter((p) => {
@@ -80,6 +90,20 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
         onExploreRegion={() => onOpenMapToRegion('Northern Morocco')}
         language={language}
       />
+
+      {isLoading && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-xs font-bold text-slate-500">
+          {isAr ? 'جاري تحميل الاستكشاف...' : 'Loading real discoveries...'}
+        </div>
+      )}
+      {loadError && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-bold text-rose-800">
+          <span>{isAr ? 'تعذر تحميل بيانات الاستكشاف' : 'Could not load explore data'}</span>
+          <button onClick={() => void loadExploreData()} className="rounded-lg bg-rose-600 px-3 py-1.5 text-white">
+            {isAr ? 'إعادة المحاولة' : 'Retry'}
+          </button>
+        </div>
+      )}
 
       {/* Community Memory Engine Stats Card: Feature 1 */}
       <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -159,6 +183,11 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
       </div>
 
       {/* Place Cards Grid: Feature 1 & 2 */}
+      {!isLoading && !loadError && filteredPlaces.length === 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-500">
+          {isAr ? 'لا توجد أماكن متاحة حالياً.' : 'No places are available right now.'}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filteredPlaces.map((place) => {
           const isSaved = savedPlaceIds.includes(place.id);

@@ -10,8 +10,8 @@ import {
   Plus
 } from 'lucide-react';
 import { Place } from './types';
-import { SEED_PLACES } from './data/mockData';
 import { fetchPlaces } from './services/api';
+import { supabase } from './lib/supabase';
 
 // Components
 import { HomeScreen } from './components/HomeScreen';
@@ -33,11 +33,19 @@ import { AuthFlowModal, AuthScreenType } from './components/AuthFlowModal';
 import { AIIcon } from './components/AIIcon';
 
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
+type CurrentUser = {
+  name: string;
+  email: string;
+  avatar: string;
+  isLoggedIn: boolean;
+};
 
 export default function App() {
   // Navigation & View State - Default to 'home' to show the exact home page requested
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
-  const [places, setPlaces] = useState<Place[]>(SEED_PLACES);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(true);
+  const [placesError, setPlacesError] = useState<string | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [activeNavDestination, setActiveNavDestination] = useState<Place | null>(null);
 
@@ -52,9 +60,9 @@ export default function App() {
   const [authInitialScreen, setAuthInitialScreen] = useState<AuthScreenType>('welcome');
 
   // User Settings & Profile
-  const [currentUser, setCurrentUser] = useState({
-    name: 'Ahmed Benali',
-    email: 'ahmed@mysindbad.ai',
+  const [currentUser, setCurrentUser] = useState<CurrentUser>({
+    name: '',
+    email: '',
     avatar: '🧔',
     isLoggedIn: false,
   });
@@ -80,11 +88,46 @@ export default function App() {
     document.documentElement.lang = language;
   }, [language, isAr]);
 
-  // Load backend places on mount
+  const loadPlaces = async () => {
+    setPlacesLoading(true);
+    setPlacesError(null);
+    try {
+      setPlaces(await fetchPlaces());
+    } catch (error) {
+      setPlacesError(error instanceof Error ? error.message : 'Failed to load places');
+    } finally {
+      setPlacesLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchPlaces().then((res) => {
-      if (res && res.length > 0) setPlaces(res);
+    void loadPlaces();
+  }, []);
+
+  useEffect(() => {
+    const applySession = (session: { user?: { email?: string; user_metadata?: Record<string, unknown> } } | null) => {
+      const user = session?.user;
+      if (!user) {
+        setCurrentUser({ name: '', email: '', avatar: '🧔', isLoggedIn: false });
+        return;
+      }
+      const metadata = user.user_metadata || {};
+      setCurrentUser({
+        name: typeof metadata.full_name === 'string' && metadata.full_name.trim()
+          ? metadata.full_name
+          : user.email?.split('@')[0] || 'Traveler',
+        email: user.email || '',
+        avatar: typeof metadata.avatar_url === 'string' && metadata.avatar_url ? metadata.avatar_url : '🧔',
+        isLoggedIn: true,
+      });
+    };
+
+    void supabase.auth.getSession().then(({ data }) => applySession(data.session));
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
     });
+
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
   const handleToggleSave = (placeId: string) => {
@@ -130,6 +173,19 @@ export default function App() {
 
   return (
     <div className={`min-h-screen bg-slate-100 flex flex-col font-sans ${isAr ? 'rtl' : 'ltr'}`}>
+      {placesLoading && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg">
+          {isAr ? 'جاري تحميل الأماكن...' : 'Loading places...'}
+        </div>
+      )}
+      {placesError && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-800 shadow-lg border border-rose-200">
+          <span>{isAr ? 'تعذر تحميل الأماكن' : 'Could not load places'}</span>
+          <button onClick={() => void loadPlaces()} className="rounded-lg bg-rose-600 px-2.5 py-1 text-white">
+            {isAr ? 'إعادة المحاولة' : 'Retry'}
+          </button>
+        </div>
+      )}
       {/* Active Tab Router */}
       <main className="flex-1 relative overflow-hidden">
         {/* 1. HOME SCREEN: Exactly matches the uploaded photo */}
@@ -196,6 +252,7 @@ export default function App() {
             </div>
 
             <MapView
+              places={places}
               onSelectPlace={(p) => setSelectedPlace(p)}
               onStartRoute={(p) => setActiveNavDestination(p)}
               onOpenMultiStopPlanner={() => setActiveTab('trips')}
