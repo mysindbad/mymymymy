@@ -110,13 +110,12 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     }
     setIsLoading(true);
     setStatusMessage(null);
-    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
     setIsLoading(false);
     if (error) {
       setStatusMessage(error.message);
       return;
     }
-    if (data.user) completeAuth(data.user);
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {

@@ -360,7 +360,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           </div>
 
           {/* Real route geometry from OSRM rendered by Leaflet */}
-          <div ref={routeMapRef} className="relative flex-1 bg-slate-950 overflow-hidden" />
+          <div ref={routeMapRef} className="relative flex-1 bg-slate-950 overflow-hidden">
 
             {/* Speed & Speed Limit Widget */}
             <div className="absolute top-4 left-4 rtl:left-auto rtl:right-4 z-20 flex flex-col items-center bg-slate-900/90 backdrop-blur-md rounded-2xl p-2.5 border border-slate-800 shadow-xl">
@@ -446,6 +446,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                 ))}
               </div>
             )}
+        </div>
         </div>
       )}
 

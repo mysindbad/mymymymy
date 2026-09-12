@@ -253,6 +253,7 @@ export default function App() {
 
             <MapView
               places={places}
+              onPlacesChange={setPlaces}
               onSelectPlace={(p) => setSelectedPlace(p)}
               onStartRoute={(p) => setActiveNavDestination(p)}
               onOpenMultiStopPlanner={() => setActiveTab('trips')}

@@ -29,6 +29,7 @@ import { RatePlaceModal } from './RatePlaceModal';
 
 interface MapViewProps {
   places: Place[];
+  onPlacesChange: React.Dispatch<React.SetStateAction<Place[]>>;
   onSelectPlace: (place: Place) => void;
   onStartRoute: (place: Place) => void;
   onOpenMultiStopPlanner: () => void;
@@ -39,6 +40,7 @@ interface MapViewProps {
 
 export const MapView: React.FC<MapViewProps> = ({
   places,
+  onPlacesChange,
   onSelectPlace,
   onStartRoute,
   onOpenMultiStopPlanner,
@@ -532,7 +534,7 @@ export const MapView: React.FC<MapViewProps> = ({
         isOpen={isAddPlaceOpen}
         onClose={() => setIsAddPlaceOpen(false)}
         onPlaceAdded={(newP) => {
-          setPlaces((prev) => [newP, ...prev]);
+          onPlacesChange((prev) => [newP, ...prev]);
           setActiveNearbyPlace(newP);
         }}
         initialCoordinates={userLocation}
@@ -557,7 +559,7 @@ export const MapView: React.FC<MapViewProps> = ({
         }}
         place={placeToRate}
         onReviewSuccess={(updated) => {
-          setPlaces((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          onPlacesChange((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
           setActiveNearbyPlace(updated);
         }}
         onUserEarnedXp={() => {}}
