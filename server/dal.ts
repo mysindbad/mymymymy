@@ -4,13 +4,19 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or SUPABASE_ANON_KEY');
+export let supabaseAdmin: SupabaseClient | null = null;
+if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+  supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
-export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+function getSupabaseAdmin(): SupabaseClient {
+  if (!supabaseAdmin) {
+    throw new Error('Supabase server configuration is missing');
+  }
+  return supabaseAdmin;
+}
 
 export function createUserClient(accessToken: string): SupabaseClient {
   return createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
@@ -277,7 +283,7 @@ export function createDal(accessToken?: string) {
   return {
     places: {
       async getAll(filters: { category?: string; region?: string; query?: string; hiddenGemsOnly?: boolean; minRating?: number } = {}) {
-        let query = supabaseAdmin.from('places').select('*, reviews(*)').order('created_at', { ascending: false });
+        let query = getSupabaseAdmin().from('places').select('*, reviews(*)').order('created_at', { ascending: false });
         if (filters.category && filters.category !== 'All') query = query.eq('category', filters.category);
         if (filters.region && filters.region !== 'All') query = query.ilike('region', filters.region);
         if (filters.hiddenGemsOnly) query = query.eq('is_under_documented_gem', true);
@@ -291,7 +297,7 @@ export function createDal(accessToken?: string) {
         return (data || []).map(mapPlace);
       },
       async getById(id: string) {
-        const { data, error } = await supabaseAdmin.from('places').select('*, reviews(*)').eq('id', id).maybeSingle();
+        const { data, error } = await getSupabaseAdmin().from('places').select('*, reviews(*)').eq('id', id).maybeSingle();
         if (error) throwMappedSupabaseError(error);
         return data ? mapPlace(data) : null;
       },
@@ -350,7 +356,7 @@ export function createDal(accessToken?: string) {
         return { review: mapReview(data), place };
       },
       async checkin(placeId: string) {
-        const { data, error } = await supabaseAdmin.rpc('increment_place_checkins', { place_id_input: placeId });
+        const { data, error } = await getSupabaseAdmin().rpc('increment_place_checkins', { place_id_input: placeId });
         if (error) throwMappedSupabaseError(error);
         return { checkInsCount: data };
       },
@@ -375,15 +381,15 @@ export function createDal(accessToken?: string) {
         return { success: true };
       },
       async getSummary() {
-        const { data, error } = await supabaseAdmin.from('traces').select('*').order('timestamp', { ascending: false }).limit(50);
+        const { data, error } = await getSupabaseAdmin().from('traces').select('*').order('timestamp', { ascending: false }).limit(50);
         if (error) throwMappedSupabaseError(error);
         return { totalTraces: data?.length || 0, recent: data || [] };
       },
     },
     getSummary: async () => {
       const [places, traces] = await Promise.all([
-        supabaseAdmin.from('places').select('id', { count: 'exact', head: true }),
-        supabaseAdmin.from('traces').select('id', { count: 'exact', head: true }),
+        getSupabaseAdmin().from('places').select('id', { count: 'exact', head: true }),
+        getSupabaseAdmin().from('traces').select('id', { count: 'exact', head: true }),
       ]);
       if (places.error) throwMappedSupabaseError(places.error);
       if (traces.error) throwMappedSupabaseError(traces.error);
