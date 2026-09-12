@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, MapPin, Building2, Landmark, Utensils, AlertTriangle, Tent, Plus, Check, Loader2, Sparkles, Navigation } from 'lucide-react';
 import { PlaceCategory, Place } from '../types';
 import { createPlace } from '../services/api';
@@ -16,7 +16,7 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
   isOpen,
   onClose,
   onPlaceAdded,
-  initialCoordinates = [35.1689, -5.2633],
+  initialCoordinates,
   language = 'en',
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
@@ -29,8 +29,8 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
   const [subCategory, setSubCategory] = useState('');
   const [region, setRegion] = useState('Northern Morocco');
   const [area, setArea] = useState('Chefchaouen');
-  const [lat, setLat] = useState(initialCoordinates[0].toString());
-  const [lng, setLng] = useState(initialCoordinates[1].toString());
+  const [lat, setLat] = useState(initialCoordinates?.[0]?.toString() || '');
+  const [lng, setLng] = useState(initialCoordinates?.[1]?.toString() || '');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
   const [formationInfo, setFormationInfo] = useState('');
@@ -42,6 +42,17 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialCoordinates) {
+      setLat(initialCoordinates[0].toString());
+      setLng(initialCoordinates[1].toString());
+    } else {
+      setLat('');
+      setLng('');
+    }
+  }, [isOpen, initialCoordinates]);
 
   // Preset photo suggestions by category
   const defaultPhotos: Record<PlaceCategory, string> = {
@@ -63,9 +74,7 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
           setLng(pos.coords.longitude.toFixed(5));
         },
         () => {
-          // fallback default
-          setLat('35.1689');
-          setLng('-5.2633');
+          setErrorMessage(isAr ? 'تعذر الوصول إلى موقعك الحالي' : 'Could not access your current location');
         }
       );
     }
