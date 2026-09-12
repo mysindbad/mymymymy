@@ -1,12 +1,8 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
@@ -14,8 +10,8 @@ const PORT = 3000;
 app.use(express.json({ limit: '10mb' }));
 
 // Database Paths
-const PLACES_FILE = path.join(__dirname, 'server', 'data', 'places.json');
-const TRACES_FILE = path.join(__dirname, 'server', 'data', 'traces.json');
+const PLACES_FILE = path.join(process.cwd(), 'server', 'data', 'places.json');
+const TRACES_FILE = path.join(process.cwd(), 'server', 'data', 'traces.json');
 
 // Helper to safely read JSON
 function readJsonFile<T>(filePath: string, fallback: T): T {
