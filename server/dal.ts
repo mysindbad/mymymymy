@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -9,6 +11,109 @@ if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
   supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+type SeedPlace = {
+  id: string;
+  name: string;
+  arabicName?: string;
+  frenchName?: string;
+  category: string;
+  subCategory?: string;
+  region: string;
+  area: string;
+  coordinates: Coordinates;
+  address: string;
+  photos?: string[];
+  description: string;
+  formationInfo?: string;
+  rating?: number;
+  reviewCount?: number;
+  ratingsBreakdown?: Record<string, unknown>;
+  features?: Record<string, unknown>;
+  priceLevel?: string;
+  openingHours?: string;
+  contactPhone?: string;
+  isUnderDocumentedGem?: boolean;
+  source?: string;
+  ownerVerified?: boolean;
+  businessOwnerName?: string;
+  checkInsCount?: number;
+  aiConfidenceScore?: number;
+  lastActivityTimestamp?: string;
+  rankText?: string;
+  reviews?: Array<Record<string, unknown>>;
+};
+
+type SeedTrace = {
+  id: string;
+  timestamp: string;
+  coordinates: [number, number];
+  mode: string;
+  speedKmh?: number;
+  nearPlaceId?: string;
+  region?: string;
+};
+
+function loadSeedData<T>(fileName: string): T[] {
+  try {
+    const filePath = path.join(process.cwd(), 'server', 'data', fileName);
+    return JSON.parse(readFileSync(filePath, 'utf8')) as T[];
+  } catch (error) {
+    console.warn(`Unable to load bundled seed data from ${fileName}`, error);
+    return [];
+  }
+}
+
+const seedPlaces = loadSeedData<SeedPlace>('places.json');
+const seedTraces = loadSeedData<SeedTrace>('traces.json');
+
+function seedPlaceMatches(place: SeedPlace, filters: {
+  category?: string;
+  region?: string;
+  query?: string;
+  hiddenGemsOnly?: boolean;
+  minRating?: number;
+}) {
+  if (filters.category && filters.category !== 'All' && place.category !== filters.category) return false;
+  if (filters.region && filters.region !== 'All' && place.region.toLowerCase() !== filters.region.toLowerCase()) return false;
+  if (filters.hiddenGemsOnly && !place.isUnderDocumentedGem) return false;
+  if (filters.minRating !== undefined && (place.rating || 0) < filters.minRating) return false;
+  if (filters.query?.trim()) {
+    const term = filters.query.trim().toLowerCase();
+    const searchable = [
+      place.name,
+      place.arabicName,
+      place.frenchName,
+      place.area,
+      place.description,
+      place.subCategory,
+    ].filter(Boolean).join(' ').toLowerCase();
+    if (!searchable.includes(term)) return false;
+  }
+  return true;
+}
+
+function mapSeedPlace(place: SeedPlace): any {
+  return {
+    ...place,
+    photos: place.photos || [],
+    rating: Number(place.rating || 0),
+    reviewCount: place.reviewCount || 0,
+    checkInsCount: place.checkInsCount || 0,
+    reviews: place.reviews || [],
+    distanceKm: null,
+  };
+}
+
+function getSeedPlaces(filters: {
+  category?: string;
+  region?: string;
+  query?: string;
+  hiddenGemsOnly?: boolean;
+  minRating?: number;
+} = {}) {
+  return seedPlaces.filter((place) => seedPlaceMatches(place, filters)).map(mapSeedPlace);
 }
 
 function getSupabaseAdmin(): SupabaseClient {
@@ -283,6 +388,7 @@ export function createDal(accessToken?: string) {
   return {
     places: {
       async getAll(filters: { category?: string; region?: string; query?: string; hiddenGemsOnly?: boolean; minRating?: number } = {}) {
+        if (!supabaseAdmin) return getSeedPlaces(filters);
         let query = getSupabaseAdmin().from('places').select('*, reviews(*)').order('created_at', { ascending: false });
         if (filters.category && filters.category !== 'All') query = query.eq('category', filters.category);
         if (filters.region && filters.region !== 'All') query = query.ilike('region', filters.region);
@@ -293,12 +399,19 @@ export function createDal(accessToken?: string) {
           query = query.or(`name.ilike.%${term}%,arabic_name.ilike.%${term}%,french_name.ilike.%${term}%,area.ilike.%${term}%,description.ilike.%${term}%,sub_category.ilike.%${term}%`);
         }
         const { data, error } = await query;
-        if (error) throwMappedSupabaseError(error);
+        if (error) {
+          console.warn('Supabase places read failed; serving bundled seed data', error.message);
+          return getSeedPlaces(filters);
+        }
         return (data || []).map(mapPlace);
       },
       async getById(id: string) {
+        if (!supabaseAdmin) return getSeedPlaces().find((place) => place.id === id) || null;
         const { data, error } = await getSupabaseAdmin().from('places').select('*, reviews(*)').eq('id', id).maybeSingle();
-        if (error) throwMappedSupabaseError(error);
+        if (error) {
+          console.warn('Supabase place read failed; serving bundled seed data', error.message);
+          return getSeedPlaces().find((place) => place.id === id) || null;
+        }
         return data ? mapPlace(data) : null;
       },
       async create(input: unknown) {
@@ -381,18 +494,29 @@ export function createDal(accessToken?: string) {
         return { success: true };
       },
       async getSummary() {
+        if (!supabaseAdmin) {
+          return { totalTraces: seedTraces.length, recent: seedTraces };
+        }
         const { data, error } = await getSupabaseAdmin().from('traces').select('*').order('timestamp', { ascending: false }).limit(50);
-        if (error) throwMappedSupabaseError(error);
+        if (error) {
+          console.warn('Supabase traces read failed; serving bundled seed data', error.message);
+          return { totalTraces: seedTraces.length, recent: seedTraces };
+        }
         return { totalTraces: data?.length || 0, recent: data || [] };
       },
     },
     getSummary: async () => {
+      if (!supabaseAdmin) {
+        return { totalPlaces: seedPlaces.length, totalTraces: seedTraces.length };
+      }
       const [places, traces] = await Promise.all([
         getSupabaseAdmin().from('places').select('id', { count: 'exact', head: true }),
         getSupabaseAdmin().from('traces').select('id', { count: 'exact', head: true }),
       ]);
-      if (places.error) throwMappedSupabaseError(places.error);
-      if (traces.error) throwMappedSupabaseError(traces.error);
+      if (places.error || traces.error) {
+        console.warn('Supabase summary read failed; serving bundled seed data', places.error || traces.error);
+        return { totalPlaces: seedPlaces.length, totalTraces: seedTraces.length };
+      }
       return { totalPlaces: places.count || 0, totalTraces: traces.count || 0 };
     },
   };
