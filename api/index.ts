@@ -1,8 +1,13 @@
-let appPromise = import('../server.ts').then((module) => module.default);
+let appPromise: Promise<any> | null = null;
+
+function getApp() {
+  appPromise ??= import('../server.ts').then((module) => module.default);
+  return appPromise;
+}
 
 export default async function handler(req: any, res: any) {
   try {
-    const app = await appPromise;
+    const app = await getApp();
     return app(req, res);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
