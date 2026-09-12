@@ -2,7 +2,13 @@
   "version": 2,
   "installCommand": "npm install --no-audit --no-fund",
   "builds": [
-    { "src": "api/index.ts", "use": "@vercel/node" },
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server.ts", "server/**/*.ts"]
+      }
+    },
     {
       "src": "package.json",
       "use": "@vercel/static-build",
