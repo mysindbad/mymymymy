@@ -33,6 +33,7 @@ import { AuthFlowModal, AuthScreenType } from './components/AuthFlowModal';
 import { AIIcon } from './components/AIIcon';
 
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
+type ExploreView = 'feed' | 'map';
 type CurrentUser = {
   name: string;
   email: string;
@@ -48,6 +49,9 @@ export default function App() {
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [activeNavDestination, setActiveNavDestination] = useState<Place | null>(null);
+  const [exploreView, setExploreView] = useState<ExploreView>('feed');
+  const [exploreQuery, setExploreQuery] = useState('');
+  const [exploreCategory, setExploreCategory] = useState('All');
 
   // Modals
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -149,19 +153,12 @@ export default function App() {
   };
 
   const handleDestinationSelect = (name: string) => {
-    // Find matching place in database or default to Chefchaouen
-    const matched = places.find(
-      (p) =>
-        p.name.toLowerCase().includes(name.toLowerCase()) ||
-        p.area.toLowerCase().includes(name.toLowerCase()) ||
-        (p.arabicName && p.arabicName.includes(name))
-    );
-    if (matched) {
-      setSelectedPlace(matched);
-    } else {
-      // Switch to explore map
-      setActiveTab('explore');
-    }
+    const query = name.trim();
+    if (!query) return;
+    setExploreQuery(query);
+    setExploreCategory('All');
+    setExploreView('feed');
+    setActiveTab('explore');
   };
 
   const savedPlacesList = places.filter((p) => savedPlaceIds.includes(p.id));
@@ -217,50 +214,57 @@ export default function App() {
 
         {/* 2. EXPLORE & LIVE MAP TAB */}
         {activeTab === 'explore' && (
-          <div className="w-full h-full">
-            {/* Top header bar for explore tab */}
-            <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setActiveTab('home')}
-                  className="px-2.5 py-1 rounded-xl bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
-                >
+          <div className="w-full h-full overflow-y-auto">
+            <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <button onClick={() => setActiveTab('home')} className="px-2.5 py-1 rounded-xl bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200 transition shrink-0">
                   ← {isAr ? 'الرئيسية' : 'Home'}
                 </button>
-                <h2 className="text-sm font-bold text-slate-900">
-                  {isAr ? 'الخريطة التفاعلية الحية' : 'Live Interactive Map'}
+                <h2 className="text-sm font-bold text-slate-900 truncate">
+                  {exploreView === 'feed' ? (isAr ? 'الاستكشاف وذاكرة المجتمع' : 'Explore & AI Memory') : (isAr ? 'الخريطة التفاعلية الحية' : 'Live Interactive Map')}
                 </h2>
               </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setIsPassiveModalOpen(true)}
-                  className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 flex items-center gap-1"
-                >
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => setExploreView(exploreView === 'feed' ? 'map' : 'feed')} className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 text-[11px] font-bold border border-slate-200">
+                  {exploreView === 'feed' ? (isAr ? 'الخريطة' : 'Map') : (isAr ? 'الاستكشاف' : 'Discoveries')}
+                </button>
+                <button onClick={() => setIsPassiveModalOpen(true)} className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 flex items-center gap-1">
                   <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
                   <span>{isPassiveOptedIn ? 'GPS Active' : 'GPS Off'}</span>
                 </button>
-
-                <button
-                  onClick={() => setIsAddPlaceOpen(true)}
-                  className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-xs flex items-center gap-1"
-                >
+                <button onClick={() => setIsAddPlaceOpen(true)} className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-xs flex items-center gap-1">
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>{isAr ? 'إضافة مكان' : 'Add Place'}</span>
+                  <span className="hidden sm:inline">{isAr ? 'إضافة مكان' : 'Add Place'}</span>
                 </button>
               </div>
             </div>
-
-            <MapView
-              places={places}
-              onPlacesChange={setPlaces}
-              onSelectPlace={(p) => setSelectedPlace(p)}
-              onStartRoute={(p) => setActiveNavDestination(p)}
-              onOpenMultiStopPlanner={() => setActiveTab('trips')}
-              savedPlaceIds={savedPlaceIds}
-              language={language}
-              currency={currency}
-            />
+            {exploreView === 'feed' ? (
+              <ExploreFeed
+                initialQuery={exploreQuery}
+                onSelectPlace={(p) => setSelectedPlace(p)}
+                onStartRoute={(p) => setActiveNavDestination(p)}
+                onOpenAddModal={() => setIsAddPlaceOpen(true)}
+                onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
+                onOpenMapToRegion={() => setExploreView('map')}
+                savedPlaceIds={savedPlaceIds}
+                onToggleSave={handleToggleSave}
+                language={language}
+                currency={currency}
+              />
+            ) : (
+              <MapView
+                places={places}
+                initialQuery={exploreQuery}
+                initialCategory={exploreCategory}
+                onPlacesChange={setPlaces}
+                onSelectPlace={(p) => setSelectedPlace(p)}
+                onStartRoute={(p) => setActiveNavDestination(p)}
+                onOpenMultiStopPlanner={() => setActiveTab('trips')}
+                savedPlaceIds={savedPlaceIds}
+                language={language}
+                currency={currency}
+              />
+            )}
           </div>
         )}
 
