@@ -1,11 +1,16 @@
 {
   "version": 2,
+  "installCommand": "npm install --no-audit --no-fund",
   "builds": [
     { "src": "api/index.ts", "use": "@vercel/node" },
     {
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist", "buildCommand": "npm run build" }
+      "config": {
+        "distDir": "dist",
+        "buildCommand": "npm run build",
+        "installCommand": "npm install --no-audit --no-fund"
+      }
     }
   ],
   "routes": [
