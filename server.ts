@@ -116,6 +116,18 @@ function textFromManeuver(maneuver: any, roadName: string, language: string, des
   return phrases[type] || (language === 'ar' ? 'تابع المسار' : 'Follow the route');
 }
 
+function getRoutingEndpoint(travelMode: unknown) {
+  if (!['driving', 'walking', 'transit', 'taxi'].includes(String(travelMode))) {
+    throw new DataValidationError('travelMode must be driving, walking, transit, or taxi');
+  }
+
+  // OSRM-compatible foot routing is hosted separately; the other modes use the road network.
+  if (travelMode === 'walking') {
+    return 'https://routing.openstreetmap.de/routed-foot/route/v1/driving';
+  }
+  return 'https://router.project-osrm.org/route/v1/driving';
+}
+
 function navigationIcon(maneuver: any): 'straight' | 'left' | 'right' | 'arrive' {
   if (maneuver?.type === 'arrive') return 'arrive';
   if (maneuver?.modifier?.includes('left')) return 'left';
@@ -275,7 +287,11 @@ app.post('/api/ai/navigation-guidance', async (req, res, next) => {
       steps,
       geometry: selected.geometry,
       trafficCondition: 'unavailable',
-      aiSummary: language === 'ar' ? 'تم حساب المسار من موقعك الحالي عبر خدمة الملاحة.' : 'Route calculated from your current location.',
+      aiSummary: travelMode === 'transit'
+         ? (language === 'ar'
+           ? 'تم حساب تقدير الوصول عبر شبكة الطرق؛ لا تتوفر جداول النقل العام في مزود الملاحة الحالي.'
+           : 'This is a road-access estimate; public-transit timetables are not available from the current routing provider.')
+         : (language === 'ar' ? 'تم حساب المسار المناسب لطريقة السفر المختارة من موقعك الحالي.' : 'Route calculated for the selected travel mode from your current location.'),
     });
   } catch (error) {
     next(error);
