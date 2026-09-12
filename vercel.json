@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "framework": "vite",
+  "installCommand": "npm install --no-audit --no-fund",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist"
+}

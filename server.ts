@@ -342,4 +342,8 @@ async function startServer() {
   });
 }
 
-void startServer();
+export default app;
+
+if (process.env.VERCEL !== '1') {
+  void startServer();
+}
