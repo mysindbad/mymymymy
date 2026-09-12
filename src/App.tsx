@@ -34,6 +34,8 @@ import { AIIcon } from './components/AIIcon';
 
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
 type ExploreView = 'feed' | 'map';
+const PASSIVE_GPS_CONSENT_KEY = 'sindbad_passive_gps_consent';
+
 type CurrentUser = {
   name: string;
   email: string;
@@ -72,7 +74,13 @@ export default function App() {
   });
   const [language, setLanguage] = useState<SupportedLanguage>('en');
   const [currency, setCurrency] = useState<string>('MAD');
-  const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(true);
+  const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(PASSIVE_GPS_CONSENT_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [userXp, setUserXp] = useState<number>(320);
   const [savedPlaceIds, setSavedPlaceIds] = useState<string[]>(() => {
     try {
@@ -82,6 +90,15 @@ export default function App() {
       return ['akchour-bridge', 'riad-el-pueblo'];
     }
   });
+
+  const handlePassiveOptInChange = (optedIn: boolean) => {
+    setIsPassiveOptedIn(optedIn);
+    try {
+      localStorage.setItem(PASSIVE_GPS_CONSENT_KEY, String(optedIn));
+    } catch {
+      // Storage may be unavailable in private browsing; keep the current session state.
+    }
+  };
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
@@ -250,6 +267,8 @@ export default function App() {
                 onToggleSave={handleToggleSave}
                 language={language}
                 currency={currency}
+                isPassiveOptedIn={isPassiveOptedIn}
+                onPassiveOptInChange={handlePassiveOptInChange}
               />
             ) : (
               <MapView
@@ -510,7 +529,7 @@ export default function App() {
         isOpen={isPassiveModalOpen}
         onClose={() => setIsPassiveModalOpen(false)}
         isOptedIn={isPassiveOptedIn}
-        onToggleOptIn={setIsPassiveOptedIn}
+        onToggleOptIn={handlePassiveOptInChange}
         language={language}
       />
     </div>
