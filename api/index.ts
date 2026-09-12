@@ -23,6 +23,7 @@ export default async function handler(req: any, res: any) {
               ? 'missing-supabase-config'
               : 'other-module-error';
     console.error('API_BOOT_FAILURE', detail, message);
-    return res.status(500).json({ error: 'Server initialization failed', category: 'module-init', detail });
+    const safeMessage = message.replace(/https?:\/\/[^\s]+/gi, '[url]').replace(/eyJ[A-Za-z0-9._-]+/g, '[secret]').replace(/[A-Za-z0-9_-]{32,}/g, '[token]').slice(0, 240);
+    return res.status(500).json({ error: 'Server initialization failed', category: 'module-init', detail, message: safeMessage });
   }
 }
