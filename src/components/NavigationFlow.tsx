@@ -82,6 +82,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const loadRoute = async (mode: TravelMode) => {
     setIsLoadingRoute(true);
     setRouteError(null);
+    setRouteData(null);
     try {
       const data = await fetchNavigationGuidance(destination.id, mode, language, userLocation[0], userLocation[1]);
       setRouteData(data);
@@ -226,10 +227,10 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             </label>
             <div className="grid grid-cols-4 gap-2">
               {[
-                { mode: 'driving' as const, label: t.modes.driving, icon: Car, time: '12 min' },
-                { mode: 'walking' as const, label: t.modes.walking, icon: Footprints, time: '38 min' },
-                { mode: 'transit' as const, label: t.modes.transit, icon: Bus, time: '20 min' },
-                { mode: 'taxi' as const, label: t.modes.taxi, icon: Car, time: '11 min' },
+                { mode: 'driving' as const, label: t.modes.driving, icon: Car },
+                { mode: 'walking' as const, label: t.modes.walking, icon: Footprints },
+                { mode: 'transit' as const, label: t.modes.transit, icon: Bus },
+                { mode: 'taxi' as const, label: t.modes.taxi, icon: Car },
               ].map((item) => {
                 const isSelected = travelMode === item.mode;
                 const Icon = item.icon;
@@ -245,7 +246,11 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                   >
                     <Icon className="w-4 h-4" />
                     <span className="text-[11px] whitespace-nowrap">{item.label}</span>
-                    <span className="text-[10px] text-slate-300 font-normal">{item.time}</span>
+                    <span className="text-[10px] text-slate-300 font-normal">
+                       {isSelected && routeData?.travelMode === item.mode
+                         ? (isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`)
+                         : '—'}
+                     </span>
                   </button>
                 );
               })}
