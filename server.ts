@@ -8,7 +8,7 @@ import {
   DalAuthenticationError,
   DataValidationError,
   throwMappedSupabaseError,
-} from './server/dal';
+} from './server/dal.ts';
 
 declare global {
   namespace Express {
