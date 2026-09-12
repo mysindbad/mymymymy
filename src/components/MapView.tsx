@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   Search,
@@ -36,6 +36,8 @@ interface MapViewProps {
   savedPlaceIds: string[];
   language?: SupportedLanguage;
   currency?: string;
+  initialQuery?: string;
+  initialCategory?: string;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -47,6 +49,8 @@ export const MapView: React.FC<MapViewProps> = ({
   savedPlaceIds,
   language = 'en',
   currency = 'MAD',
+  initialQuery = '',
+  initialCategory = 'All',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -57,8 +61,8 @@ export const MapView: React.FC<MapViewProps> = ({
   const isAr = language === 'ar';
 
   // State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'All');
   const [selectedRegion, setSelectedRegion] = useState<string>('Northern Morocco');
   const [onlyHiddenGems, setOnlyHiddenGems] = useState<boolean>(false);
   const [showCrowdHeatmap, setShowCrowdHeatmap] = useState<boolean>(false);
@@ -74,6 +78,23 @@ export const MapView: React.FC<MapViewProps> = ({
   const [placeToRate, setPlaceToRate] = useState<Place | null>(null);
   const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(true);
 
+  useEffect(() => {
+    setSearchQuery(initialQuery);
+    setSelectedCategory(initialCategory || 'All');
+  }, [initialQuery, initialCategory]);
+
+  const visiblePlaces = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return places.filter((place) => {
+      const matchesCategory = selectedCategory === 'All' || place.category === selectedCategory;
+      if (!matchesCategory) return false;
+      if (!query) return true;
+      return [place.name, place.area, place.arabicName, place.description, place.formationInfo]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [places, searchQuery, selectedCategory]);
+
   // Use the browser location when available; this is only a fallback.
   const [userLocation, setUserLocation] = useState<[number, number]>([35.1695, -5.2625]);
 
@@ -87,10 +108,10 @@ export const MapView: React.FC<MapViewProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!activeNearbyPlace || !places.some((place) => place.id === activeNearbyPlace.id)) {
-      setActiveNearbyPlace(places[0] || null);
+    if (!activeNearbyPlace || !visiblePlaces.some((place) => place.id === activeNearbyPlace.id)) {
+      setActiveNearbyPlace(visiblePlaces[0] || null);
     }
-  }, [places, activeNearbyPlace]);
+  }, [visiblePlaces, activeNearbyPlace]);
 
   // Initialize Map
   useEffect(() => {
@@ -229,7 +250,7 @@ export const MapView: React.FC<MapViewProps> = ({
     markersRef.current.push(userMarker);
 
     // Add Markers with Visual Distinction (Feature 2)
-    places.forEach((place) => {
+    visiblePlaces.forEach((place) => {
       const isSelected = activeNearbyPlace?.id === place.id;
       const { bg, border, iconChar } = getMarkerBadgeStyle(place.category, isSelected);
 
@@ -265,7 +286,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       markersRef.current.push(marker);
     });
-  }, [places, activeNearbyPlace, userLocation, showCrowdHeatmap, realTraces, isAr]);
+  }, [visiblePlaces, activeNearbyPlace, userLocation, showCrowdHeatmap, realTraces, isAr]);
 
   const handleToggleTraces = async () => {
     if (showCrowdHeatmap) {
