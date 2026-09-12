@@ -38,6 +38,8 @@ interface MapViewProps {
   currency?: string;
   initialQuery?: string;
   initialCategory?: string;
+  isPassiveOptedIn: boolean;
+  onPassiveOptInChange: (optedIn: boolean) => void;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -51,6 +53,8 @@ export const MapView: React.FC<MapViewProps> = ({
   currency = 'MAD',
   initialQuery = '',
   initialCategory = 'All',
+  isPassiveOptedIn,
+  onPassiveOptInChange,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -76,7 +80,6 @@ export const MapView: React.FC<MapViewProps> = ({
   const [isPassiveDataOpen, setIsPassiveDataOpen] = useState(false);
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [placeToRate, setPlaceToRate] = useState<Place | null>(null);
-  const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(true);
 
   useEffect(() => {
     setSearchQuery(initialQuery);
@@ -95,17 +98,21 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [places, searchQuery, selectedCategory]);
 
-  // Use the browser location when available; this is only a fallback.
-  const [userLocation, setUserLocation] = useState<[number, number]>([35.1695, -5.2625]);
+  // Request location only after explicit passive GPS consent. There is no static user-location fallback.
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!isPassiveOptedIn || !navigator.geolocation) {
+      setUserLocation(null);
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => setUserLocation([coords.latitude, coords.longitude]),
-      () => setUserLocation([35.1695, -5.2625]),
+      () => setUserLocation(null),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     );
-  }, []);
+  }, [isPassiveOptedIn]);
 
   useEffect(() => {
     if (!activeNearbyPlace || !visiblePlaces.some((place) => place.id === activeNearbyPlace.id)) {
@@ -232,8 +239,9 @@ export const MapView: React.FC<MapViewProps> = ({
       }
     }
 
-    // Add Live User Pulse Marker
-    const userMarkerHtml = `
+    // Add a user marker only when the browser provided a real position.
+    if (userLocation) {
+      const userMarkerHtml = `
       <div class="relative flex items-center justify-center">
         <div class="w-7 h-7 rounded-full bg-blue-500/30 pulse-location absolute"></div>
         <div class="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg relative z-10 flex items-center justify-center text-[8px] text-white font-bold">▲</div>
@@ -246,8 +254,9 @@ export const MapView: React.FC<MapViewProps> = ({
       iconAnchor: [14, 14],
     });
     const userMarker = L.marker(userLocation, { icon: userIcon }).addTo(map);
-    userMarker.bindTooltip(isAr ? 'موقعك المباشر' : 'Your Live Location', { direction: 'top' });
-    markersRef.current.push(userMarker);
+      userMarker.bindTooltip(isAr ? 'موقعك الحالي' : 'Your Current Location', { direction: 'top' });
+      markersRef.current.push(userMarker);
+    }
 
     // Add Markers with Visual Distinction (Feature 2)
     visiblePlaces.forEach((place) => {
@@ -307,7 +316,7 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   const handleRecenter = () => {
-    if (mapInstanceRef.current) {
+    if (mapInstanceRef.current && userLocation) {
       mapInstanceRef.current.flyTo(userLocation, 13, { duration: 1.2 });
     }
   };
@@ -399,7 +408,8 @@ export const MapView: React.FC<MapViewProps> = ({
       <div className="absolute right-3 rtl:right-auto rtl:left-3 top-28 z-30 flex flex-col gap-2">
         <button
           onClick={handleRecenter}
-          className="w-10 h-10 rounded-2xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:text-blue-600 transition active:scale-95"
+          disabled={!userLocation}
+          className="w-10 h-10 rounded-2xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:text-blue-600 transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
           title="Recenter Map"
         >
           <Crosshair className="w-5 h-5" />
@@ -558,7 +568,7 @@ export const MapView: React.FC<MapViewProps> = ({
           onPlacesChange((prev) => [newP, ...prev]);
           setActiveNearbyPlace(newP);
         }}
-        initialCoordinates={userLocation}
+        initialCoordinates={userLocation || undefined}
         language={language}
       />
 
@@ -567,7 +577,7 @@ export const MapView: React.FC<MapViewProps> = ({
         isOpen={isPassiveDataOpen}
         onClose={() => setIsPassiveDataOpen(false)}
         isOptedIn={isPassiveOptedIn}
-        onToggleOptIn={setIsPassiveOptedIn}
+        onToggleOptIn={onPassiveOptInChange}
         language={language}
       />
 
