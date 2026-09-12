@@ -1,6 +1,7 @@
 [
   {
     "id": "akchour-bridge-of-god",
+    "seed_data": true,
     "name": "God's Bridge & Akchour Waterfalls",
     "arabicName": "قنطرة ربي وشلالات أقشور",
     "frenchName": "Pont de Dieu et Cascades d'Akchour",
@@ -64,6 +65,7 @@
   },
   {
     "id": "riad-cherifa-chefchaouen",
+    "seed_data": true,
     "name": "Riad Cherifa",
     "arabicName": "رياض الشريفة",
     "frenchName": "Riad Cherifa",
@@ -118,6 +120,7 @@
   },
   {
     "id": "gite-rural-talassemtane",
+    "seed_data": true,
     "name": "Gîte Rural Talassemtane & Eco-Lodge",
     "arabicName": "المأوى القروي تلاسمطان",
     "frenchName": "Gîte Rural Talassemtane",
@@ -173,6 +176,7 @@
   },
   {
     "id": "restaurant-chez-hassan-akchour",
+    "seed_data": true,
     "name": "Chez Hassan Creek-side Tagines",
     "arabicName": "مطعم حسن على ضفاف الوادي",
     "frenchName": "Chez Hassan au bord de l'eau",
@@ -227,6 +231,7 @@
   },
   {
     "id": "restaurant-bab-ssour-chefchaouen",
+    "seed_data": true,
     "name": "Restaurant Bab Ssour",
     "arabicName": "مطعم باب السور",
     "frenchName": "Restaurant Bab Ssour",
@@ -281,6 +286,7 @@
   },
   {
     "id": "spanish-mosque-bouzaafar",
+    "seed_data": true,
     "name": "Spanish Mosque & Bouzaafar Lookout",
     "arabicName": "المسجد الإسباني وإطلالة بوزعافر",
     "frenchName": "Mosquée Espagnole de Chefchaouen",
@@ -333,6 +339,7 @@
   },
   {
     "id": "camping-azilan-chefchaouen",
+    "seed_data": true,
     "name": "Camping Azilan Chefchaouen",
     "arabicName": "مخيم أزيلان شفشاون",
     "frenchName": "Camping Caravaning Azilan",
@@ -388,6 +395,7 @@
   },
   {
     "id": "hopital-mohammed-v-chefchaouen",
+    "seed_data": true,
     "name": "Chefchaouen Provincial Hospital (Emergency & Trauma)",
     "arabicName": "المستشفى الإقليمي محمد الخامس شفشاون (المستعجلات)",
     "frenchName": "Hôpital Provincial Mohammed V - Urgences",
@@ -439,6 +447,7 @@
   },
   {
     "id": "gendarmerie-akchour-post",
+    "seed_data": true,
     "name": "Gendarmerie Royale & Mountain Safety Post",
     "arabicName": "مركز الدرك الملكي للإنقاذ الجبلي بأقشور",
     "frenchName": "Poste de la Gendarmerie Royale Akchour",
@@ -489,6 +498,7 @@
   },
   {
     "id": "selene-restaurant-santorini",
+    "seed_data": true,
     "name": "Selene Restaurant",
     "arabicName": "مطعم سيلين الراقي",
     "frenchName": "Restaurant Selene",
@@ -543,6 +553,7 @@
   },
   {
     "id": "hotel-royal-mansour-marrakech",
+    "seed_data": true,
     "name": "Hotel Royal Mansour",
     "arabicName": "فندق رويال منصور",
     "frenchName": "Hôtel Royal Mansour",
