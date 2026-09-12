@@ -1,7 +1,7 @@
 let appPromise: Promise<any> | null = null;
 
 function getApp() {
-  appPromise ??= import('../server.ts').then((module) => module.default);
+  appPromise ??= import('../server').then((module) => module.default);
   return appPromise;
 }
 
