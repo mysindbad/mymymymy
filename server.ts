@@ -24,13 +24,18 @@ const PORT = Number(process.env.PORT || 3000);
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+let supabaseAuth: ReturnType<typeof createClient> | null = null;
+function getSupabaseAuth() {
+  if (!supabaseAuth) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      throw new Error('Supabase auth configuration is missing');
+    }
+    supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return supabaseAuth;
 }
-
-const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
 
 let geminiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI | null {
@@ -67,13 +72,17 @@ function authMiddleware(req: Request, _res: Response, next: NextFunction) {
   const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!token) return next();
 
-  void supabaseAuth.auth.getUser(token).then(({ data, error }) => {
-    if (!error && data.user) {
-      req.user = { id: data.user.id, email: data.user.email };
-      req.accessToken = token;
-    }
+  try {
+    void getSupabaseAuth().auth.getUser(token).then(({ data, error }) => {
+      if (!error && data.user) {
+        req.user = { id: data.user.id, email: data.user.email };
+        req.accessToken = token;
+      }
+      next();
+    }).catch(() => next());
+  } catch {
     next();
-  }).catch(() => next());
+  }
 }
 
 function requireAuth(req: Request, _res: Response, next: NextFunction) {
