@@ -82,6 +82,27 @@ requirePattern('src/components/HomeScreen.tsx', [
   'Available Places',
 ]);
 
+requirePattern('src/types.ts', [
+  'seedData?: boolean',
+  'photoProvenance?: string | null',
+  'ratingProvenance?: string | null',
+  'seedRating?: number | null',
+  'seedReviewCount?: number',
+]);
+
+requirePattern('src/components/ExploreFeed.tsx', [
+  'place.seedData',
+  'Curated baseline',
+  'بيانات تأسيسية منسّقة',
+]);
+
+requirePattern('src/components/PlaceDetailModal.tsx', [
+  'place.seedData',
+  'Curated baseline',
+  'curated starting catalog',
+  'No live reviews yet',
+]);
+
 requirePattern('src/components/NavigationFlow.tsx', [
   'useState<[number, number] | null>(null)',
   '!routeData || steps.length === 0',
@@ -104,6 +125,9 @@ requirePattern('server/dal.ts', [
   'owner_verified: false',
   'rating: 0',
   'check_ins_count: 0',
+  'seedData: Boolean(row.seed_data)',
+  'photoProvenance: row.photo_provenance || null',
+  'ratingProvenance: row.rating_provenance || null',
 ]);
 
 console.log('User-truth contracts verified.');
