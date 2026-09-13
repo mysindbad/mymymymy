@@ -24,6 +24,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Apply final hardening patch
         run: python3 scripts/apply-final-hardening.py
+      - name: Show generated syntax context
+        run: nl -ba server.ts | sed -n '680,700p'
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
