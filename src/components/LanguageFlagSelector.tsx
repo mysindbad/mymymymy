@@ -151,10 +151,20 @@ export const LanguageFlagSelector: React.FC<LanguageFlagSelectorProps> = ({
           <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-blue-600" />
-              <span>{currentLanguage === 'ar' ? 'اختر لغة التطبيق' : 'Select Language'}</span>
+               <span>
+                 {currentLanguage === 'ar'
+                   ? 'اختر لغة التطبيق'
+                   : currentLanguage === 'fr'
+                     ? 'Choisir la langue'
+                     : 'Select Language'}
+               </span>
             </span>
             <span className="text-[10px] text-blue-600 font-semibold lowercase">
-              {currentLanguage === 'ar' ? 'أعلام الدول' : 'National flags'}
+               {currentLanguage === 'ar'
+                 ? 'أعلام الدول'
+                 : currentLanguage === 'fr'
+                   ? 'Drapeaux nationaux'
+                   : 'National flags'}
             </span>
           </div>
 
