@@ -37,7 +37,7 @@ interface AuthFlowModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialScreen?: AuthScreenType;
-  onAuthSuccess?: (user: { name: string; email: string; avatar: string }) => void;
+  onAuthSuccess?: (user: { name: string; email: string; avatar: string; xp?: number }) => void;
   language?: SupportedLanguage;
   onToggleLanguage?: (lang: SupportedLanguage) => void;
 }
@@ -108,12 +108,14 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
 
   const completeAuth = (user: { email?: string; user_metadata?: Record<string, unknown> }) => {
     const metadata = user.user_metadata || {};
+    const metadataXp = Number(metadata.community_xp);
     onAuthSuccess?.({
       name: typeof metadata.full_name === 'string' && metadata.full_name.trim()
         ? metadata.full_name
         : user.email?.split('@')[0] || 'Traveler',
       email: user.email || '',
       avatar: typeof metadata.avatar_url === 'string' && metadata.avatar_url ? metadata.avatar_url : '🧔',
+      xp: Number.isFinite(metadataXp) && metadataXp >= 0 ? Math.floor(metadataXp) : undefined,
     });
     onClose();
   };
