@@ -550,6 +550,20 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ArrowRight className={`w-4 h-4 text-blue-600 transition ${isAr ? 'rotate-180' : ''}`} />
               </button>
 
+               {/* Explicit sign-up path for new travelers */}
+               <div className="text-center mb-3">
+                 <span className="text-xs text-slate-500">
+                   {localize("New to My Sindbad? ", "جديد على ماي سندباد؟ ", "Nouveau sur My Sindbad ? ")}
+                 </span>
+                 <button
+                   type="button"
+                   onClick={() => navigateTo('create-account')}
+                   className="text-xs font-bold text-blue-600 hover:underline"
+                 >
+                   {localize("Create an account", "أنشئ حساباً", "Créer un compte")}
+                 </button>
+               </div>
+
               {/* Security Badge */}
               <div className="p-2.5 rounded-2xl bg-blue-50/80 border border-blue-100 flex items-start gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
@@ -558,9 +572,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     {localize("Your data is safe with us", "بياناتك وخصوصيتك في أمان تام", "Vos données sont en sécurité")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
-                    {isAr
-                      ? 'نحن نلتزم بأعلى معايير الأمان والتشفير لبياناتك الشخصية.'
-                      : 'We never share your personal information with anyone else.'}
+                     {localize(
+                       'We never share your personal information with anyone else.',
+                       'نحن نلتزم بأعلى معايير الأمان والتشفير لبياناتك الشخصية.',
+                       'Nous ne partageons jamais vos informations personnelles.'
+                     )}
                   </span>
                 </div>
               </div>
@@ -578,9 +594,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   <span>👋</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isAr
-                    ? 'سجل دخولك لمتابعة رحلاتك مع ماي سندباد'
-                    : 'Sign in to continue your journey with My Sindbad'}
+                   {localize(
+                     'Sign in to continue your journey with My Sindbad',
+                     'سجل دخولك لمتابعة رحلاتك مع ماي سندباد',
+                     'Connectez-vous pour continuer votre voyage avec My Sindbad'
+                   )}
                 </p>
               </div>
 
@@ -719,9 +737,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   {localize("Create Your Account", "إنشاء حساب جديد", "Créez votre compte")}
                 </h2>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  {isAr
-                    ? 'انضم إلى ماي سندباد وابدأ رحلتك إلى عالم ساحر'
-                    : 'Join My Sindbad and start your journey to a brighter world'}
+                   {localize(
+                     'Join My Sindbad and start your journey to a brighter world',
+                     'انضم إلى ماي سندباد وابدأ رحلتك إلى عالم ساحر',
+                     'Rejoignez My Sindbad et commencez votre voyage vers un monde plus lumineux'
+                   )}
                 </p>
                 <div className="w-10 h-0.5 bg-blue-500 mx-auto rounded-full mt-1.5" />
               </div>
@@ -872,9 +892,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   {localize("Forgot Your Password?", "استعادة كلمة المرور", "Mot de passe oublié ?")}
                 </h2>
                 <p className="text-xs text-slate-500 mt-1 max-w-[260px] mx-auto leading-relaxed">
-                  {isAr
-                    ? 'أدخل بريدك الإلكتروني وسنرسل لك رابطاً مباشراً لتعيين كلمة مرور جديدة.'
-                    : "No worries! Enter your email address and we'll send you a link to reset your password."}
+                  {localize(
+                    "No worries! Enter your email address and we'll send you a link to reset your password.",
+                    'أدخل بريدك الإلكتروني وسنرسل لك رابطاً مباشراً لتعيين كلمة مرور جديدة.',
+                    'Pas d’inquiétude ! Saisissez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.'
+                  )}
                 </p>
               </div>
 
@@ -925,9 +947,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     {localize("Your data is safe with us", "حماية وأمان كامل لمعلوماتك", "Vos données sont en sécurité")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
-                    {isAr
-                      ? 'لن يتم مشاركة بريدك الإلكتروني مع أي طرف آخر. الرابط مخصص لك فقط.'
-                      : "We'll never share your email with anyone else. This link is only used to reset your password."}
+                    {localize(
+                      "We'll never share your email with anyone else. This link is only used to reset your password.",
+                      'لن يتم مشاركة بريدك الإلكتروني مع أي طرف آخر. الرابط مخصص لك فقط.',
+                      'Nous ne partagerons jamais votre e-mail. Ce lien sert uniquement à réinitialiser votre mot de passe.'
+                    )}
                   </span>
                 </div>
               </div>
@@ -1098,9 +1122,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     {localize("Your data is safe with us", "بياناتك مشفرة ومحمية", "Vos données sont en sécurité")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
-                    {isAr
-                      ? 'كلمة مرورك مشفرة ولا يتم مشاركتها أبداً مع أي جهة خارجية.'
-                      : 'Your password is encrypted and never shared with anyone else.'}
+                    {localize(
+                      'Your password is encrypted and never shared with anyone else.',
+                      'كلمة مرورك مشفرة ولا يتم مشاركتها أبداً مع أي جهة خارجية.',
+                      'Votre mot de passe est chiffré et jamais partagé avec qui que ce soit.'
+                    )}
                   </span>
                 </div>
               </div>
