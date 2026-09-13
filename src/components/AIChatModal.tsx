@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, X, MapPin, Loader2 } from 'lucide-react';
 import { MascotSindbad } from './MascotSindbad';
-import { sendChatMessage } from '../services/api';
+import { ApiAuthenticationError, sendChatMessage } from '../services/api';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 
 interface AIChatModalProps {
@@ -114,19 +114,25 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (e) {
-      // Local fallback in case of connection issues
-      const fallbackMsg: Message = {
+    } catch (error) {
+      const authenticationRequired = error instanceof ApiAuthenticationError;
+      const unavailableMsg: Message = {
         id: `ai-err-${Date.now()}`,
         sender: 'sindbad',
-        text: isAr
-          ? 'جرّب أقشور صباحاً للاستمتاع بالمسارات والطبيعة، ثم استكشف أزقة شفشاون قبل الغروب.'
-          : isFr
-            ? 'Visitez Akchour le matin pour ses sentiers, puis découvrez les ruelles de Chefchaouen avant le coucher du soleil.'
-            : 'Visit Akchour in the morning for its trails and scenery, then explore Chefchaouen’s blue alleys before sunset.',
+        text: authenticationRequired
+          ? (isAr
+            ? 'يلزم تسجيل الدخول لاستخدام مساعد سندباد بالذكاء الاصطناعي. لم يتم إنشاء إجابة لهذا الطلب.'
+            : isFr
+              ? 'Vous devez vous connecter pour utiliser l’assistant IA Sindbad. Aucune réponse n’a été générée pour cette demande.'
+              : 'Sign in to use the Sindbad AI assistant. No AI answer was generated for this request.')
+          : (isAr
+            ? 'خدمة سندباد بالذكاء الاصطناعي غير متاحة مؤقتاً. لم يتم إنشاء إجابة، ويمكنك إعادة المحاولة لاحقاً.'
+            : isFr
+              ? 'Le service IA Sindbad est temporairement indisponible. Aucune réponse n’a été générée ; vous pouvez réessayer plus tard.'
+              : 'The Sindbad AI service is temporarily unavailable. No answer was generated; please try again later.'),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, fallbackMsg]);
+      setMessages((prev) => [...prev, unavailableMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -135,18 +141,16 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
       <div className="bg-white w-full max-w-xl h-[88vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
-        {/* Header with Scope Security Badge */}
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white shrink-0">
           <div className="flex items-center gap-3">
             <MascotSindbad size="sm" mood="happy" />
             <div>
               <div className="flex items-center gap-1.5">
                 <h2 className="text-base font-bold tracking-tight">{t.sindbadAiCompanion}</h2>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </div>
               <p className="text-xs text-blue-100 flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
-                <span>{destination} • {t.expertActive}</span>
+                <span>{destination}</span>
               </p>
             </div>
           </div>
@@ -160,7 +164,6 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
           </div>
         </div>
 
-        {/* Messages Container */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/60">
           {messages.map((m) => (
             <div
@@ -207,7 +210,6 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
           <div ref={chatEndRef} />
         </div>
 
-        {/* Quick Prompts Carousel */}
         <div className="p-2.5 bg-white border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-2 rtl:pl-0 rtl:pr-2 whitespace-nowrap flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-amber-500" />
@@ -228,7 +230,6 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
           ))}
         </div>
 
-        {/* Input Bar */}
         <div className="p-3 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0">
           <input
             type="text"
