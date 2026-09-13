@@ -274,7 +274,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             <div className="mb-4 p-4 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-md">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-2xl font-black text-white">{routeData.durationMinutes} min</span>
+                   <span className="text-2xl font-black text-white">{isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`}</span>
                   <span className="text-xs text-slate-400 ml-2">({routeData.totalDistanceKm} km)</span>
                 </div>
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/40">
@@ -392,7 +392,9 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             <div className="max-w-xl mx-auto flex items-center justify-between">
               <div>
                 <div className="text-2xl font-black text-white tracking-tight">
-                  {Math.max(1, (routeData?.durationMinutes || 12) - currentStepIndex * 2)} min
+                  {isAr
+                    ? `${Math.max(1, (routeData?.durationMinutes || 12) - currentStepIndex * 2)} دقيقة`
+                    : `${Math.max(1, (routeData?.durationMinutes || 12) - currentStepIndex * 2)} min`}
                 </div>
                 <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
                   <span>

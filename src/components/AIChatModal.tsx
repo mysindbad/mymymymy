@@ -188,7 +188,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
                     : 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-none shadow-xs'
                 }`}
               >
-                <div className="whitespace-pre-line">{m.text}</div>
+                <div className="whitespace-pre-line">{m.text.replace(/\*\*/g, '')}</div>
                 <div
                   className={`text-[10px] mt-1 text-right ${
                     m.sender === 'user' ? 'text-blue-200' : 'text-slate-400'

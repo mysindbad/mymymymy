@@ -103,9 +103,34 @@ function requestUser(req: Request) {
   return { id: req.user.id, token: req.accessToken };
 }
 
+function translateManeuverModifier(modifier: unknown, language: string) {
+  if (typeof modifier !== 'string' || !modifier.trim()) return '';
+  if (language !== 'ar') return ` ${modifier}`;
+
+  const normalized = modifier.trim().toLowerCase();
+  const arabicModifier = normalized === 'right'
+    ? 'يمين'
+    : normalized === 'left'
+      ? 'يسار'
+      : normalized === 'straight'
+        ? 'مباشرة'
+        : normalized === 'uturn'
+          ? 'دوران كامل'
+          : normalized.includes('right')
+            ? 'يمين'
+            : normalized.includes('left')
+              ? 'يسار'
+              : normalized.includes('uturn')
+                ? 'دوران كامل'
+                : normalized.includes('straight')
+                  ? 'مباشرة'
+                  : modifier.trim();
+  return ` ${arabicModifier}`;
+}
+
 function textFromManeuver(maneuver: any, roadName: string, language: string, destinationName?: string) {
   const type = maneuver?.type || 'continue';
-  const modifier = maneuver?.modifier ? ` ${maneuver.modifier}` : '';
+  const modifier = translateManeuverModifier(maneuver?.modifier, language);
   if (type === 'arrive') {
     return language === 'ar' ? `لقد وصلت إلى وجهتك: ${destinationName || roadName}` : `Arrive at destination: ${destinationName || roadName}`;
   }
