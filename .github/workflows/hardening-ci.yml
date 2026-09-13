@@ -26,6 +26,8 @@ jobs:
       - run: npm run lint
       - name: Verify truthful DAL fallback behavior
         run: node --import tsx scripts/verify-truthful-dal.ts
+      - name: Verify user-facing truth contracts
+        run: node --import tsx scripts/verify-user-truth-contracts.ts
       - run: npm run build
       - name: Verify Supabase URL bootstrap normalization
         run: |
