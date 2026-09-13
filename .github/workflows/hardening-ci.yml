@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -22,19 +22,6 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: Apply Vercel runtime contract fix
-        run: python3 scripts/apply-vercel-runtime-fix.py
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
-      - name: Persist tested Vercel runtime fix
-        if: github.event_name == 'push'
-        run: |
-          if git diff --quiet -- api/index.ts server.ts api/navigation.ts; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api/index.ts server.ts api/navigation.ts
-          git commit -m "fix: align Vercel runtime with hardened database contracts"
-          git push origin HEAD:audit/vercel-runtime-fix-20260913
