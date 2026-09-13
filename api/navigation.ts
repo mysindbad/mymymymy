@@ -81,7 +81,7 @@ export default async function handler(req: any, res: any) {
         error: language === 'ar'
           ? 'التوجيه الحقيقي بالنقل العام غير متاح من مزود الملاحة الحالي.'
           : 'Real public-transit routing is not available from the current routing provider.',
-        code: 'TRANSIT_PROVIDER_UNAVAILABLE',
+        code: 'TRANSIT_NOT_SUPPORTED',
         supportedModes: ['driving', 'walking', 'taxi'],
       });
     }

@@ -158,10 +158,10 @@ function requireAuth(req: Request, _res: Response, next: NextFunction) {
 }
 
 const AI_CHAT_MAX_CHARS = 2000;
-const AI_CHAT_RATE_LIMIT = 12;
-const AI_CHAT_WINDOW_SECONDS = 60;
-const AI_PLAN_RATE_LIMIT = 6;
-const AI_PLAN_WINDOW_SECONDS = 600;
+const AI_CHAT_RATE_LIMIT = 30;
+const AI_CHAT_WINDOW_SECONDS = 3600;
+const AI_PLAN_RATE_LIMIT = 10;
+const AI_PLAN_WINDOW_SECONDS = 3600;
 
 function requestUser(req: Request) {
   if (!req.user || !req.accessToken) throw authenticationError(req);
@@ -174,11 +174,6 @@ function getUserSupabaseClient(accessToken: string) {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
-}
-
-function requestIp(req: Request): string {
-  const forwarded = req.header('x-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || req.ip || req.socket.remoteAddress || 'unknown';
 }
 
 async function consumeRateLimit(scope: string, identity: string, limit: number, windowSeconds: number) {
@@ -633,7 +628,7 @@ app.post('/api/ai/plan-trip', requireAuth, async (req, res, next) => {
   }
 });
 
-app.post('/api/ai/chat', async (req, res, next) => {
+app.post('/api/ai/chat', requireAuth, async (req, res, next) => {
   try {
     const { message: rawMessage, language = 'en' } = req.body || {};
     if (typeof rawMessage !== 'string' || !rawMessage.trim()) throw new DataValidationError('Message is required');
@@ -641,7 +636,7 @@ app.post('/api/ai/chat', async (req, res, next) => {
     if (message.length > AI_CHAT_MAX_CHARS) throw new DataValidationError(`Message must be ${AI_CHAT_MAX_CHARS} characters or fewer`);
     if (!['ar', 'fr', 'en'].includes(String(language))) throw new DataValidationError('language must be ar, fr, or en');
 
-    const identity = req.user ? `user:${req.user.id}` : `ip:${requestIp(req)}`;
+    const identity = `user:${req.user!.id}`;
     const rateLimit = await consumeRateLimit('ai-chat', identity, AI_CHAT_RATE_LIMIT, AI_CHAT_WINDOW_SECONDS);
     if (!rateLimit.allowed) {
       res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds));
