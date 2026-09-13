@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { getNormalizedSupabaseUrl } from './supabase-url';
+import { getNormalizedSupabaseUrl } from './supabase-url.js';
 
 function numberField(value: unknown, name: string) {
   const parsed = Number(value);
