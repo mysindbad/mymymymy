@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "installCommand": "npm install --no-audit --no-fund",
+  "installCommand": "npm ci --no-audit --no-fund",
   "builds": [
     {
       "src": "api/index.ts",
@@ -23,7 +23,7 @@
       "config": {
         "distDir": "dist",
         "buildCommand": "npm run lint && npm run build",
-        "installCommand": "npm install --no-audit --no-fund"
+        "installCommand": "npm ci --no-audit --no-fund"
       }
     }
   ],
