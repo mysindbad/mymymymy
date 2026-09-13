@@ -1,19 +1,6 @@
-import React, { useState } from 'react';
-import {
-  Users,
-  Radio,
-  Building2,
-  Star,
-  Award,
-  Plus,
-  ShieldCheck,
-  CheckCircle2,
-  Compass,
-  MapPin,
-  Sparkles,
-  ArrowRight
-} from 'lucide-react';
-import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
+import React from 'react';
+import { Award, Mail, Plus, Radio, UserRound } from 'lucide-react';
+import { SupportedLanguage } from '../data/translations';
 
 interface CommunityHubProps {
   onOpenAddModal: () => void;
@@ -21,7 +8,7 @@ interface CommunityHubProps {
   isPassiveOptedIn: boolean;
   userXp: number;
   language?: SupportedLanguage;
-  currentUser?: { name: string; email: string; isLoggedIn?: boolean };
+  currentUser?: { name: string; email: string; avatar?: string; isLoggedIn?: boolean };
   onOpenAuth?: () => void;
 }
 
@@ -34,202 +21,94 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   currentUser,
   onOpenAuth,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
   const isFr = language === 'fr';
   const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
   const localize = (english: string, arabic: string, french: string) =>
     isAr ? arabic : isFr ? french : english;
-
-  const contributors = [
-    { name: 'Karim Tazi', role: 'Rif Mountain Trail Guide', points: 1420, verifiedCount: 28, badge: 'Pioneer' },
-    { name: 'Fatima Zahra', role: 'Chefchaouen Heritage Architect', points: 1180, verifiedCount: 22, badge: 'Explorer' },
-    { name: 'Youssef El Idrissi', role: 'Akchour Riad Host', points: 950, verifiedCount: 17, badge: 'Owner' },
-    { name: 'Mehdi Bennani', role: 'Active Backpacker', points: 720, verifiedCount: 12, badge: 'Trailblazer' },
-  ];
+  const isLoggedIn = Boolean(currentUser?.isLoggedIn);
+  const displayName = isLoggedIn && currentUser?.name
+    ? currentUser.name
+    : localize('Guest traveler', 'مسافر زائر', 'Voyageur invité');
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 animate-in fade-in pb-24 select-none">
-      {/* Personal profile summary */}
-      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between gap-3">
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4 pb-24">
+      <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-4 sm:p-5">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white text-xl shrink-0">
-            🧔
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl shrink-0">
+            {currentUser?.avatar || '🧔'}
           </div>
-          <div className="min-w-0">
-            <h2 className="font-black text-slate-900 text-sm truncate">
-              {currentUser?.isLoggedIn && currentUser.name
-                ? currentUser.name
-                : localize('Guest traveler', 'مسافر زائر', 'Voyageur invité')}
-            </h2>
-            <p className="text-[11px] text-slate-500 truncate">
-              {currentUser?.isLoggedIn && currentUser.email
-                ? currentUser.email
-                : localize('Sign in to keep your XP with your account.', 'سجّل الدخول لحفظ نقاط خبرتك مع حسابك.', 'Connectez-vous pour conserver votre XP avec votre compte.')}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              {localize('Account', 'الحساب', 'Compte')}
             </p>
+            <h1 className="text-lg font-black text-slate-900 truncate">{displayName}</h1>
+            {isLoggedIn && currentUser?.email ? (
+              <p className="text-xs text-slate-500 truncate flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 shrink-0" />
+                {currentUser.email}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-500">
+                {localize('Guest mode', 'وضع الزائر', 'Mode invité')}
+              </p>
+            )}
           </div>
         </div>
-        {!currentUser?.isLoggedIn && onOpenAuth && (
+        {!isLoggedIn && onOpenAuth && (
           <button
             type="button"
             onClick={onOpenAuth}
-            className="shrink-0 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold"
+            className="mt-4 w-full py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition"
           >
-            {localize('Sign in', 'تسجيل الدخول', 'Se connecter')}
+            {localize('Sign in to save your account progress', 'سجّل الدخول لحفظ تقدم حسابك', 'Connectez-vous pour conserver votre progression')}
           </button>
         )}
-      </div>
+      </section>
 
-      {/* Header Banner */}
-      <div className="p-5 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white shadow-xl space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-blue-200 uppercase tracking-wider flex items-center gap-1.5">
-            <Users className="w-4 h-4" />
-            <span>{isAr ? 'مجتمع سندباد التعاوني' : 'Sindbad Community Collective'}</span>
-          </span>
-          <div className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-black text-amber-300 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 fill-current" />
-            <span>
-              {isAr
-                ? `المستوى ${userLevel} • ${userXp} نقطة خبرة`
-                : isFr
-                  ? `Niveau ${userLevel} • ${userXp} XP`
-                  : `Level ${userLevel} • ${userXp} XP`}
-            </span>
-          </div>
+      <section className="grid grid-cols-2 gap-3">
+        <div className="rounded-3xl bg-blue-50 border border-blue-100 p-4">
+          <Award className="w-5 h-5 text-blue-600 mb-3" />
+          <p className="text-[11px] font-bold text-blue-700">{localize('Experience', 'الخبرة', 'Expérience')}</p>
+          <p className="mt-1 text-2xl font-black text-slate-900">{userXp}</p>
+          <p className="text-[11px] text-slate-500">XP</p>
         </div>
-        <h1 className="text-xl sm:text-2xl font-black">
-          {isAr ? 'خريطة يصنعها المسافرون وأصحاب الأعمال معاً' : 'A Living Map Built by Travelers & Local Hosts'}
-        </h1>
-        <p className="text-xs sm:text-sm text-blue-100 max-w-2xl leading-relaxed">
-          {isAr
-            ? 'لا نعتمد على شركات الخرائط الاحتكارية البعيدة. سندباد يتعلم من خطواتك اليومية ومساهمات أصحاب المشاريع الصغيرة في أزقة شفشاون وجبال أقشور.'
-            : 'Sindbad AI is not a static corporate lookup. Every step you walk and every review you write enriches the collective memory of northern Morocco and beyond.'}
-        </p>
-      </div>
+        <div className="rounded-3xl bg-amber-50 border border-amber-100 p-4">
+          <UserRound className="w-5 h-5 text-amber-600 mb-3" />
+          <p className="text-[11px] font-bold text-amber-700">{localize('Level', 'المستوى', 'Niveau')}</p>
+          <p className="mt-1 text-2xl font-black text-slate-900">{userLevel}</p>
+          <p className="text-[11px] text-slate-500">{localize('Current level', 'المستوى الحالي', 'Niveau actuel')}</p>
+        </div>
+      </section>
 
-      {/* Two Pillars: Local Business Owners & Passive Data (Feature 4 requirements) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Pillar 1: Local Business Owners Portal */}
-        <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900">
-              {isAr ? 'بوابة أصحاب الأنشطة التجارية والمحلية' : 'Local Business Owners Portal'}
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              {isAr
-                ? 'هل تملك رياضاً، نزلاً ريفياً، مطعم طاجين في الوادي، أو خدمة نقل محلية؟ أضف مكانك بصوره وموقعه الجغرافي الدقيق ليدخل فوراً في خوارزميات الذكاء الاصطناعي وتوصيات المسافرين.'
-                : 'Do you own a riad, rural guesthouse, riverfront cafe, or local guide service? Add your listing with verified GPS coordinates and photos directly to the shared database.'}
-            </p>
-          </div>
-
+      <section className="rounded-3xl bg-white border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3">
+        <div>
+          <h2 className="font-black text-slate-900">{localize('Your contributions', 'مساهماتك', 'Vos contributions')}</h2>
+          <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+            {localize('Add a place or manage optional GPS sharing from here.', 'أضف مكاناً أو أدر مشاركة GPS الاختيارية من هنا.', 'Ajoutez un lieu ou gérez le partage GPS facultatif depuis ici.')}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <button
+            type="button"
             onClick={onOpenAddModal}
-            className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 transition active:scale-98"
+            className="py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>{isAr ? 'إضافة نشاط تجاري جديد' : 'Register Your Business Listing'}</span>
+            <Plus className="w-4 h-4" />
+            {localize('Add a place', 'إضافة مكان', 'Ajouter un lieu')}
           </button>
-        </div>
-
-        {/* Pillar 2: Passive GPS Contribution */}
-        <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-          <div className="space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-              <Radio className="w-6 h-6 animate-pulse" />
-            </div>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">
-                {isAr
-                  ? 'مساهمة GPS اختيارية'
-                  : isFr
-                    ? 'Contribution GPS facultative'
-                    : 'Optional GPS Contribution'}
-              </h3>
-              <span
-                className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                  isPassiveOptedIn
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {isPassiveOptedIn
-                  ? isAr
-                    ? 'مفعّل • تمت الموافقة'
-                    : isFr
-                      ? 'Activé • consentement enregistré'
-                      : 'Enabled • Consent saved'
-                  : isAr
-                    ? 'متوقف'
-                    : isFr
-                      ? 'En pause'
-                      : 'Paused'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              {isAr
-                ? 'بعد موافقتك، يمكنك إرسال عينة مجهولة يدوياً من زر الإرسال. لا يتم تشغيل تتبع مستمر في الخلفية في هذا الإصدار.'
-                : isFr
-                  ? 'Après votre consentement, vous pouvez envoyer un échantillon anonyme avec le bouton ci-dessous. Le suivi continu en arrière-plan n’est pas activé dans cette version.'
-                  : 'After opting in, you can send an anonymous sample with the button below. Continuous background tracking is not enabled in this version.'}
-            </p>
-          </div>
-
           <button
+            type="button"
             onClick={onOpenPassiveModal}
-            className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition active:scale-98"
+            className="py-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center justify-center gap-2 transition"
           >
             <Radio className="w-4 h-4" />
-            <span>{isAr ? 'إدارة إعدادات المشاركة' : 'Manage Passive Sharing'}</span>
+            {isPassiveOptedIn
+              ? localize('GPS sharing is on', 'مشاركة GPS مفعّلة', 'Partage GPS activé')
+              : localize('Manage GPS sharing', 'إدارة مشاركة GPS', 'Gérer le partage GPS')}
           </button>
         </div>
-      </div>
-
-      {/* Community Leaderboard */}
-      <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Award className="w-5 h-5 text-amber-500" />
-            <h3 className="font-bold text-slate-900 text-base">
-              {isAr ? 'رواد استكشاف وتوثيق شمال المغرب' : 'Top Regional Contributors'}
-            </h3>
-          </div>
-            <span className="text-xs text-slate-400 font-medium">
-              {isAr ? 'بيانات تجريبية' : isFr ? 'Données d’exemple' : 'Preview data'}
-            </span>
-        </div>
-
-        <div className="divide-y divide-slate-100">
-          {contributors.map((contributor, idx) => (
-            <div key={contributor.name} className="py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="w-6 text-center font-black text-slate-400 text-sm">
-                  #{idx + 1}
-                </span>
-                <div>
-                  <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
-                    <span>{contributor.name}</span>
-                    <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-50 text-blue-700 font-bold">
-                      {contributor.badge}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">{contributor.role}</span>
-                </div>
-              </div>
-
-              <div className="text-right rtl:text-left">
-                <div className="text-xs sm:text-sm font-black text-slate-900">{contributor.points} XP</div>
-                <span className="text-[10px] text-emerald-600 font-semibold">
-                  {contributor.verifiedCount} places verified
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </section>
     </div>
   );
 };
