@@ -1,19 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Star,
   MapPin,
   Navigation,
   Heart,
-  Share2,
   Phone,
   Clock,
-  Building2,
   CheckCircle2,
   Sparkles,
   ShieldCheck,
-  Camera,
-  AlertCircle,
   Plus
 } from 'lucide-react';
 import { Place } from '../types';
@@ -44,23 +40,46 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   currency = 'MAD',
 }) => {
   const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [checkInError, setCheckInError] = useState<string | null>(null);
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
 
+  useEffect(() => {
+    setIsCheckedIn(false);
+    setIsCheckingIn(false);
+    setCheckInError(null);
+    setIsRateModalOpen(false);
+    setActivePhotoIdx(0);
+  }, [place?.id]);
+
   if (!place) return null;
 
   const handleCheckIn = async () => {
-    setIsCheckedIn(true);
-    await submitPlaceCheckIn(place.id);
+    if (isCheckingIn || isCheckedIn) return;
+    setIsCheckingIn(true);
+    setCheckInError(null);
+
+    try {
+      const success = await submitPlaceCheckIn(place.id);
+      if (success) {
+        setIsCheckedIn(true);
+      } else {
+        setCheckInError(isAr
+          ? 'تعذر تأكيد تسجيل الوصول. تحقق من تسجيل الدخول والاتصال ثم حاول مجدداً.'
+          : 'Check-in could not be confirmed. Check your sign-in and connection, then try again.');
+      }
+    } finally {
+      setIsCheckingIn(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in select-none">
       <div className="bg-white w-full max-w-xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
-        {/* Photo Hero with Overlaid Controls */}
         <div className="relative h-64 sm:h-72 w-full bg-slate-900 shrink-0">
           <img
             src={place.photos[activePhotoIdx] || place.photos[0]}
@@ -69,7 +88,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
 
-          {/* Top Bar Controls */}
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-1.5">
               <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase text-white bg-black/50 backdrop-blur-md border border-white/20">
@@ -109,7 +127,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Bottom Hero Info */}
           <div className="absolute bottom-4 left-4 right-4 text-white z-10">
             <h1 className="text-xl sm:text-2xl font-black leading-tight drop-shadow-md">
               {isAr && place.arabicName ? place.arabicName : place.name}
@@ -120,7 +137,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </p>
           </div>
 
-          {/* Photo Dots if multiple */}
           {place.photos.length > 1 && (
             <div className="absolute bottom-2 right-4 flex gap-1 z-20">
               {place.photos.map((_, i) => (
@@ -136,9 +152,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           )}
         </div>
 
-        {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-slate-700 text-xs sm:text-sm">
-          {/* Quick Metrics Bar: Rating, Price, Distance, Reviews */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-center">
             <div>
               <div className="flex items-center justify-center text-amber-500 font-black text-base">
@@ -165,7 +179,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
 
             <div>
               <div className="text-base font-black text-blue-600">
-                {place.distanceKm || 1.4} km
+                {typeof place.distanceKm === 'number' ? `${place.distanceKm} km` : '—'}
               </div>
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                 {isAr ? 'المسافة عنك' : 'Distance'}
@@ -173,7 +187,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Business Owner Verification (Feature 4) */}
           {place.ownerVerified && (
             <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -188,7 +201,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </div>
           )}
 
-          {/* Description Section */}
           <div>
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
               {isAr ? 'عن المكان والخدمات' : 'About this Place'}
@@ -198,19 +210,16 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </p>
           </div>
 
-          {/* FORMATION & BACKGROUND (Explicit client requirement for Feature 2) */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 space-y-1.5">
             <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
               <span>{isAr ? 'التكوين والتاريخ المحلي (Formation & History)' : 'Formation & Historical Context'}</span>
             </div>
             <p className="text-blue-950 text-xs leading-relaxed">
-              {place.formationInfo ||
-                'Discovered and documented through the collective contributions of Moroccan travelers and local community residents.'}
+              {place.formationInfo || (isAr ? 'لا تتوفر معلومات موثقة عن الخلفية التاريخية لهذا المكان حالياً.' : 'Verified background information is not available for this place yet.')}
             </p>
           </div>
 
-          {/* Opening hours & contact if available */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             {place.openingHours && (
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2">
@@ -228,7 +237,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             )}
           </div>
 
-          {/* User Reviews Section (Feature 1 & Feature 4) */}
           <div className="space-y-2 pt-2 border-t border-slate-200">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
@@ -280,33 +288,44 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Footer Action Buttons */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleCheckIn}
-            disabled={isCheckedIn}
-            className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition ${
-              isCheckedIn
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <CheckCircle2 className={`w-4 h-4 ${isCheckedIn ? 'text-emerald-600' : 'text-slate-400'}`} />
-            <span>{isCheckedIn ? t.checkedIn : t.checkIn}</span>
-          </button>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-2 shrink-0">
+          {checkInError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700">
+              {checkInError}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleCheckIn()}
+              disabled={isCheckedIn || isCheckingIn}
+              className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition ${
+                isCheckedIn
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-60'
+              }`}
+            >
+              <CheckCircle2 className={`w-4 h-4 ${isCheckedIn ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <span>
+                {isCheckedIn
+                  ? t.checkedIn
+                  : isCheckingIn
+                    ? (isAr ? 'جاري التأكيد...' : 'Confirming...')
+                    : t.checkIn}
+              </span>
+            </button>
 
-          <button
-            id="modal-start-navigation-btn"
-            onClick={() => onStartNavigation(place)}
-            className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition active:scale-98"
-          >
-            <Navigation className="w-4 h-4 fill-current" />
-            <span>{t.startNavigation}</span>
-          </button>
+            <button
+              id="modal-start-navigation-btn"
+              onClick={() => onStartNavigation(place)}
+              className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition active:scale-98"
+            >
+              <Navigation className="w-4 h-4 fill-current" />
+              <span>{t.startNavigation}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Write Review Modal */}
       <RatePlaceModal
         isOpen={isRateModalOpen}
         onClose={() => setIsRateModalOpen(false)}
