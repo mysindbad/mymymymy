@@ -504,6 +504,14 @@ function mapPlace(row: any): any {
     ownerVerified: row.owner_verified,
     businessOwnerName: row.business_owner_name,
     checkInsCount: row.check_ins_count || 0,
+    seedData: Boolean(row.seed_data),
+    seedCheckInsCount: row.seed_check_ins_count || 0,
+    photoProvenance: row.photo_provenance || null,
+    ratingProvenance: row.rating_provenance || null,
+    seedRating: row.seed_rating === null || row.seed_rating === undefined ? null : Number(row.seed_rating),
+    seedReviewCount: row.seed_review_count || 0,
+    seedOwnerVerified: Boolean(row.seed_owner_verified),
+    seedSource: row.seed_source || null,
     aiConfidenceScore: row.ai_confidence_score === null ? undefined : Number(row.ai_confidence_score),
     lastActivityTimestamp: row.last_activity_timestamp,
     rankText: row.rank_text,
@@ -663,9 +671,13 @@ export function createDal(accessToken?: string) {
         return { review: mapReview(data), place };
       },
       async checkin(placeId: string) {
-        const { data, error } = await getSupabaseAdmin().rpc('increment_place_checkins', { place_id_input: placeId });
+        const user = await verifyUser();
+        const { data, error } = await getSupabaseAdmin().rpc('record_place_checkin_server', {
+          p_user_id: user.id,
+          p_place_id: placeId,
+        });
         if (error) throwMappedSupabaseError(error);
-        return { checkInsCount: data };
+        return { checkInsCount: Number(data || 0) };
       },
     },
     trips: {
