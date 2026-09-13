@@ -2,30 +2,24 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   Search,
-  SlidersHorizontal,
   Navigation,
   Sparkles,
   Star,
   Crosshair,
-  Building2,
-  Landmark,
-  Utensils,
-  AlertTriangle,
-  Tent,
   Plus,
   Radio,
   Layers,
   MapPin,
-  ChevronRight,
   ShieldCheck
 } from 'lucide-react';
-import { Place, PlaceCategory, FilterSettings } from '../types';
+import { Place, PlaceCategory } from '../types';
 import { fetchTracesSummary } from '../services/api';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
 import { AddPlaceModal } from './AddPlaceModal';
 import { PassiveDataModal } from './PassiveDataModal';
 import { RatePlaceModal } from './RatePlaceModal';
+import type { UserLocation } from '../hooks/useGeolocation';
 
 interface MapViewProps {
   places: Place[];
@@ -38,6 +32,7 @@ interface MapViewProps {
   currency?: string;
   initialQuery?: string;
   initialCategory?: string;
+  userLocation?: UserLocation | null;
   isPassiveOptedIn: boolean;
   onPassiveOptInChange: (optedIn: boolean) => void;
 }
@@ -53,6 +48,7 @@ export const MapView: React.FC<MapViewProps> = ({
   currency = 'MAD',
   initialQuery = '',
   initialCategory = 'All',
+  userLocation = null,
   isPassiveOptedIn,
   onPassiveOptInChange,
 }) => {
@@ -60,11 +56,12 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const tracesLayerRef = useRef<L.LayerGroup | null>(null);
+  const userRadiusLayerRef = useRef<L.LayerGroup | null>(null);
+  const hasCenteredOnUserRef = useRef(false);
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
 
-  // State
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'All');
   const [selectedRegion, setSelectedRegion] = useState<string>('Northern Morocco');
@@ -75,7 +72,6 @@ export const MapView: React.FC<MapViewProps> = ({
   const [tracesLoading, setTracesLoading] = useState(false);
   const [tracesError, setTracesError] = useState<string | null>(null);
 
-  // Modals
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
   const [isPassiveDataOpen, setIsPassiveDataOpen] = useState(false);
   const [isRateModalOpen, setIsRateModalOpen] = useState(false);
@@ -98,29 +94,12 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [places, searchQuery, selectedCategory]);
 
-  // Request location only after explicit passive GPS consent. There is no static user-location fallback.
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-
-  useEffect(() => {
-    if (!isPassiveOptedIn || !navigator.geolocation) {
-      setUserLocation(null);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => setUserLocation([coords.latitude, coords.longitude]),
-      () => setUserLocation(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
-    );
-  }, [isPassiveOptedIn]);
-
   useEffect(() => {
     if (!activeNearbyPlace || !visiblePlaces.some((place) => place.id === activeNearbyPlace.id)) {
       setActiveNearbyPlace(visiblePlaces[0] || null);
     }
   }, [visiblePlaces, activeNearbyPlace]);
 
-  // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -138,6 +117,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       tracesLayerRef.current = L.layerGroup().addTo(map);
+      userRadiusLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
     }
 
@@ -148,19 +128,34 @@ export const MapView: React.FC<MapViewProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Update Region Center when region changes
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (selectedRegion === 'Northern Morocco') {
-      mapInstanceRef.current.flyTo([35.175, -5.26], 12);
-    } else if (selectedRegion === 'Marrakech') {
-      mapInstanceRef.current.flyTo([31.625, -7.99], 13);
-    } else if (selectedRegion === 'Santorini') {
-      mapInstanceRef.current.flyTo([36.435, 25.41], 12);
-    }
-  }, [selectedRegion]);
+    const map = mapInstanceRef.current;
+    if (!map || !userLocation || hasCenteredOnUserRef.current) return;
+    map.flyTo([userLocation.latitude, userLocation.longitude], 13, { duration: 1.2 });
+    hasCenteredOnUserRef.current = true;
+  }, [userLocation]);
 
-  // Marker Styling Helper: FEATURE 2 (Visually distinguish categories of points)
+  useEffect(() => {
+    const layer = userRadiusLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    if (!userLocation) return;
+
+    const center: [number, number] = [userLocation.latitude, userLocation.longitude];
+    [1000, 5000, 10000].forEach((radiusMeters) => {
+      layer.addLayer(
+        L.circle(center, {
+          radius: radiusMeters,
+          color: '#2563eb',
+          weight: 1,
+          opacity: 0.3,
+          fillOpacity: 0.03,
+          interactive: false,
+        })
+      );
+    });
+  }, [userLocation]);
+
   const getMarkerBadgeStyle = (category: PlaceCategory, isSelected: boolean) => {
     let bg = 'bg-blue-600';
     let iconChar = '📍';
@@ -168,31 +163,26 @@ export const MapView: React.FC<MapViewProps> = ({
 
     switch (category) {
       case 'accommodation':
-        // Accommodation: Deep Indigo / Royal Purple Bed Marker
         bg = 'bg-gradient-to-r from-indigo-700 to-violet-800 text-white';
         border = 'border-indigo-900';
         iconChar = '🛏️';
         break;
       case 'tourist_poi':
-        // Tourist & POI: Vibrant Emerald Landmark Marker
         bg = 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white';
         border = 'border-emerald-800';
         iconChar = '🏛️';
         break;
       case 'restaurant':
-        // Food: Warm Amber / Terracotta Dining Marker
         bg = 'bg-gradient-to-r from-amber-600 to-orange-600 text-white';
         border = 'border-amber-700';
         iconChar = '🍽️';
         break;
       case 'emergency':
-        // Emergency & Safety: High-Visibility Crimson Red Marker
         bg = 'bg-gradient-to-r from-rose-600 to-red-700 text-white';
         border = 'border-rose-800';
         iconChar = '🚨';
         break;
       case 'campsite':
-        // Campsite / Outdoors: Forest Pine Green Marker
         bg = 'bg-gradient-to-r from-lime-700 to-green-800 text-white';
         border = 'border-green-900';
         iconChar = '⛺';
@@ -206,16 +196,13 @@ export const MapView: React.FC<MapViewProps> = ({
     return { bg, border, iconChar };
   };
 
-  // Render Markers and Heatmap Traces
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Clear existing markers
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    // Clear and re-render crowd heatmap traces if enabled
     if (tracesLayerRef.current) {
       tracesLayerRef.current.clearLayers();
       if (showCrowdHeatmap) {
@@ -239,7 +226,6 @@ export const MapView: React.FC<MapViewProps> = ({
       }
     }
 
-    // Add a user marker only when the browser provided a real position.
     if (userLocation) {
       const userMarkerHtml = `
       <div class="relative flex items-center justify-center">
@@ -247,18 +233,17 @@ export const MapView: React.FC<MapViewProps> = ({
         <div class="w-4 h-4 rounded-full bg-blue-600 border-2 border-white shadow-lg relative z-10 flex items-center justify-center text-[8px] text-white font-bold">▲</div>
       </div>
     `;
-    const userIcon = L.divIcon({
-      html: userMarkerHtml,
-      className: 'custom-user-marker',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-    });
-    const userMarker = L.marker(userLocation, { icon: userIcon }).addTo(map);
+      const userIcon = L.divIcon({
+        html: userMarkerHtml,
+        className: 'custom-user-marker',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+      const userMarker = L.marker([userLocation.latitude, userLocation.longitude], { icon: userIcon }).addTo(map);
       userMarker.bindTooltip(isAr ? 'موقعك الحالي' : 'Your Current Location', { direction: 'top' });
       markersRef.current.push(userMarker);
     }
 
-    // Add Markers with Visual Distinction (Feature 2)
     visiblePlaces.forEach((place) => {
       const isSelected = activeNearbyPlace?.id === place.id;
       const { bg, border, iconChar } = getMarkerBadgeStyle(place.category, isSelected);
@@ -317,18 +302,15 @@ export const MapView: React.FC<MapViewProps> = ({
 
   const handleRecenter = () => {
     if (mapInstanceRef.current && userLocation) {
-      mapInstanceRef.current.flyTo(userLocation, 13, { duration: 1.2 });
+      mapInstanceRef.current.flyTo([userLocation.latitude, userLocation.longitude], 13, { duration: 1.2 });
     }
   };
 
   return (
     <div className="relative w-full h-[calc(100vh-115px)] overflow-hidden flex flex-col select-none">
-      {/* Map Canvas */}
       <div ref={mapContainerRef} className="w-full h-full z-0 bg-slate-900" />
 
-      {/* Top Floating Controls Bar */}
       <div className="absolute top-3 left-3 right-3 z-30 flex flex-col gap-2 max-w-xl mx-auto">
-        {/* Search Bar + Region Dropdown */}
         <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/90 px-3.5 py-2">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
@@ -339,7 +321,6 @@ export const MapView: React.FC<MapViewProps> = ({
             className="w-full bg-transparent text-xs sm:text-sm text-slate-800 focus:outline-none placeholder:text-slate-400 font-medium"
           />
 
-          {/* Region Switcher: Feature 6 */}
           <select
             value={selectedRegion}
             onChange={(e) => setSelectedRegion(e.target.value)}
@@ -351,7 +332,6 @@ export const MapView: React.FC<MapViewProps> = ({
             <option value="All">🌍 All Regions</option>
           </select>
 
-          {/* Add Business / Place Button (Feature 4) */}
           <button
             id="map-add-place-btn"
             onClick={() => setIsAddPlaceOpen(true)}
@@ -363,15 +343,14 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         </div>
 
-        {/* Filter Categories Pills with Marker Legend Visuals (Feature 2) */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
           {[
-            { key: 'All', label: isAr ? 'الكل' : 'All', icon: '📍' },
-            { key: 'accommodation', label: isAr ? '🛏️ إقامة ورياض' : '🛏️ Riads & Stays', badgeColor: 'bg-indigo-600 text-white' },
-            { key: 'tourist_poi', label: isAr ? '🏛️ معالم وسياحة' : '🏛️ Sights & POIs', badgeColor: 'bg-emerald-600 text-white' },
-            { key: 'restaurant', label: isAr ? '🍽️ مطاعم ومقاهي' : '🍽️ Dining & Food', badgeColor: 'bg-amber-600 text-white' },
-            { key: 'emergency', label: isAr ? '🚨 طوارئ وأمن' : '🚨 Emergency & Police', badgeColor: 'bg-rose-600 text-white' },
-            { key: 'campsite', label: isAr ? '⛺ مخيمات' : '⛺ Campsites', badgeColor: 'bg-green-700 text-white' },
+            { key: 'All', label: isAr ? 'الكل' : 'All' },
+            { key: 'accommodation', label: isAr ? '🛏️ إقامة ورياض' : '🛏️ Riads & Stays' },
+            { key: 'tourist_poi', label: isAr ? '🏛️ معالم وسياحة' : '🏛️ Sights & POIs' },
+            { key: 'restaurant', label: isAr ? '🍽️ مطاعم ومقاهي' : '🍽️ Dining & Food' },
+            { key: 'emergency', label: isAr ? '🚨 طوارئ وأمن' : '🚨 Emergency & Police' },
+            { key: 'campsite', label: isAr ? '⛺ مخيمات' : '⛺ Campsites' },
           ].map((item) => {
             const isSelected = selectedCategory === item.key;
             return (
@@ -389,7 +368,6 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })}
 
-          {/* Hidden Gems Toggle Button (Feature 1 & 6) */}
           <button
             onClick={() => setOnlyHiddenGems(!onlyHiddenGems)}
             className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm backdrop-blur-md transition border flex items-center gap-1 shrink-0 ${
@@ -404,20 +382,18 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       </div>
 
-      {/* Floating Side Tools: Recenter, Heatmap Toggle, Passive GPS Status */}
       <div className="absolute right-3 rtl:right-auto rtl:left-3 top-28 z-30 flex flex-col gap-2">
         <button
           onClick={handleRecenter}
           disabled={!userLocation}
           className="w-10 h-10 rounded-2xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:text-blue-600 transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Recenter Map"
+          title={isAr ? 'إعادة توسيط الخريطة' : 'Recenter Map'}
         >
           <Crosshair className="w-5 h-5" />
         </button>
 
-        {/* Heatmap Trail Toggle */}
         <button
-            onClick={() => void handleToggleTraces()}
+          onClick={() => void handleToggleTraces()}
           className={`w-10 h-10 rounded-2xl shadow-lg border flex items-center justify-center transition active:scale-95 ${
             showCrowdHeatmap
               ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/25'
@@ -433,7 +409,6 @@ export const MapView: React.FC<MapViewProps> = ({
           </div>
         )}
 
-        {/* Passive GPS Opt-in Status Indicator (Feature 4) */}
         <button
           onClick={() => setIsPassiveDataOpen(true)}
           className="w-10 h-10 rounded-2xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:text-emerald-600 transition active:scale-95 relative"
@@ -446,7 +421,6 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>
       </div>
 
-      {/* Underserved Region Depth Banner (Feature 6) */}
       <div className="absolute top-28 left-3 rtl:left-auto rtl:right-3 z-30 max-w-[210px] hidden sm:block">
         <div className="p-2.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700 text-white shadow-lg space-y-1">
           <div className="flex items-center gap-1 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
@@ -461,7 +435,6 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       </div>
 
-      {/* Bottom Floating Info Card for Tapped Point: FEATURE 2 */}
       {activeNearbyPlace && (
         <div className="absolute bottom-3 left-3 right-3 z-30 max-w-xl mx-auto">
           <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-3.5 shadow-2xl border border-slate-200/90 flex gap-3.5 items-center animate-in slide-in-from-bottom-4">
@@ -509,12 +482,10 @@ export const MapView: React.FC<MapViewProps> = ({
                 {isAr && activeNearbyPlace.arabicName ? activeNearbyPlace.arabicName : activeNearbyPlace.name}
               </h3>
 
-              {/* Formation / History brief snippet (Feature 2) */}
               <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
                 {activeNearbyPlace.formationInfo || activeNearbyPlace.description}
               </p>
 
-              {/* Rating and Distance */}
               <div className="flex items-center gap-2 text-xs text-slate-600 mt-1">
                 <div className="flex items-center text-amber-500 font-bold">
                   <Star className="w-3.5 h-3.5 fill-current mr-0.5 rtl:mr-0 rtl:ml-0.5" />
@@ -523,12 +494,17 @@ export const MapView: React.FC<MapViewProps> = ({
                 </div>
                 <span>•</span>
                 <span className="font-semibold text-slate-700">{formatPriceLevel(activeNearbyPlace.priceLevel, currency)}</span>
-                <span>•</span>
-                <span className="text-blue-600 font-medium">{activeNearbyPlace.distanceKm || 1.2} km</span>
+                {typeof activeNearbyPlace.distanceKm === 'number' && (
+                  <>
+                    <span>•</span>
+                    <span className="text-blue-600 font-medium">
+                      {activeNearbyPlace.distanceKm >= 10 ? Math.round(activeNearbyPlace.distanceKm) : activeNearbyPlace.distanceKm.toFixed(1)} km
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Action Buttons: Navigate + Rate */}
             <div className="flex flex-col gap-1.5 shrink-0">
               <button
                 id="map-navigate-active-btn"
@@ -552,6 +528,7 @@ export const MapView: React.FC<MapViewProps> = ({
           </div>
         </div>
       )}
+
       {places.length === 0 && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="rounded-2xl bg-white/95 px-5 py-4 text-center text-xs font-bold text-slate-600 shadow-xl border border-slate-200">
@@ -560,7 +537,6 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* Add Place / Business Listing Modal (Feature 4) */}
       <AddPlaceModal
         isOpen={isAddPlaceOpen}
         onClose={() => setIsAddPlaceOpen(false)}
@@ -568,11 +544,10 @@ export const MapView: React.FC<MapViewProps> = ({
           onPlacesChange((prev) => [newP, ...prev]);
           setActiveNearbyPlace(newP);
         }}
-        initialCoordinates={userLocation || undefined}
+        initialCoordinates={userLocation ? [userLocation.latitude, userLocation.longitude] : undefined}
         language={language}
       />
 
-      {/* Passive Location Contribution Modal (Feature 4) */}
       <PassiveDataModal
         isOpen={isPassiveDataOpen}
         onClose={() => setIsPassiveDataOpen(false)}
@@ -581,7 +556,6 @@ export const MapView: React.FC<MapViewProps> = ({
         language={language}
       />
 
-      {/* Rate & Review Modal (Feature 4) */}
       <RatePlaceModal
         isOpen={isRateModalOpen}
         onClose={() => {
