@@ -33,6 +33,7 @@ import { AuthFlowModal, AuthScreenType } from './components/AuthFlowModal';
 import { AIIcon } from './components/AIIcon';
 import { OnboardingModal, hasCompletedOnboarding } from './components/OnboardingModal';
 import { useGeolocation } from './hooks/useGeolocation';
+import { usePwaInstall } from './hooks/usePwaInstall';
 
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
 type ExploreView = 'feed' | 'map';
@@ -115,6 +116,12 @@ export default function App() {
     }
   });
   const { location: userLocation, permission, requestPermission } = useGeolocation();
+  const {
+    canInstall,
+    promptInstall,
+    showIosHint: showIosInstallHint,
+    dismissIosHint: dismissIosInstallHint,
+  } = usePwaInstall();
 
   const handlePassiveOptInChange = (optedIn: boolean) => {
     setIsPassiveOptedIn(optedIn);
@@ -517,6 +524,10 @@ export default function App() {
         userXp={userXp}
         language={language}
         onOpenAuth={handleOpenAuth}
+        canInstall={canInstall}
+        onInstall={() => { void promptInstall(); }}
+        showIosInstallHint={showIosInstallHint}
+        onDismissIosInstallHint={dismissIosInstallHint}
       />
 
       {/* Auth & Onboarding 6-Screen Flow Modal */}

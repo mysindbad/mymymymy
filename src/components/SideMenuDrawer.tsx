@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   Heart,
   ChevronRight,
-  Info
+  Info,
+  Download,
+  X as CloseIcon
 } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import { MascotSindbad } from './MascotSindbad';
@@ -25,6 +27,10 @@ interface SideMenuDrawerProps {
   onOpenAuth?: (screen?: any) => void;
   userXp: number;
   language: SupportedLanguage;
+  canInstall?: boolean;
+  onInstall?: () => void;
+  showIosInstallHint?: boolean;
+  onDismissIosInstallHint?: () => void;
 }
 
 export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
@@ -37,6 +43,10 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   onOpenAuth,
   userXp,
   language,
+  canInstall = false,
+  onInstall,
+  showIosInstallHint = false,
+  onDismissIosInstallHint,
 }) => {
   if (!isOpen) return null;
   const isAr = language === 'ar';
@@ -123,6 +133,23 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             <span className="font-semibold">{localize('Home', 'الرئيسية', 'Accueil')}</span>
             <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
           </button>
+
+          {canInstall && onInstall && (
+            <button
+              onClick={onInstall}
+              className="w-full p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 flex items-center gap-2.5 text-blue-800 transition"
+            >
+              <Download className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-bold">{localize('Install app', 'تثبيت التطبيق', 'Installer l’application')}</span>
+            </button>
+          )}
+
+          {showIosInstallHint && onDismissIosInstallHint && (
+            <div className="flex items-start gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-3 text-[11px] text-blue-800">
+              <span className="flex-1">{localize('In Safari: Share, then Add to Home Screen', 'من Safari: مشاركة ثم إضافة إلى الشاشة الرئيسية', 'Dans Safari : Partager, puis Ajouter à l’écran d’accueil')}</span>
+              <button onClick={onDismissIosInstallHint} className="shrink-0 rounded-lg p-0.5 hover:bg-blue-100" aria-label={localize('Dismiss', 'إغلاق', 'Fermer')}><CloseIcon className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
 
           <button
             onClick={() => {
