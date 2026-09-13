@@ -663,9 +663,13 @@ export function createDal(accessToken?: string) {
         return { review: mapReview(data), place };
       },
       async checkin(placeId: string) {
-        const { data, error } = await getSupabaseAdmin().rpc('increment_place_checkins', { place_id_input: placeId });
+        const user = await verifyUser();
+        const { data, error } = await getSupabaseAdmin().rpc('record_place_checkin_server', {
+          p_user_id: user.id,
+          p_place_id: placeId,
+        });
         if (error) throwMappedSupabaseError(error);
-        return { checkInsCount: data };
+        return { checkInsCount: Number(data || 0) };
       },
     },
     trips: {

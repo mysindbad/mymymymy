@@ -158,7 +158,6 @@ function requireAuth(req: Request, _res: Response, next: NextFunction) {
 }
 
 const HARDENING_PATCH_20260913 = true;
-const CHECKIN_COOLDOWN_SECONDS = 60;
 const AI_CHAT_MAX_CHARS = 2000;
 const AI_CHAT_RATE_LIMIT = 12;
 const AI_CHAT_WINDOW_SECONDS = 60;
@@ -518,24 +517,18 @@ app.post('/api/places/:id/reviews', requireAuth, async (req, res, next) => {
 app.post('/api/places/:id/checkin', requireAuth, async (req, res, next) => {
   try {
     const { token } = requestUser(req);
-    const { data, error } = await getUserSupabaseClient(token).rpc('record_place_checkin', {
-      place_id_input: req.params.id,
-      cooldown_seconds: CHECKIN_COOLDOWN_SECONDS,
-    });
-    if (error) {
-      const message = String(error.message || '');
-      if (/check_in_rate_limited/i.test(message)) {
-        res.setHeader('Retry-After', String(CHECKIN_COOLDOWN_SECONDS));
-        return res.status(429).json({
-          error: 'Please wait before checking in to this place again',
-          retryAfterSeconds: CHECKIN_COOLDOWN_SECONDS,
-        });
-      }
-      if (/place not found/i.test(message)) return res.status(404).json({ error: 'Place not found' });
-      throwMappedSupabaseError(error);
+    const result = await createDal(token).places.checkin(req.params.id);
+    res.json({ success: true, checkInsCount: result.checkInsCount });
+  } catch (error: any) {
+    const message = String(error?.message || '');
+    if (/check_in_rate_limited/i.test(message)) {
+      res.setHeader('Retry-After', '60');
+      return res.status(429).json({
+        error: 'Please wait before checking in to this place again',
+        retryAfterSeconds: 60,
+      });
     }
-    res.json({ success: true, checkInsCount: Number(data || 0) });
-  } catch (error) {
+    if (/place not found/i.test(message)) return res.status(404).json({ error: 'Place not found' });
     next(error);
   }
 });
