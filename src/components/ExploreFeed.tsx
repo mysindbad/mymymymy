@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sparkles,
   MapPin,
@@ -7,22 +7,16 @@ import {
   Heart,
   Plus,
   Compass,
-  Filter,
   Search,
-  TrendingUp,
   ShieldCheck,
-  Building2,
-  Landmark,
-  Utensils,
-  AlertTriangle,
-  Tent,
   Radio
 } from 'lucide-react';
-import { Place, PlaceCategory } from '../types';
+import { Place } from '../types';
 import { AiMemoryInsights, fetchPlaces, fetchAiMemoryInsights } from '../services/api';
 import { NorthernMoroccoBanner } from './NorthernMoroccoBanner';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
+import type { UserLocation } from '../hooks/useGeolocation';
 
 interface ExploreFeedProps {
   onSelectPlace: (place: Place) => void;
@@ -35,6 +29,9 @@ interface ExploreFeedProps {
   language?: SupportedLanguage;
   currency?: string;
   initialQuery?: string;
+  userLocation?: UserLocation | null;
+  isPassiveOptedIn?: boolean;
+  onPassiveOptInChange?: (optedIn: boolean) => void;
 }
 
 export const ExploreFeed: React.FC<ExploreFeedProps> = ({
@@ -48,11 +45,12 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   language = 'en',
   currency = 'MAD',
   initialQuery = '',
+  userLocation = null,
 }) => {
   const [places, setPlaces] = useState<Place[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'hidden_gems' | 'accommodations' | 'tourist' | 'emergency'>('all');
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [nearestFirst, setNearestFirst] = useState(Boolean(userLocation));
   const [insights, setInsights] = useState<AiMemoryInsights | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -64,11 +62,18 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
     setSearchQuery(initialQuery);
   }, [initialQuery]);
 
+  useEffect(() => {
+    if (userLocation) setNearestFirst(true);
+  }, [userLocation]);
+
   const loadExploreData = async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [loadedPlaces, loadedInsights] = await Promise.all([fetchPlaces(), fetchAiMemoryInsights()]);
+      const [loadedPlaces, loadedInsights] = await Promise.all([
+        fetchPlaces(userLocation ? { userLat: userLocation.latitude, userLng: userLocation.longitude } : undefined),
+        fetchAiMemoryInsights(),
+      ]);
       setPlaces(loadedPlaces);
       setInsights(loadedInsights);
     } catch (error) {
@@ -80,9 +85,9 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
 
   useEffect(() => {
     void loadExploreData();
-  }, []);
+  }, [userLocation?.latitude, userLocation?.longitude]);
 
-  const filteredPlaces = places.filter((p) => {
+  const filteredPlaces = useMemo(() => places.filter((p) => {
     const query = searchQuery.trim().toLowerCase();
     const matchesQuery = !query || [p.name, p.area, p.arabicName, p.description, p.formationInfo]
       .filter(Boolean)
@@ -92,13 +97,20 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
     if (selectedFilter === 'accommodations' && p.category !== 'accommodation') return false;
     if (selectedFilter === 'tourist' && p.category !== 'tourist_poi') return false;
     if (selectedFilter === 'emergency' && p.category !== 'emergency') return false;
-    if (selectedCategory !== 'All' && p.category !== selectedCategory) return false;
     return true;
-  });
+  }), [places, searchQuery, selectedFilter]);
+
+  const displayedPlaces = useMemo(() => {
+    if (!nearestFirst || !userLocation) return filteredPlaces;
+    return [...filteredPlaces].sort((a, b) => {
+      const distanceA = typeof a.distanceKm === 'number' ? a.distanceKm : Number.POSITIVE_INFINITY;
+      const distanceB = typeof b.distanceKm === 'number' ? b.distanceKm : Number.POSITIVE_INFINITY;
+      return distanceA - distanceB;
+    });
+  }, [filteredPlaces, nearestFirst, userLocation]);
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 animate-in fade-in pb-24 select-none">
-      {/* Feature 6: Northern Morocco Local Depth Focus Banner */}
       <NorthernMoroccoBanner
         onExploreRegion={() => onOpenMapToRegion('Northern Morocco')}
         language={language}
@@ -118,7 +130,6 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
         </div>
       )}
 
-      {/* Community Memory Engine Stats Card: Feature 1 */}
       <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
@@ -171,15 +182,14 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
         />
       </div>
 
-      {/* Filter Tabs: Feature 2 (Distinct Accommodations vs Tourist POIs vs Hidden Gems) */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
             <Compass className="w-4 h-4 text-blue-600" />
             <span>{isAr ? 'استكشف وجهات مختارة وموثقة' : 'Curated Community Discoveries'}</span>
           </h2>
-          <span className="text-xs text-slate-400 font-medium">
-            {filteredPlaces.length} {isAr ? 'مكان متاح' : 'Places Listed'}
+          <span className="text-xs text-slate-400 font-medium shrink-0">
+            {displayedPlaces.length} {isAr ? 'مكان متاح' : 'Places Listed'}
           </span>
         </div>
 
@@ -193,7 +203,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setSelectedFilter(tab.id as any)}
+              onClick={() => setSelectedFilter(tab.id as typeof selectedFilter)}
               className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition border ${
                 selectedFilter === tab.id
                   ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
@@ -204,16 +214,30 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
             </button>
           ))}
         </div>
+
+        {userLocation && (
+          <button
+            type="button"
+            onClick={() => setNearestFirst((current) => !current)}
+            className={`flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black transition ${
+              nearestFirst
+                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <MapPin className="h-3.5 w-3.5" />
+            {nearestFirst ? (isAr ? 'عرض الأقرب أولاً: مفعّل' : 'Show nearest first: On') : (isAr ? 'عرض الأقرب أولاً: متوقف' : 'Show nearest first: Off')}
+          </button>
+        )}
       </div>
 
-      {/* Place Cards Grid: Feature 1 & 2 */}
-      {!isLoading && !loadError && filteredPlaces.length === 0 && (
+      {!isLoading && !loadError && displayedPlaces.length === 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-500">
           {isAr ? 'لا توجد أماكن متاحة حالياً.' : 'No places are available right now.'}
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {filteredPlaces.map((place) => {
+        {displayedPlaces.map((place) => {
           const isSaved = savedPlaceIds.includes(place.id);
           return (
             <div
@@ -221,7 +245,6 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
               className="group bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-xs hover:shadow-md transition flex flex-col justify-between cursor-pointer"
               onClick={() => onSelectPlace(place)}
             >
-              {/* Card Photo Header */}
               <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
                 <img
                   src={place.photos[0]}
@@ -230,7 +253,6 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                {/* Top Badges */}
                 <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span
@@ -263,6 +285,11 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                         <span>Hidden Gem</span>
                       </span>
                     )}
+                    {typeof place.distanceKm === 'number' && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-white/90 text-blue-700 shadow-xs backdrop-blur-md">
+                        {place.distanceKm >= 10 ? Math.round(place.distanceKm) : place.distanceKm.toFixed(1)} km
+                      </span>
+                    )}
                   </div>
 
                   <button
@@ -278,7 +305,6 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                   </button>
                 </div>
 
-                {/* Bottom Photo Overlay Info */}
                 <div className="absolute bottom-3 left-3 right-3 text-white">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium text-slate-200">{place.area}</span>
@@ -291,7 +317,6 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                 </div>
               </div>
 
-              {/* Card Body */}
               <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between gap-1">
@@ -303,13 +328,11 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                     </span>
                   </div>
 
-                  {/* Formation snippet (Feature 2) */}
                   <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
                     {place.formationInfo || place.description}
                   </p>
                 </div>
 
-                {/* Card Footer: Verified Owner tag & Navigate button */}
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1 text-[11px] text-slate-500 truncate">
                     {place.ownerVerified ? (
@@ -317,12 +340,12 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                         <span>{isAr ? 'مالك موثق' : 'Verified Owner'}</span>
                       </span>
-                    ) : (
+                    ) : typeof place.distanceKm === 'number' ? (
                       <span className="text-blue-700 font-medium flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-blue-500" />
-                        <span>{place.distanceKm || 1.2} km away</span>
+                        <span>{place.distanceKm >= 10 ? Math.round(place.distanceKm) : place.distanceKm.toFixed(1)} km away</span>
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
                   <button
