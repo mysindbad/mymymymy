@@ -1,8 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
-import { getNormalizedSupabaseUrl } from './supabase-url.js';
+
+function normalizedSupabaseUrl() {
+  const raw = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  if (!raw) throw new Error('Supabase configuration is missing');
+
+  let value = raw.trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Supabase URL is invalid');
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Supabase URL must use http or https');
+  }
+  return parsed.origin;
+}
 
 function adminClient() {
-  const url = getNormalizedSupabaseUrl();
+  const url = normalizedSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) throw new Error('Supabase server configuration is missing');
   return createClient(url, serviceRoleKey, {
