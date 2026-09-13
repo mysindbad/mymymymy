@@ -30,7 +30,7 @@ function dateFromToday(offset: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatDate(value: string, language: SupportedLanguage) {
+function formatDate(value: string, language: string) {
   if (!value) return '—';
   return new Intl.DateTimeFormat(language === 'ar' ? 'ar-MA' : language, { dateStyle: 'medium' }).format(new Date(value + 'T00:00:00'));
 }
