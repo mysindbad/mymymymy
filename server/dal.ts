@@ -256,6 +256,99 @@ function nonNegativeInteger(value: unknown, field: string): number | undefined {
   return number;
 }
 
+const TRIP_STATUSES = ['planning', 'active', 'completed', 'cancelled'] as const;
+type TripStatus = (typeof TRIP_STATUSES)[number];
+
+export interface TripCreatePayload {
+  name: string;
+  destinationId?: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  currency: string;
+  participantsCount: number;
+  preferences: string[];
+}
+
+export interface TripPatchPayload {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  budget?: number;
+  currency?: string;
+  participantsCount?: number;
+  status?: TripStatus;
+  aiItinerary?: unknown;
+  preferences?: string[];
+}
+
+function validateTripDate(value: unknown, field: string): string {
+  const date = requiredText(value, field);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    throw new DataValidationError(`${field} must be a valid date in YYYY-MM-DD format`);
+  }
+  return date;
+}
+
+function validateTripPreferences(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    throw new DataValidationError('preferences must be an array of strings');
+  }
+  return value.map((item) => item.trim()).filter(Boolean);
+}
+
+export function validateTripCreatePayload(input: unknown): TripCreatePayload {
+  const value = (input || {}) as Record<string, unknown>;
+  const startDate = validateTripDate(value.startDate ?? value.start_date, 'startDate');
+  const endDate = validateTripDate(value.endDate ?? value.end_date, 'endDate');
+  if (endDate < startDate) throw new DataValidationError('endDate must be on or after startDate');
+  const budget = optionalNumber(value.budget, 'budget', Number.MIN_VALUE, Number.MAX_SAFE_INTEGER);
+  if (budget === undefined) throw new DataValidationError('budget is required');
+  const participantsCount = nonNegativeInteger(value.participantsCount ?? value.participants_count, 'participantsCount');
+  if (participantsCount === undefined || participantsCount < 1) throw new DataValidationError('participantsCount must be at least 1');
+  const destinationId = optionalText(value.destinationId ?? value.destination_id);
+  return {
+    name: requiredText(value.name, 'name'),
+    destinationId,
+    startDate,
+    endDate,
+    budget,
+    currency: optionalText(value.currency) || 'MAD',
+    participantsCount,
+    preferences: validateTripPreferences(value.preferences),
+  };
+}
+
+export function validateTripPatchPayload(input: unknown): TripPatchPayload {
+  const value = (input || {}) as Record<string, unknown>;
+  const patch: TripPatchPayload = {};
+  if ('name' in value) patch.name = requiredText(value.name, 'name');
+  if ('startDate' in value || 'start_date' in value) patch.startDate = validateTripDate(value.startDate ?? value.start_date, 'startDate');
+  if ('endDate' in value || 'end_date' in value) patch.endDate = validateTripDate(value.endDate ?? value.end_date, 'endDate');
+  if (patch.startDate && patch.endDate && patch.endDate < patch.startDate) throw new DataValidationError('endDate must be on or after startDate');
+  if ('budget' in value) {
+    const budget = optionalNumber(value.budget, 'budget', Number.MIN_VALUE, Number.MAX_SAFE_INTEGER);
+    if (budget === undefined) throw new DataValidationError('budget is required');
+    patch.budget = budget;
+  }
+  if ('currency' in value) patch.currency = requiredText(value.currency, 'currency');
+  if ('participantsCount' in value || 'participants_count' in value) {
+    const participantsCount = nonNegativeInteger(value.participantsCount ?? value.participants_count, 'participantsCount');
+    if (participantsCount === undefined || participantsCount < 1) throw new DataValidationError('participantsCount must be at least 1');
+    patch.participantsCount = participantsCount;
+  }
+  if ('status' in value) {
+    const status = requiredText(value.status, 'status');
+    if (!TRIP_STATUSES.includes(status as TripStatus)) throw new DataValidationError('Invalid trip status');
+    patch.status = status as TripStatus;
+  }
+  if ('aiItinerary' in value || 'ai_itinerary' in value) patch.aiItinerary = value.aiItinerary ?? value.ai_itinerary;
+  if ('preferences' in value) patch.preferences = validateTripPreferences(value.preferences);
+  if (Object.keys(patch).length === 0) throw new DataValidationError('At least one trip field is required');
+  return patch;
+}
+
 export function validatePlacePayload(input: unknown): PlacePayload {
   const value = (input || {}) as Record<string, unknown>;
   const category = requiredText(value.category, 'category');
@@ -363,6 +456,26 @@ function mapPlace(row: any): any {
   };
 }
 
+function mapTrip(row: any): any {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    destinationId: row.destination_id,
+    destinationName: row.destination?.name || null,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    budget: Number(row.budget),
+    currency: row.currency,
+    participantsCount: row.participants_count,
+    status: row.status,
+    preferences: Array.isArray(row.preferences) ? row.preferences : [],
+    aiItinerary: row.ai_itinerary,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export function throwMappedSupabaseError(error: any): never {
   const message = error?.message || 'Database request failed';
   if (error?.code === '42501' || /row-level security|permission denied/i.test(message)) {
@@ -383,6 +496,14 @@ export function createDal(accessToken?: string) {
     const { data, error } = await userClient!.auth.getUser(token);
     if (error || !data.user) throw new DalAuthenticationError(error?.message || 'Invalid access token');
     return data.user;
+  };
+
+  const getOwnedTrip = async (id: string, userId: string) => {
+    const { data, error } = await getSupabaseAdmin().from('trips').select('id, user_id').eq('id', id).maybeSingle();
+    if (error) throwMappedSupabaseError(error);
+    if (!data) return null;
+    if (data.user_id !== userId) throw new DalAuthorizationError();
+    return data;
   };
 
   return {
@@ -472,6 +593,69 @@ export function createDal(accessToken?: string) {
         const { data, error } = await getSupabaseAdmin().rpc('increment_place_checkins', { place_id_input: placeId });
         if (error) throwMappedSupabaseError(error);
         return { checkInsCount: data };
+      },
+    },
+    trips: {
+      async list() {
+        const user = await verifyUser();
+        const { data, error } = await userClient!.from('trips').select('*, destination:places(name)').eq('user_id', user.id).order('created_at', { ascending: false });
+        if (error) throwMappedSupabaseError(error);
+        return (data || []).map(mapTrip);
+      },
+      async create(payload: TripCreatePayload) {
+        const user = await verifyUser();
+        if (payload.destinationId) {
+          const { data: destination, error: destinationError } = await getSupabaseAdmin().from('places').select('id').eq('id', payload.destinationId).maybeSingle();
+          if (destinationError) throwMappedSupabaseError(destinationError);
+          if (!destination) throw new DataValidationError('destinationId does not exist');
+        }
+        const { data, error } = await userClient!.from('trips').insert({
+          user_id: user.id,
+          name: payload.name,
+          destination_id: payload.destinationId || null,
+          start_date: payload.startDate,
+          end_date: payload.endDate,
+          budget: payload.budget,
+          currency: payload.currency,
+          participants_count: payload.participantsCount,
+          preferences: payload.preferences,
+        }).select('*, destination:places(name)').single();
+        if (error) throwMappedSupabaseError(error);
+        return mapTrip(data);
+      },
+      async get(id: string) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(id, user.id);
+        if (!owned) return null;
+        const { data, error } = await getSupabaseAdmin().from('trips').select('*, destination:places(name)').eq('id', id).single();
+        if (error) throwMappedSupabaseError(error);
+        return mapTrip(data);
+      },
+      async update(id: string, patch: TripPatchPayload) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(id, user.id);
+        if (!owned) return null;
+        const row: Record<string, unknown> = {};
+        if (patch.name !== undefined) row.name = patch.name;
+        if (patch.startDate !== undefined) row.start_date = patch.startDate;
+        if (patch.endDate !== undefined) row.end_date = patch.endDate;
+        if (patch.budget !== undefined) row.budget = patch.budget;
+        if (patch.currency !== undefined) row.currency = patch.currency;
+        if (patch.participantsCount !== undefined) row.participants_count = patch.participantsCount;
+        if (patch.status !== undefined) row.status = patch.status;
+        if (patch.aiItinerary !== undefined) row.ai_itinerary = patch.aiItinerary;
+        if (patch.preferences !== undefined) row.preferences = patch.preferences;
+        const { data, error } = await userClient!.from('trips').update(row).eq('id', id).eq('user_id', user.id).select('*, destination:places(name)').single();
+        if (error) throwMappedSupabaseError(error);
+        return mapTrip(data);
+      },
+      async remove(id: string) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(id, user.id);
+        if (!owned) return false;
+        const { error } = await userClient!.from('trips').delete().eq('id', id).eq('user_id', user.id);
+        if (error) throwMappedSupabaseError(error);
+        return true;
       },
     },
     traces: {

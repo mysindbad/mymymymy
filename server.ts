@@ -9,6 +9,8 @@ import {
   DataValidationError,
   supabaseAdmin,
   throwMappedSupabaseError,
+  validateTripCreatePayload,
+  validateTripPatchPayload,
 } from './server/dal.ts';
 
 declare global {
@@ -212,6 +214,58 @@ app.get('/api/user/profile', requireAuth, async (req, res, next) => {
       .maybeSingle();
     if (error) throwMappedSupabaseError(error);
     res.json({ profile: data || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/trips', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    res.json({ trips: await createDal(token).trips.list() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/trips', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const trip = await createDal(token).trips.create(validateTripCreatePayload(req.body));
+    res.status(201).json({ trip });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/trips/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const trip = await createDal(token).trips.get(req.params.id);
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    res.json({ trip });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/trips/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const trip = await createDal(token).trips.update(req.params.id, validateTripPatchPayload(req.body));
+    if (!trip) return res.status(404).json({ error: 'Trip not found' });
+    res.json({ trip });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/trips/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const removed = await createDal(token).trips.remove(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Trip not found' });
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
