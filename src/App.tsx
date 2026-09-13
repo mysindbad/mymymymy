@@ -31,6 +31,8 @@ import { SupportedLanguage, TRANSLATIONS } from './data/translations';
 import mySindbadTransparent from './assets/images/my_sindbad_logo_transparent.png';
 import { AuthFlowModal, AuthScreenType } from './components/AuthFlowModal';
 import { AIIcon } from './components/AIIcon';
+import { OnboardingModal, hasCompletedOnboarding } from './components/OnboardingModal';
+import { useGeolocation } from './hooks/useGeolocation';
 
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
 type ExploreView = 'feed' | 'map';
@@ -48,6 +50,7 @@ function readStoredXp(): number {
 }
 
 type CurrentUser = {
+  id: string;
   name: string;
   email: string;
   avatar: string;
@@ -74,11 +77,13 @@ export default function App() {
   const [isFlightsOpen, setIsFlightsOpen] = useState(false);
   const [isWeatherOpen, setIsWeatherOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isSessionResolved, setIsSessionResolved] = useState(false);
   const [authInitialScreen, setAuthInitialScreen] = useState<AuthScreenType>('welcome');
 
   // User Settings & Profile
   const [currentUser, setCurrentUser] = useState<CurrentUser>({
+    id: '',
     name: '',
     email: '',
     avatar: '🧔',
@@ -109,6 +114,7 @@ export default function App() {
       return ['akchour-bridge', 'riad-el-pueblo'];
     }
   });
+  const { location: userLocation, permission, requestPermission } = useGeolocation();
 
   const handlePassiveOptInChange = (optedIn: boolean) => {
     setIsPassiveOptedIn(optedIn);
@@ -142,6 +148,14 @@ export default function App() {
     }
   }, [userXp, currentUser.isLoggedIn, isSessionResolved]);
 
+  useEffect(() => {
+    if (!isSessionResolved || !currentUser.isLoggedIn || !currentUser.id) {
+      setIsOnboardingOpen(false);
+      return;
+    }
+    setIsOnboardingOpen(!hasCompletedOnboarding(currentUser.id));
+  }, [currentUser.id, currentUser.isLoggedIn, isSessionResolved]);
+
   // Apply RTL direction when Arabic is selected
   useEffect(() => {
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
@@ -165,10 +179,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const applySession = (session: { user?: { email?: string; user_metadata?: Record<string, unknown> } } | null) => {
+    const applySession = (session: { user?: { id?: string; email?: string; user_metadata?: Record<string, unknown> } } | null) => {
       const user = session?.user;
       if (!user) {
-        setCurrentUser({ name: '', email: '', avatar: '🧔', isLoggedIn: false });
+        setCurrentUser({ id: '', name: '', email: '', avatar: '🧔', isLoggedIn: false });
         setUserXp(readStoredXp());
         return;
       }
@@ -176,6 +190,7 @@ export default function App() {
       const metadataXp = Number(metadata.community_xp);
       setUserXp(Number.isFinite(metadataXp) && metadataXp >= 0 ? Math.floor(metadataXp) : readStoredXp());
       setCurrentUser({
+        id: user.id || '',
         name: typeof metadata.full_name === 'string' && metadata.full_name.trim()
           ? metadata.full_name
           : user.email?.split('@')[0] || 'Traveler',
@@ -333,6 +348,7 @@ export default function App() {
                 onToggleSave={handleToggleSave}
                 language={language}
                 currency={currency}
+                userLocation={userLocation}
                 isPassiveOptedIn={isPassiveOptedIn}
                 onPassiveOptInChange={handlePassiveOptInChange}
               />
@@ -348,6 +364,9 @@ export default function App() {
                 savedPlaceIds={savedPlaceIds}
                 language={language}
                 currency={currency}
+                userLocation={userLocation}
+                isPassiveOptedIn={isPassiveOptedIn}
+                onPassiveOptInChange={handlePassiveOptInChange}
               />
             )}
           </div>
@@ -515,6 +534,7 @@ export default function App() {
         onToggleLanguage={setLanguage}
         onAuthSuccess={(user) => {
           setCurrentUser({
+            id: user.id,
             name: user.name,
             email: user.email,
             avatar: user.avatar,
@@ -525,6 +545,18 @@ export default function App() {
           }
         }}
       />
+
+      {isOnboardingOpen && currentUser.isLoggedIn && currentUser.id && (
+        <OnboardingModal
+          userId={currentUser.id}
+          language={language}
+          onLanguageChange={setLanguage}
+          userLocation={userLocation}
+          permission={permission}
+          requestPermission={requestPermission}
+          onComplete={() => setIsOnboardingOpen(false)}
+        />
+      )}
 
       {/* Flights Discovery Modal */}
       <FlightsModal
