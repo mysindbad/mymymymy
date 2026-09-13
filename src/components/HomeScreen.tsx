@@ -22,7 +22,6 @@ import {
 import { Place } from '../types';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { BrandLogo } from './BrandLogo';
-import { LanguageFlagSelector } from './LanguageFlagSelector';
 
 interface HomeScreenProps {
   onOpenAIChat: () => void;
@@ -38,7 +37,6 @@ interface HomeScreenProps {
   savedPlaceIds: string[];
   onToggleSave: (placeId: string) => void;
   language?: SupportedLanguage;
-  onToggleLanguage?: (lang: SupportedLanguage) => void;
   onOpenAuth?: (screen?: any) => void;
   currentUser?: { name: string; email: string; avatar: string; isLoggedIn?: boolean };
 }
@@ -57,7 +55,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   savedPlaceIds,
   onToggleSave,
   language = 'en',
-  onToggleLanguage,
   onOpenAuth,
   currentUser,
 }) => {
@@ -191,17 +188,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           {/* Exterior Language Flag Switcher + User Traveler Greeting + Notification Bell */}
           <div className="flex items-center gap-1.5">
-            {/* Direct Language Flag Selector at outer entry */}
-            {onToggleLanguage && (
-              <div className="bg-white/90 backdrop-blur-md rounded-full shadow-sm border border-slate-200/80 p-0.5">
-                <LanguageFlagSelector
-                  currentLanguage={language}
-                  onSelectLanguage={onToggleLanguage}
-                  variant="compact"
-                />
-              </div>
-            )}
-
             <button
               onClick={() => {
                 if (onOpenAuth) {
