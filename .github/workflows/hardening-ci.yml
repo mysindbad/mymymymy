@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -22,19 +22,6 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
-      - name: Apply Vercel entrypoint hardening
-        run: python3 scripts/apply-vercel-entrypoint-hardening.py
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
-      - name: Persist tested Vercel entrypoint hardening
-        if: github.event_name == 'push'
-        run: |
-          if git diff --quiet -- api/index.ts; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api/index.ts
-          git commit -m "security: harden Vercel API entrypoints"
-          git push origin HEAD:audit/vercel-entrypoints-20260913
