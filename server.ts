@@ -363,6 +363,86 @@ app.get('/api/traces/summary', async (_req, res, next) => {
   }
 });
 
+app.post('/api/ai/plan-trip', requireAuth, async (req, res, next) => {
+  try {
+    const input = req.body || {};
+    const payload = validateTripCreatePayload({ ...input, participantsCount: input.participants ?? input.participantsCount });
+    const destination = await createDal().places.getById(payload.destinationId || '');
+    if (!destination) return res.status(404).json({ error: 'Destination not found' });
+    const dayCount = Math.min(7, Math.floor((Date.parse(`${payload.endDate}T00:00:00Z`) - Date.parse(`${payload.startDate}T00:00:00Z`)) / 86400000) + 1);
+    const preferences = payload.preferences.length ? payload.preferences.join(', ') : 'none specified';
+    const placeContext = JSON.stringify({
+      id: destination.id,
+      name: destination.name,
+      arabicName: destination.arabicName,
+      category: destination.category,
+      region: destination.region,
+      area: destination.area,
+      address: destination.address,
+      description: destination.description,
+      rating: destination.rating,
+      reviews: (destination.reviews || []).slice(0, 20).map((review: any) => ({ rating: review.rating, text: review.text, tags: review.tags })),
+    });
+    const client = getGeminiClient();
+    if (!client) return res.status(503).json({ error: 'AI planning temporarily unavailable' });
+    const prompt = [
+      'Act as an expert Morocco travel planner for My Sindbad.',
+      'Use ONLY the provided place data and general knowledge of the region. Do not invent specific businesses, attractions, prices, or facts not grounded in the place data.',
+      'Return ONLY valid JSON with this exact shape: {"days":[{"day":1,"title":"...","items":[{"time":"09:00","activity":"...","category":"food|sight|activity|transport|accommodation","estimatedCost":number,"note":"..."}],"dailyCost":number}],"totalEstimatedCost":number,"currency":"...","tips":["..."]}.',
+      `Create exactly ${dayCount} day(s), with the inclusive date range ${payload.startDate} to ${payload.endDate}; the maximum is 7 days.`,
+      `Respect the budget: totalEstimatedCost must be <= ${payload.budget} ${payload.currency}; scale choices to the budget and express all costs in ${payload.currency}.`,
+      `Preferences: ${preferences}. Participants: ${payload.participantsCount}. Destination data: ${placeContext}.`,
+    ].join('\n');
+    let responseText: string | undefined;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const aiRequest = client.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' },
+      });
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error('AI planning timed out')), 20000);
+      });
+      const response = await Promise.race([aiRequest, timeout]);
+      responseText = response.text;
+    } catch {
+      return res.status(503).json({ error: 'AI planning temporarily unavailable' });
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(responseText || '');
+      if (!parsed || !Array.isArray(parsed.days) || parsed.days.length !== dayCount || !Array.isArray(parsed.tips)) throw new Error('Invalid itinerary shape');
+      const allowedCategories = new Set(['food', 'sight', 'activity', 'transport', 'accommodation']);
+      let totalEstimatedCost = 0;
+      parsed.days = parsed.days.map((day: any, index: number) => {
+        if (!day || !Array.isArray(day.items)) throw new Error('Invalid itinerary day');
+        const items = day.items.map((item: any) => {
+          const estimatedCost = Number(item.estimatedCost);
+          if (typeof item.time !== 'string' || typeof item.activity !== 'string' || !allowedCategories.has(item.category) || !Number.isFinite(estimatedCost) || estimatedCost < 0 || typeof item.note !== 'string') {
+            throw new Error('Invalid itinerary item');
+          }
+          return { time: item.time, activity: item.activity, category: item.category, estimatedCost, note: item.note };
+        });
+        const dailyCost = items.reduce((sum: number, item: any) => sum + item.estimatedCost, 0);
+        totalEstimatedCost += dailyCost;
+        return { day: index + 1, title: typeof day.title === 'string' ? day.title : `Day ${index + 1}`, items, dailyCost };
+      });
+      parsed.totalEstimatedCost = totalEstimatedCost;
+      parsed.currency = payload.currency;
+      parsed.tips = parsed.tips.filter((tip: unknown): tip is string => typeof tip === 'string');
+      const overBudget = totalEstimatedCost > payload.budget;
+      return res.json({ itinerary: parsed, overBudget, aiGenerated: true });
+    } catch {
+      return res.status(503).json({ error: 'AI planning temporarily unavailable' });
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/ai/chat', async (req, res, next) => {
   try {
     const { message, language = 'en' } = req.body || {};
