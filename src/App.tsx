@@ -74,6 +74,7 @@ export default function App() {
   const [isFlightsOpen, setIsFlightsOpen] = useState(false);
   const [isWeatherOpen, setIsWeatherOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isSessionResolved, setIsSessionResolved] = useState(false);
   const [authInitialScreen, setAuthInitialScreen] = useState<AuthScreenType>('welcome');
 
   // User Settings & Profile
@@ -136,10 +137,10 @@ export default function App() {
       // Storage may be unavailable; keep the current session XP.
     }
 
-    if (currentUser.isLoggedIn) {
+    if (isSessionResolved && currentUser.isLoggedIn) {
       void supabase.auth.updateUser({ data: { community_xp: userXp } });
     }
-  }, [userXp, currentUser.isLoggedIn]);
+  }, [userXp, currentUser.isLoggedIn, isSessionResolved]);
 
   // Apply RTL direction when Arabic is selected
   useEffect(() => {
@@ -184,7 +185,9 @@ export default function App() {
       });
     };
 
-    void supabase.auth.getSession().then(({ data }) => applySession(data.session));
+    void supabase.auth.getSession().then(({ data }) => applySession(data.session)).finally(() => {
+      setIsSessionResolved(true);
+    });
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       applySession(session);
     });
@@ -499,6 +502,9 @@ export default function App() {
             avatar: user.avatar,
             isLoggedIn: true,
           });
+          if (typeof user.xp === 'number' && Number.isFinite(user.xp) && user.xp >= 0) {
+            setUserXp(Math.floor(user.xp));
+          }
         }}
       />
 
