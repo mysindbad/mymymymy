@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plane, Calendar, ArrowRight, Sparkles, MapPin, Check } from 'lucide-react';
+import { X, Plane } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 
 interface FlightsModalProps {
@@ -17,33 +17,6 @@ export const FlightsModal: React.FC<FlightsModalProps> = ({ isOpen, onClose, lan
   const [showResults, setShowResults] = useState(false);
 
   if (!isOpen) return null;
-
-  const deals = [
-    {
-      airline: 'Royal Air Maroc',
-      flightNo: 'AT 402',
-      departTime: '09:15',
-      arriveTime: '10:25',
-      price: '$64',
-      type: 'Direct • 1h 10m',
-    },
-    {
-      airline: 'Air Arabia Maroc',
-      flightNo: '3O 118',
-      departTime: '14:30',
-      arriveTime: '15:40',
-      price: '$48',
-      type: 'Direct • 1h 10m',
-    },
-    {
-      airline: 'Iberia',
-      flightNo: 'IB 3340',
-      departTime: '18:50',
-      arriveTime: '20:10',
-      price: '$82',
-      type: 'Direct • 1h 20m',
-    },
-  ];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,8 +36,8 @@ export const FlightsModal: React.FC<FlightsModalProps> = ({ isOpen, onClose, lan
               <Plane className="w-5 h-5 text-white -rotate-45" />
             </div>
             <div>
-              <h3 className="font-bold text-base">{isAr ? 'حجوزات الطيران الذكية' : 'Flights • Best Deals Worldwide'}</h3>
-              <p className="text-xs text-sky-100">{isAr ? 'مقارنة أسعار الرحلات بمساعدة الذكاء الاصطناعي' : 'AI-assisted flight pricing & direct connections'}</p>
+              <h3 className="font-bold text-base">{isAr ? 'تخطيط الرحلات الجوية' : 'Flight Planning'}</h3>
+              <p className="text-xs text-sky-100">{isAr ? 'خطط لمسارك — الأسعار الحية غير متصلة بعد' : 'Plan your route — live fares are not connected yet'}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center">
@@ -115,25 +88,21 @@ export const FlightsModal: React.FC<FlightsModalProps> = ({ isOpen, onClose, lan
 
           {showResults && (
             <div className="space-y-2 pt-3 border-t border-slate-100">
-              <h4 className="text-xs font-bold text-slate-800">{isAr ? 'أفضل الرحلات المتاحة' : 'Available Direct Options'}</h4>
-              {deals.map((deal) => (
-                <div key={deal.flightNo} className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-slate-900 text-xs block">{deal.airline} • {deal.flightNo}</span>
-                    <span className="text-[11px] text-slate-500">{deal.departTime} → {deal.arriveTime} ({deal.type})</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-base font-black text-blue-600 block">{deal.price}</span>
-                    <button
-                      type="button"
-                      onClick={() => alert(`Redirecting to ${deal.airline} booking partner...`)}
-                      className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-700"
-                    >
-                      {isAr ? 'حجز' : 'Select'}
-                    </button>
-                  </div>
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                <h4 className="text-xs font-bold text-amber-900">
+                  {isAr ? 'البحث المباشر غير متصل بعد' : 'Live flight search is not connected yet'}
+                </h4>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  {isAr
+                    ? 'تم حفظ تفاصيل مسارك فقط. لن نعرض أسعاراً أو رحلات ثابتة على أنها عروض حقيقية.'
+                    : 'Your route details are ready, but no live prices or flight options are being shown as real offers.'}
+                </p>
+                <div className="text-[11px] font-semibold text-slate-700 space-y-0.5">
+                  <div>{isAr ? 'من:' : 'From:'} {fromCity || '—'}</div>
+                  <div>{isAr ? 'إلى:' : 'To:'} {toCity || '—'}</div>
+                  <div>{isAr ? 'التاريخ:' : 'Date:'} {flightDate || '—'}</div>
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </form>
