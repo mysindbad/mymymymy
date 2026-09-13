@@ -55,27 +55,47 @@ export interface TraceSummary {
   }>;
 }
 
-async function getAccessToken(): Promise<string | null> {
-  const { data, error } = await supabase.auth.getSession();
+async function getAccessToken(forceRefresh = false): Promise<string | null> {
+  const { data, error } = forceRefresh
+    ? await supabase.auth.refreshSession()
+    : await supabase.auth.getSession();
   if (error) throw new Error(error.message);
   return data.session?.access_token || null;
 }
 
 async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Promise<T> {
   const { requiresAuth = false, body, headers, ...requestOptions } = options;
-  const token = await getAccessToken();
+  let token = await getAccessToken();
+  if (requiresAuth && !token) {
+    try {
+      token = await getAccessToken(true);
+    } catch {
+      // The authentication error below provides the user-facing state.
+    }
+  }
   if (requiresAuth && !token) throw new ApiAuthenticationError();
 
-  const requestHeaders = new Headers(headers);
-  if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
-  if (token) requestHeaders.set('Authorization', `Bearer ${token}`);
+  const sendRequest = (requestToken: string | null) => {
+    const requestHeaders = new Headers(headers);
+    if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
+    if (requestToken) requestHeaders.set('Authorization', `Bearer ${requestToken}`);
+    return fetch(url, {
+      ...requestOptions,
+      headers: requestHeaders,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: options.signal || AbortSignal.timeout(8000),
+    });
+  };
 
-  const response = await fetch(url, {
-    ...requestOptions,
-    headers: requestHeaders,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: options.signal || AbortSignal.timeout(8000),
-  });
+  let response = await sendRequest(token);
+  if (requiresAuth && response.status === 401) {
+    try {
+      const refreshedToken = await getAccessToken(true);
+      if (refreshedToken) response = await sendRequest(refreshedToken);
+    } catch {
+      // Keep the original authentication response for consistent handling.
+    }
+  }
   const payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
   if (response.status === 401) throw new ApiAuthenticationError(payload.error);
   if (!response.ok) throw new Error(payload.error || `Request failed with status ${response.status}`);
