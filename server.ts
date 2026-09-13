@@ -20,6 +20,7 @@ declare global {
     interface Request {
       user: { id: string; email?: string } | null;
       accessToken: string | null;
+      authFailure: 'TOKEN_MISSING' | 'TOKEN_INVALID' | null;
     }
   }
 }
@@ -28,6 +29,22 @@ const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const CLIENT_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+
+function originOf(value: string | undefined): string {
+  if (!value) return '';
+  try {
+    return new URL(value).origin;
+  } catch {
+    return '[invalid-url]';
+  }
+}
+
+const serverSupabaseOrigin = originOf(SUPABASE_URL);
+const clientSupabaseOrigin = originOf(CLIENT_SUPABASE_URL);
+if (serverSupabaseOrigin && clientSupabaseOrigin && serverSupabaseOrigin !== clientSupabaseOrigin) {
+  console.error('AUTH_ENV_MISMATCH', { serverOrigin: serverSupabaseOrigin, clientOrigin: clientSupabaseOrigin });
+}
 
 let supabaseAuth: ReturnType<typeof createClient> | null = null;
 function getSupabaseAuth() {
@@ -70,28 +87,72 @@ function requireRoutePoint(input: unknown): [number, number] {
   return [latitude, longitude];
 }
 
+function requestLanguage(req: Request): 'ar' | 'en' {
+  const requested = typeof req.query.lang === 'string'
+    ? req.query.lang
+    : req.header('accept-language')?.split(',')[0]?.trim();
+  return requested?.toLowerCase().startsWith('ar') ? 'ar' : 'en';
+}
+
+function redactAuthMessage(value: unknown): string {
+  return String(value || 'Unknown Supabase auth error')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/eyJ[A-Za-z0-9._-]+/g, '[redacted]');
+}
+
+function logAuthVerificationFailure(error: unknown) {
+  const details = error as { code?: unknown; message?: unknown } | null;
+  console.error('Supabase auth verification failed', {
+    code: details?.code ? String(details.code) : undefined,
+    message: redactAuthMessage(details?.message || error),
+  });
+}
+
+function authenticationError(req: Request) {
+  const error = new DalAuthenticationError() as DalAuthenticationError & { code?: string };
+  error.code = req.authFailure || 'TOKEN_INVALID';
+  return error;
+}
+
 function authMiddleware(req: Request, _res: Response, next: NextFunction) {
   req.user = null;
   req.accessToken = null;
+  req.authFailure = null;
   const header = req.header('authorization');
-  const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token) return next();
+  if (!header) {
+    req.authFailure = 'TOKEN_MISSING';
+    return next();
+  }
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!token) {
+    req.authFailure = 'TOKEN_INVALID';
+    return next();
+  }
 
   try {
     void getSupabaseAuth().auth.getUser(token).then(({ data, error }) => {
       if (!error && data.user) {
         req.user = { id: data.user.id, email: data.user.email };
         req.accessToken = token;
+      } else {
+        req.authFailure = 'TOKEN_INVALID';
+        logAuthVerificationFailure(error || new Error('Supabase did not return a user'));
       }
       next();
-    }).catch(() => next());
-  } catch {
+    }).catch((error) => {
+      req.authFailure = 'TOKEN_INVALID';
+      logAuthVerificationFailure(error);
+      next();
+    });
+  } catch (error) {
+    req.authFailure = 'TOKEN_INVALID';
+    logAuthVerificationFailure(error);
     next();
   }
 }
 
 function requireAuth(req: Request, _res: Response, next: NextFunction) {
-  if (!req.user || !req.accessToken) return next(new DalAuthenticationError());
+  if (!req.user || !req.accessToken) return next(authenticationError(req));
   next();
 }
 
@@ -99,7 +160,7 @@ const checkinCooldowns = new Map<string, number>();
 const CHECKIN_COOLDOWN_MS = 60_000;
 
 function requestUser(req: Request) {
-  if (!req.user || !req.accessToken) throw new DalAuthenticationError();
+  if (!req.user || !req.accessToken) throw authenticationError(req);
   return { id: req.user.id, token: req.accessToken };
 }
 
@@ -173,10 +234,18 @@ function userInputBlock(value: string): string {
   return `<user_input>${escaped}</user_input>`;
 }
 
-function appErrorHandler(error: any, _req: Request, res: Response, _next: NextFunction) {
+function appErrorHandler(error: any, req: Request, res: Response, _next: NextFunction) {
   const status = Number(error?.status || 500);
+  const isAuthError = status === 401 || error?.code === 'TOKEN_MISSING' || error?.code === 'TOKEN_INVALID';
+  const code = isAuthError ? (error?.code || 'TOKEN_INVALID') : (typeof error?.code === 'string' ? error.code : undefined);
+  const ar = isAuthError
+    ? (code === 'TOKEN_MISSING' ? 'جلسة غير موجودة' : 'انتهت الجلسة، سجل الدخول مجدداً')
+    : (status >= 500 ? 'خطأ داخلي في الخادم' : error?.message || 'تعذر تنفيذ الطلب');
+  const en = isAuthError
+    ? (code === 'TOKEN_MISSING' ? 'No session' : 'Session expired')
+    : (status >= 500 ? 'Internal server error' : error?.message || 'Request failed');
   if (status >= 500) console.error(error);
-  res.status(status).json({ error: status >= 500 ? 'Internal server error' : error.message || 'Request failed' });
+  res.status(status).json({ error: requestLanguage(req) === 'ar' ? ar : en, ...(code ? { code } : {}), ar, en });
 }
 
 function haversineDistanceKm([lat1, lng1]: [number, number], [lat2, lng2]: [number, number]) {
