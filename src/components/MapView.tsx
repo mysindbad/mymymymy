@@ -9,7 +9,6 @@ import {
   Plus,
   Radio,
   Layers,
-  MapPin,
   ShieldCheck
 } from 'lucide-react';
 import { Place, PlaceCategory } from '../types';
@@ -86,13 +85,15 @@ export const MapView: React.FC<MapViewProps> = ({
     const query = searchQuery.trim().toLowerCase();
     return places.filter((place) => {
       const matchesCategory = selectedCategory === 'All' || place.category === selectedCategory;
-      if (!matchesCategory) return false;
+      const matchesRegion = selectedRegion === 'All' || place.region === selectedRegion;
+      const matchesHiddenGem = !onlyHiddenGems || Boolean(place.isUnderDocumentedGem);
+      if (!matchesCategory || !matchesRegion || !matchesHiddenGem) return false;
       if (!query) return true;
       return [place.name, place.area, place.arabicName, place.description, place.formationInfo]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query));
     });
-  }, [places, searchQuery, selectedCategory]);
+  }, [places, searchQuery, selectedCategory, selectedRegion, onlyHiddenGems]);
 
   useEffect(() => {
     if (!activeNearbyPlace || !visiblePlaces.some((place) => place.id === activeNearbyPlace.id)) {
@@ -221,7 +222,7 @@ export const MapView: React.FC<MapViewProps> = ({
         if (coordinates.length > 1) {
           tracesLayerRef.current.addLayer(
             L.polyline(coordinates, { color: '#38bdf8', weight: 4, opacity: 0.75 })
-              .bindTooltip(isAr ? 'مسارات حقيقية من المجتمع' : 'Real community traces', { sticky: true })
+              .bindTooltip(isAr ? 'مسارات المجتمع المتاحة' : 'Available community traces', { sticky: true })
           );
         }
         coordinates.forEach((coordinate) => {
@@ -296,16 +297,25 @@ export const MapView: React.FC<MapViewProps> = ({
   const handleToggleTraces = async () => {
     if (showCrowdHeatmap) {
       setShowCrowdHeatmap(false);
+      setTracesError(null);
       return;
     }
     setTracesLoading(true);
     setTracesError(null);
     try {
       const summary = await fetchTracesSummary();
+      if (summary.recent.length === 0) {
+        setRealTraces([]);
+        setShowCrowdHeatmap(false);
+        setTracesError(summary.totalTraces > 0
+          ? (isAr ? 'الإحداثيات الخام خاصة؛ لا توجد طبقة مجمعة للخريطة بعد' : 'Raw trace coordinates are private; an aggregate map layer is not available yet')
+          : (isAr ? 'لا توجد مساهمات GPS مجمعة لعرضها حالياً' : 'No aggregate GPS contributions are available to display yet'));
+        return;
+      }
       setRealTraces(summary.recent.map((trace) => ({ coordinates: trace.coordinates })));
       setShowCrowdHeatmap(true);
     } catch (error) {
-      setTracesError(error instanceof Error ? error.message : 'Failed to load traces');
+      setTracesError(error instanceof Error ? error.message : 'Failed to load trace summary');
     } finally {
       setTracesLoading(false);
     }
@@ -410,22 +420,22 @@ export const MapView: React.FC<MapViewProps> = ({
               ? 'bg-emerald-600 border-emerald-700 text-white shadow-emerald-500/25'
               : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
-          title={isAr ? 'عرض مسارات المجتمع الحية' : 'Toggle Crowdsourced GPS Trails'}
+          title={isAr ? 'حالة بيانات GPS المجتمعية' : 'Community GPS data status'}
         >
           <Layers className={`w-5 h-5 ${tracesLoading ? 'animate-pulse' : ''}`} />
         </button>
         {tracesError && (
-          <div className="max-w-[180px] rounded-xl bg-rose-50 px-2.5 py-2 text-[10px] font-bold text-rose-700 shadow-lg">
-            {isAr ? 'تعذر تحميل المسارات الحقيقية' : 'Could not load real traces'}
+          <div className="max-w-[210px] rounded-xl bg-rose-50 px-2.5 py-2 text-[10px] font-bold text-rose-700 shadow-lg">
+            {tracesError}
           </div>
         )}
 
         <button
           onClick={() => setIsPassiveDataOpen(true)}
           className="w-10 h-10 rounded-2xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:text-emerald-600 transition active:scale-95 relative"
-          title={isAr ? 'مشاركة الموقع غير المباشرة' : 'Passive GPS Sharing Status'}
+          title={isAr ? 'إدارة مساهمات GPS الاختيارية' : 'Manage optional GPS contributions'}
         >
-          <Radio className={`w-5 h-5 ${isPassiveOptedIn ? 'text-emerald-600 animate-pulse' : 'text-slate-400'}`} />
+          <Radio className={`w-5 h-5 ${isPassiveOptedIn ? 'text-emerald-600' : 'text-slate-400'}`} />
           {isPassiveOptedIn && (
             <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white" />
           )}
@@ -436,12 +446,12 @@ export const MapView: React.FC<MapViewProps> = ({
         <div className="p-2.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700 text-white shadow-lg space-y-1">
           <div className="flex items-center gap-1 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
             <ShieldCheck className="w-3 h-3" />
-            <span>{isAr ? 'عمق محلي فائق' : 'Deep Local Coverage'}</span>
+            <span>{isAr ? 'تركيز محلي' : 'Local Coverage'}</span>
           </div>
           <p className="text-[10px] text-slate-300 leading-tight">
             {isAr
-              ? 'مناطق شمال المغرب (شفشاون، أقشور، الريف) مدعومة ببيانات مسارات متجددة.'
-              : 'Northern Morocco (Chefchaouen, Akchour, Rif trails) enriched with live community data.'}
+              ? 'تعرض الخريطة الأماكن المتاحة حالياً في الفهرس، مع إبقاء إحداثيات مساهمات GPS الخام خاصة.'
+              : 'The map shows places currently available in the catalog while keeping raw GPS contribution coordinates private.'}
           </p>
         </div>
       </div>
@@ -540,7 +550,7 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {places.length === 0 && (
+      {visiblePlaces.length === 0 && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="rounded-2xl bg-white/95 px-5 py-4 text-center text-xs font-bold text-slate-600 shadow-xl border border-slate-200">
             {isAr ? 'لا توجد أماكن متاحة بهذه الفلاتر' : 'No places match these filters'}
