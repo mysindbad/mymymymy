@@ -156,6 +156,17 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [userLocation]);
 
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    if (selectedRegion === 'Northern Morocco') {
+      mapInstanceRef.current.flyTo([35.175, -5.26], 12);
+    } else if (selectedRegion === 'Marrakech') {
+      mapInstanceRef.current.flyTo([31.625, -7.99], 13);
+    } else if (selectedRegion === 'Santorini') {
+      mapInstanceRef.current.flyTo([36.435, 25.41], 12);
+    }
+  }, [selectedRegion]);
+
   const getMarkerBadgeStyle = (category: PlaceCategory, isSelected: boolean) => {
     let bg = 'bg-blue-600';
     let iconChar = '📍';
