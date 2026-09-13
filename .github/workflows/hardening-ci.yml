@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -22,6 +22,19 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Apply runtime parity patch
+        run: python3 scripts/apply-runtime-parity.py
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
+      - name: Persist tested runtime parity
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- server.ts; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git commit -m "fix: align local API contracts with Vercel production"
+          git push origin HEAD:audit/runtime-parity-20260913
