@@ -90,6 +90,9 @@ function requireAuth(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+const checkinCooldowns = new Map<string, number>();
+const CHECKIN_COOLDOWN_MS = 60_000;
+
 function requestUser(req: Request) {
   if (!req.user || !req.accessToken) throw new DalAuthenticationError();
   return { id: req.user.id, token: req.accessToken };
@@ -193,9 +196,19 @@ app.post('/api/places/:id/reviews', requireAuth, async (req, res, next) => {
   }
 });
 
-app.post('/api/places/:id/checkin', async (req, res, next) => {
+app.post('/api/places/:id/checkin', requireAuth, async (req, res, next) => {
   try {
-    const result = await createDal().places.checkin(req.params.id);
+    const { id, token } = requestUser(req);
+    const key = `${id}:${req.params.id}`;
+    const now = Date.now();
+    const lastCheckinAt = checkinCooldowns.get(key);
+    if (lastCheckinAt && now - lastCheckinAt < CHECKIN_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.ceil((CHECKIN_COOLDOWN_MS - (now - lastCheckinAt)) / 1000);
+      return res.status(429).json({ error: 'Please wait before checking in to this place again', retryAfterSeconds });
+    }
+
+    const result = await createDal(token).places.checkin(req.params.id);
+    checkinCooldowns.set(key, Date.now());
     res.json({ success: true, checkInsCount: result.checkInsCount });
   } catch (error) {
     next(error);
