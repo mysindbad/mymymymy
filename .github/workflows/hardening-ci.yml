@@ -25,3 +25,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
+      - name: Verify Supabase URL bootstrap normalization
+        run: |
+          SUPABASE_URL=' "https://example.supabase.co/rest/v1?source=bad#fragment" ' node --import tsx --input-type=module -e "await import('./api/runtime.ts'); if (process.env.SUPABASE_URL !== 'https://example.supabase.co') { console.error('SUPABASE_URL was not normalized:', process.env.SUPABASE_URL); process.exit(1); }"
+          VITE_SUPABASE_URL="'https://example.supabase.co/rest/v1'" node --import tsx --input-type=module -e "await import('./api/runtime.ts'); if (process.env.VITE_SUPABASE_URL !== 'https://example.supabase.co') { console.error('VITE_SUPABASE_URL was not normalized:', process.env.VITE_SUPABASE_URL); process.exit(1); }"
