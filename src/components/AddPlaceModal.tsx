@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { X, MapPin, Building2, Landmark, Utensils, AlertTriangle, Tent, Plus, Check, Loader2, Sparkles, Navigation } from 'lucide-react';
-import { PlaceCategory, Place } from '../types';
+import { AlertTriangle, Building2, Landmark, Loader2, MapPin, Plus, Tent, Utensils, X } from 'lucide-react';
+import { Place, PlaceCategory } from '../types';
 import { createPlace } from '../services/api';
-import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
+import { SupportedLanguage } from '../data/translations';
 
 interface AddPlaceModalProps {
   isOpen: boolean;
@@ -12,6 +12,14 @@ interface AddPlaceModalProps {
   language?: SupportedLanguage;
 }
 
+const categories: Array<{ cat: PlaceCategory; en: string; ar: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { cat: 'accommodation', en: 'Stay / Riad', ar: 'إقامة ورياض', icon: Building2 },
+  { cat: 'tourist_poi', en: 'Tourist POI', ar: 'معلم / طبيعة', icon: Landmark },
+  { cat: 'restaurant', en: 'Food / Cafe', ar: 'مطعم / مقهى', icon: Utensils },
+  { cat: 'emergency', en: 'Emergency', ar: 'طوارئ / أمن', icon: AlertTriangle },
+  { cat: 'campsite', en: 'Campsite', ar: 'مخيم / طبيعة', icon: Tent },
+];
+
 export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
   isOpen,
   onClose,
@@ -19,439 +27,249 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
   initialCoordinates,
   language = 'en',
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
-
-  const [role, setRole] = useState<'business_owner' | 'community_traveler'>('business_owner');
+  const [role, setRole] = useState<'business_owner' | 'community_traveler'>('community_traveler');
   const [name, setName] = useState('');
   const [arabicName, setArabicName] = useState('');
-  const [category, setCategory] = useState<PlaceCategory>('accommodation');
+  const [category, setCategory] = useState<PlaceCategory>('tourist_poi');
   const [subCategory, setSubCategory] = useState('');
-  const [region, setRegion] = useState('Northern Morocco');
-  const [area, setArea] = useState('Chefchaouen');
-  const [lat, setLat] = useState(initialCoordinates?.[0]?.toString() || '');
-  const [lng, setLng] = useState(initialCoordinates?.[1]?.toString() || '');
+  const [region, setRegion] = useState('');
+  const [area, setArea] = useState('');
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
   const [address, setAddress] = useState('');
   const [description, setDescription] = useState('');
   const [formationInfo, setFormationInfo] = useState('');
   const [priceLevel, setPriceLevel] = useState<'$' | '$$' | '$$$' | '$$$$'>('$$');
   const [businessOwnerName, setBusinessOwnerName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [openingHours, setOpeningHours] = useState('09:00 - 22:00 Daily');
+  const [openingHours, setOpeningHours] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const text = (en: string, ar: string) => (isAr ? ar : en);
+
   useEffect(() => {
     if (!isOpen) return;
     if (initialCoordinates) {
-      setLat(initialCoordinates[0].toString());
-      setLng(initialCoordinates[1].toString());
+      setLat(String(initialCoordinates[0]));
+      setLng(String(initialCoordinates[1]));
     } else {
       setLat('');
       setLng('');
     }
+    setErrorMessage('');
   }, [isOpen, initialCoordinates]);
-
-  // Preset photo suggestions by category
-  const defaultPhotos: Record<PlaceCategory, string> = {
-    accommodation: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80',
-    tourist_poi: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=800&auto=format&fit=crop&q=80',
-    restaurant: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
-    emergency: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80',
-    campsite: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop&q=80',
-    service: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80',
-  };
 
   if (!isOpen) return null;
 
   const handleUseCurrentLocation = () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLat(pos.coords.latitude.toFixed(5));
-          setLng(pos.coords.longitude.toFixed(5));
-        },
-        () => {
-          setErrorMessage(isAr ? 'تعذر الوصول إلى موقعك الحالي' : 'Could not access your current location');
-        }
-      );
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (!name.trim()) {
-      setErrorMessage(isAr ? 'يرجى كتابة اسم المكان' : 'Please enter place name');
+    if (!navigator.geolocation) {
+      setErrorMessage(text('Geolocation is not supported by this browser.', 'الموقع الجغرافي غير مدعوم في هذا المتصفح.'));
       return;
     }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLat(position.coords.latitude.toFixed(6));
+        setLng(position.coords.longitude.toFixed(6));
+        setErrorMessage('');
+      },
+      () => setErrorMessage(text('Could not access your current location.', 'تعذر الوصول إلى موقعك الحالي.')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  };
 
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
-    if (isNaN(latitude) || isNaN(longitude)) {
-      setErrorMessage(isAr ? 'إحداثيات غير صحيحة' : 'Invalid coordinates');
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorMessage('');
+
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!name.trim() || !region.trim() || !area.trim() || !address.trim() || !description.trim() || !photoUrl.trim()) {
+      setErrorMessage(text(
+        'Name, region, area, address, description, and a real photo URL are required.',
+        'الاسم والمنطقة والمدينة والعنوان والوصف ورابط صورة حقيقية حقول مطلوبة.',
+      ));
+      return;
+    }
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      setErrorMessage(text('Enter valid coordinates.', 'أدخل إحداثيات صحيحة.'));
+      return;
+    }
+    try {
+      const parsedPhoto = new URL(photoUrl.trim());
+      if (!['http:', 'https:'].includes(parsedPhoto.protocol)) throw new Error('invalid protocol');
+    } catch {
+      setErrorMessage(text('Photo URL must be a valid http(s) URL for this place.', 'يجب أن يكون رابط الصورة صالحاً ويبدأ بـ http أو https وأن يخص هذا المكان.'));
       return;
     }
 
     setIsSubmitting(true);
-
-    const payload = {
+    const payload: Partial<Place> & Record<string, unknown> = {
       name: name.trim(),
-      arabicName: arabicName.trim() || name.trim(),
+      arabicName: arabicName.trim() || undefined,
       category,
-      subCategory: subCategory.trim() || (category === 'accommodation' ? 'Riad / Guesthouse' : 'Local Landmark'),
-      region,
-      area: area.trim() || 'Northern Morocco',
-      coordinates: [latitude, longitude] as [number, number],
-      address: address.trim() || `${name}, ${area}, Morocco`,
-      photos: [photoUrl.trim() || defaultPhotos[category]],
-      description: description.trim() || `${name} in ${area}, welcoming visitors and travelers.`,
-      formationInfo: formationInfo.trim() || 'Documented by the local community on Sindbad.',
+      subCategory: subCategory.trim() || undefined,
+      region: region.trim(),
+      area: area.trim(),
+      coordinates: [latitude, longitude],
+      address: address.trim(),
+      photos: [photoUrl.trim()],
+      description: description.trim(),
+      formationInfo: formationInfo.trim() || undefined,
       priceLevel,
-      openingHours,
-      contactPhone: contactPhone.trim(),
+      openingHours: openingHours.trim() || undefined,
+      contactPhone: contactPhone.trim() || undefined,
       source: role,
-      businessOwnerName: role === 'business_owner' ? businessOwnerName.trim() || 'Verified Local Owner' : undefined,
-      ownerVerified: role === 'business_owner',
-      features: {
-        familyFriendly: true,
-        accessible: false,
-        wifi: true,
-        parking: true,
-      },
+      businessOwnerName: role === 'business_owner' ? (businessOwnerName.trim() || undefined) : undefined,
     };
 
     const result = await createPlace(payload);
     setIsSubmitting(false);
-
-    if (result.success && result.place) {
-      setIsSuccess(true);
-      onPlaceAdded(result.place);
-      setTimeout(() => {
-        setIsSuccess(false);
-        onClose();
-      }, 1200);
-    } else {
-      setErrorMessage(result.error || (isAr ? 'فشل الحفظ، حاول مجدداً' : 'Failed to create listing'));
+    if (!result.success || !result.place) {
+      setErrorMessage(result.error || text('Could not submit the listing.', 'تعذر إرسال المكان.'));
+      return;
     }
+
+    setIsSuccess(true);
+    onPlaceAdded(result.place);
+    window.setTimeout(() => {
+      setIsSuccess(false);
+      onClose();
+    }, 900);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white w-full max-w-xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
-        {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-xs">
-              <Plus className="w-5 h-5 text-white stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30">
+              <Plus className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold tracking-tight leading-tight">
-                {isAr ? 'إضافة نشاط تجاري أو معلم للمجتمع' : 'Add Place or Business Listing'}
-              </h2>
-              <p className="text-xs text-blue-100">
-                {isAr ? 'يغذي خريطة سندباد الحية والذاكرة الذكية فوراً' : 'Feeds into shared AI memory & live map instantly'}
-              </p>
+              <h2 className="text-base font-bold">{text('Add Place or Business Listing', 'إضافة مكان أو نشاط للمجتمع')}</h2>
+              <p className="text-xs text-blue-100">{text('Submit only details you know to be accurate. Verification is handled separately.', 'أرسل فقط المعلومات التي تعرف أنها صحيحة. التحقق يتم بشكل منفصل.')}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition"
-          >
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center" aria-label={text('Close', 'إغلاق')}>
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs text-slate-700">
-          {errorMessage && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 font-medium">
-              {errorMessage}
-            </div>
-          )}
+          {errorMessage && <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 font-medium">{errorMessage}</div>}
 
-          {/* Submitter Role Selector (Local Business Owner vs Explorer) */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              {isAr ? 'هل أنت صاحب المشروع أم مسافر مكتشف؟' : 'Are you the Business Owner or a Traveler Explorer?'}
-            </label>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{text('Submission role (not verification)', 'صفة المساهم (لا تعني التحقق)')}</label>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRole('business_owner')}
-                className={`p-3 rounded-2xl border text-left rtl:text-right transition flex items-center gap-2.5 ${
-                  role === 'business_owner'
-                    ? 'bg-blue-50 border-blue-600 text-blue-900 ring-2 ring-blue-500/20'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Building2 className={`w-5 h-5 ${role === 'business_owner' ? 'text-blue-600' : 'text-slate-400'}`} />
-                <div>
-                  <div className="font-bold text-xs">{isAr ? 'صاحب نشاط محلي' : 'Local Business Owner'}</div>
-                  <div className="text-[10px] text-slate-500">{isAr ? 'فندق، مطعم، نزل ريفي، مقهى' : 'Hotel, riad, restaurant, guide'}</div>
-                </div>
+              <button type="button" onClick={() => setRole('business_owner')} className={`p-3 rounded-2xl border text-left rtl:text-right ${role === 'business_owner' ? 'bg-blue-50 border-blue-600 text-blue-900' : 'bg-slate-50 border-slate-200'}`}>
+                <Building2 className="w-5 h-5 mb-1" />
+                <div className="font-bold">{text('Submitting as owner', 'الإرسال بصفة صاحب النشاط')}</div>
+                <div className="text-[10px] text-slate-500">{text('Does not mark the listing verified', 'لا يمنح شارة التحقق')}</div>
               </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('community_traveler')}
-                className={`p-3 rounded-2xl border text-left rtl:text-right transition flex items-center gap-2.5 ${
-                  role === 'community_traveler'
-                    ? 'bg-blue-50 border-blue-600 text-blue-900 ring-2 ring-blue-500/20'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Landmark className={`w-5 h-5 ${role === 'community_traveler' ? 'text-blue-600' : 'text-slate-400'}`} />
-                <div>
-                  <div className="font-bold text-xs">{isAr ? 'مسافر / مستكشف' : 'Traveler / Pioneer'}</div>
-                  <div className="text-[10px] text-slate-500">{isAr ? 'معلم طبيعي، نقطة مخفية' : 'Hidden gem, natural sight'}</div>
-                </div>
+              <button type="button" onClick={() => setRole('community_traveler')} className={`p-3 rounded-2xl border text-left rtl:text-right ${role === 'community_traveler' ? 'bg-blue-50 border-blue-600 text-blue-900' : 'bg-slate-50 border-slate-200'}`}>
+                <Landmark className="w-5 h-5 mb-1" />
+                <div className="font-bold">{text('Traveler / community', 'مسافر / مساهم مجتمعي')}</div>
+                <div className="text-[10px] text-slate-500">{text('Place discovery contribution', 'مساهمة لاكتشاف مكان')}</div>
               </button>
             </div>
           </div>
 
-          {/* Place Category Selector */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              {isAr ? 'تصنيف المكان' : 'Category'}
-            </label>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{text('Category', 'التصنيف')}</label>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-              {[
-                { cat: 'accommodation' as PlaceCategory, label: isAr ? 'إقامة ورياض' : 'Stay / Riad', icon: Building2 },
-                { cat: 'tourist_poi' as PlaceCategory, label: isAr ? 'معلم / طبيعة' : 'Tourist POI', icon: Landmark },
-                { cat: 'restaurant' as PlaceCategory, label: isAr ? 'مطعم / مقهى' : 'Food / Cafe', icon: Utensils },
-                { cat: 'emergency' as PlaceCategory, label: isAr ? 'طوارئ / أمن' : 'Emergency', icon: AlertTriangle },
-                { cat: 'campsite' as PlaceCategory, label: isAr ? 'مخيم / طبيعة' : 'Campsite', icon: Tent },
-              ].map((item) => {
+              {categories.map((item) => {
                 const Icon = item.icon;
-                const isSelected = category === item.cat;
                 return (
-                  <button
-                    key={item.cat}
-                    type="button"
-                    onClick={() => setCategory(item.cat)}
-                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition ${
-                      isSelected
-                        ? 'bg-blue-600 border-blue-600 text-white font-bold shadow-xs'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
+                  <button key={item.cat} type="button" onClick={() => setCategory(item.cat)} className={`p-2 rounded-xl border flex flex-col items-center gap-1 ${category === item.cat ? 'bg-blue-600 border-blue-600 text-white font-bold' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                     <Icon className="w-4 h-4" />
-                    <span className="text-[10px] whitespace-nowrap">{item.label}</span>
+                    <span className="text-[10px]">{isAr ? item.ar : item.en}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Place Name & Arabic Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAr ? 'اسم المكان (إنجليزي / لاتيني)' : 'Place / Business Name (Required)'}
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Riad Kasbah Akchour"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAr ? 'الاسم باللغة العربية' : 'Arabic Name (Optional)'}
-              </label>
-              <input
-                type="text"
-                value={arabicName}
-                onChange={(e) => setArabicName(e.target.value)}
-                placeholder="مثال: رياض قصبة أقشور"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
+            <Field label={text('Place / business name *', 'اسم المكان / النشاط *')} value={name} onChange={setName} />
+            <Field label={text('Arabic name (optional)', 'الاسم بالعربية (اختياري)')} value={arabicName} onChange={setArabicName} />
+            <Field label={text('Subcategory (optional)', 'التصنيف الفرعي (اختياري)')} value={subCategory} onChange={setSubCategory} />
+            <Field label={text('Region *', 'المنطقة *')} value={region} onChange={setRegion} placeholder={text('e.g. Northern Morocco', 'مثال: شمال المغرب')} />
+            <Field label={text('City / area *', 'المدينة / المنطقة المحلية *')} value={area} onChange={setArea} />
+            <Field label={text('Address *', 'العنوان *')} value={address} onChange={setAddress} />
           </div>
 
-          {/* Region & Area */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAr ? 'المنطقة الكبرى' : 'Region'}
-              </label>
-              <select
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-              >
-                <option value="Northern Morocco">Northern Morocco (Chefchaouen, Rif, Akchour)</option>
-                <option value="Marrakech">Marrakech & High Atlas</option>
-                <option value="Santorini">Santorini (Greece)</option>
-                <option value="Global">Global Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAr ? 'المدينة / الوادي' : 'City / Area'}
-              </label>
-              <input
-                type="text"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                placeholder="e.g. Akchour, Chefchaouen, Tetouan"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Exact Coordinates with "Use My GPS" */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-bold text-slate-600">
-                {isAr ? 'الإحداثيات الجغرافية الدقيقة (خط الطول والعرض)' : 'Exact GPS Coordinates (Lat, Lng)'}
-              </label>
-              <button
-                type="button"
-                onClick={handleUseCurrentLocation}
-                className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-              >
-                <Navigation className="w-3 h-3" />
-                <span>{isAr ? 'استخدام موقعي الحالي' : 'Use Current GPS'}</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-600">{text('Exact coordinates *', 'الإحداثيات الدقيقة *')}</label>
+              <button type="button" onClick={handleUseCurrentLocation} className="px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" /> {text('Use my location', 'استخدم موقعي')}
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-[11px]">Lat:</span>
-                <input
-                  type="text"
-                  required
-                  value={lat}
-                  onChange={(e) => setLat(e.target.value)}
-                  placeholder="35.1689"
-                  className="w-full pl-11 pr-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-[11px]">Lng:</span>
-                <input
-                  type="text"
-                  required
-                  value={lng}
-                  onChange={(e) => setLng(e.target.value)}
-                  placeholder="-5.2633"
-                  className="w-full pl-11 pr-3 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
+              <Field label={text('Latitude', 'خط العرض')} value={lat} onChange={setLat} inputMode="decimal" />
+              <Field label={text('Longitude', 'خط الطول')} value={lng} onChange={setLng} inputMode="decimal" />
             </div>
           </div>
 
-          {/* Description & Formation Background (Feature 1 & 2) */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-              {isAr ? 'وصف المكان وما يميزه' : 'Description & Highlights'}
-            </label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={
-                isAr
-                  ? 'صف الأجواء، الخدمات، الإطلالة الجبلية أو المعالم القريبة...'
-                  : 'Describe the ambiance, views, local specialties or experience...'
-              }
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">{text('Description *', 'الوصف *')}</label>
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} required className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" placeholder={text('Write only details you personally know or can verify.', 'اكتب فقط ما تعرفه أو تستطيع التحقق منه.')}/>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-              {isAr ? 'معلومات التكوين أو التاريخ المحلي (Formation / History)' : 'Formation / Historical Background'}
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">{text('Formation / history (optional)', 'التكوين / التاريخ (اختياري)')}</label>
+            <textarea value={formationInfo} onChange={(event) => setFormationInfo(event.target.value)} rows={2} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" placeholder={text('Leave blank if you do not know verified background information.', 'اتركه فارغاً إذا لم تكن لديك معلومات موثقة.')}/>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label={text('Real photo URL *', 'رابط صورة حقيقية للمكان *')} value={photoUrl} onChange={setPhotoUrl} type="url" placeholder="https://..." />
+            <label className="block">
+              <span className="block text-[11px] font-bold text-slate-600 mb-1">{text('Price level', 'مستوى السعر')}</span>
+              <select value={priceLevel} onChange={(event) => setPriceLevel(event.target.value as '$' | '$$' | '$$$' | '$$$$')} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white">
+                <option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option><option value="$$$$">$$$$</option>
+              </select>
             </label>
-            <textarea
-              rows={2}
-              value={formationInfo}
-              onChange={(e) => setFormationInfo(e.target.value)}
-              placeholder={
-                isAr
-                  ? 'كيف تم تأسيسه؟ تاريخ المعلم أو التكوين الجيولوجي أو معلومات عن الحرفيين...'
-                  : 'Historical origin, architectural story, geological formation, or local background...'
-              }
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+            <Field label={text('Opening hours (optional)', 'ساعات العمل (اختياري)')} value={openingHours} onChange={setOpeningHours} />
+            <Field label={text('Phone (optional)', 'الهاتف (اختياري)')} value={contactPhone} onChange={setContactPhone} />
+            {role === 'business_owner' && <Field label={text('Owner / operator name (optional)', 'اسم صاحب / مشغل النشاط (اختياري)')} value={businessOwnerName} onChange={setBusinessOwnerName} />}
           </div>
 
-          {/* Business Owner Credentials if role === 'business_owner' */}
-          {role === 'business_owner' && (
-            <div className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-100 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                <span>{isAr ? 'بيانات المالك للتحقق والتوثيق' : 'Business Owner Details & Verification'}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={businessOwnerName}
-                  onChange={(e) => setBusinessOwnerName(e.target.value)}
-                  placeholder={isAr ? 'اسم المالك أو المدير' : 'Owner / Manager Name'}
-                  className="px-3 py-2 rounded-xl border border-blue-200 text-slate-800 text-xs bg-white outline-none"
-                />
-                <input
-                  type="tel"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder={isAr ? 'رقم الهاتف (+212...)' : 'Phone Number (+212...)'}
-                  className="px-3 py-2 rounded-xl border border-blue-200 text-slate-800 text-xs bg-white outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Photo URL */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-              {isAr ? 'رابط الصورة (Photo URL)' : 'Photo URL (Leave empty for category default)'}
-            </label>
-            <input
-              type="url"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              placeholder={defaultPhotos[category]}
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-900">
+            {text('Submitting as an owner does not verify ownership. Ratings, check-ins, trust flags, and verification are assigned only by server-side workflows.', 'الإرسال بصفة صاحب نشاط لا يثبت الملكية. التقييمات وتسجيلات الوصول وشارات الثقة والتحقق تُحدد فقط عبر مسارات الخادم.')}
           </div>
 
-          {/* Footer Submit Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>{isAr ? 'جاري الحفظ في الذاكرة...' : 'Saving to AI Memory...'}</span>
-                </>
-              ) : isSuccess ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-300 stroke-[3]" />
-                  <span>{isAr ? 'تمت الإضافة بنجاح!' : 'Successfully Listed & Saved!'}</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>{isAr ? 'نشر المكان وحفظه في الذاكرة الحية' : 'Publish & Save to Shared AI Memory'}</span>
-                </>
-              )}
-            </button>
-          </div>
+          <button type="submit" disabled={isSubmitting || isSuccess} className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+            {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />{text('Submitting...', 'جاري الإرسال...')}</> : isSuccess ? text('Submitted', 'تم الإرسال') : text('Submit place', 'إرسال المكان')}
+          </button>
         </form>
       </div>
     </div>
   );
 };
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+  inputMode,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: React.HTMLInputTypeAttribute;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[11px] font-bold text-slate-600 mb-1">{label}</span>
+      <input type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 outline-none focus:ring-2 focus:ring-blue-500" />
+    </label>
+  );
+}
