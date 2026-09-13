@@ -44,6 +44,10 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
 }) => {
   if (!isOpen) return null;
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
+  const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
+  const localize = (english: string, arabic: string, french: string) =>
+    isAr ? arabic : isFr ? french : english;
 
   return (
     <div className="fixed inset-0 z-50 flex animate-in fade-in">
@@ -62,7 +66,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             <div>
               <h2 className="font-black text-lg tracking-tight">My Sindbad</h2>
               <p className="text-xs text-blue-100">
-                {isAr ? 'رحلتك أذكى مع الذكاء الاصطناعي' : 'Your trip, smarter with AI'}
+                {localize('Your trip, smarter with AI', 'رحلتك أذكى مع الذكاء الاصطناعي', 'Votre voyage, plus intelligent avec l’IA') }
               </p>
             </div>
           </div>
@@ -83,11 +87,11 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
               </div>
               <div>
                 <div className="text-xs font-bold text-slate-800">
-                  {isAr ? 'مرحباً، أيها المسافر!' : 'Hello, Traveler!'}
+                  {localize('Hello, Traveler!', 'مرحباً، أيها المسافر!', 'Bonjour, voyageur !')}
                 </div>
                 <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  <span>Level 2 • {userXp} XP</span>
+                  <span>{localize(`Level ${userLevel} • ${userXp} XP`, `المستوى ${userLevel} • ${userXp} نقطة خبرة`, `Niveau ${userLevel} • ${userXp} XP`)}</span>
                 </div>
               </div>
             </div>
@@ -105,7 +109,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
                 }}
                 className="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold text-xs shadow-xs text-center hover:from-blue-700 hover:to-sky-600 transition"
               >
-                {isAr ? 'تسجيل الدخول / الحساب' : 'Sign In / Account'}
+                {localize('Sign In / Account', 'تسجيل الدخول / الحساب', 'Connexion / compte')}
               </button>
             </div>
           )}
@@ -120,7 +124,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             }}
             className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
           >
-            <span className="font-semibold">{isAr ? 'الرئيسية' : 'Home'}</span>
+            <span className="font-semibold">{localize('Home', 'الرئيسية', 'Accueil')}</span>
             <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
           </button>
 
@@ -131,7 +135,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             }}
             className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
           >
-            <span className="font-semibold">{isAr ? 'الخريطة التفاعلية الحية' : 'Interactive Live Map'}</span>
+            <span className="font-semibold">{localize('Interactive Live Map', 'الخريطة التفاعلية الحية', 'Carte interactive en direct')}</span>
             <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
           </button>
 
@@ -142,7 +146,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             }}
             className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
           >
-            <span className="font-semibold">{isAr ? 'استكشاف الأماكن والذاكرة' : 'Explore & AI Memory'}</span>
+            <span className="font-semibold">{localize('Explore & AI Memory', 'استكشاف الأماكن والذاكرة', 'Explorer et mémoire IA')}</span>
             <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
           </button>
 
@@ -153,7 +157,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             }}
             className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
           >
-            <span className="font-semibold">{isAr ? 'مخطط الرحلات والأماكن المحفوظة' : 'Trips & Offline Saved'}</span>
+            <span className="font-semibold">{localize('Trips & Saved Places', 'مخطط الرحلات والأماكن المحفوظة', 'Voyages et lieux enregistrés')}</span>
             <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
           </button>
 
@@ -164,7 +168,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             }}
             className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
           >
-            <span className="font-semibold">{isAr ? 'بوابة المجتمع وأصحاب الأعمال' : 'Community & Business Hub'}</span>
+            <span className="font-semibold">{localize('Community & Business Hub', 'بوابة المجتمع وأصحاب الأعمال', 'Communauté et entreprises')}</span>
             <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
           </button>
 
@@ -179,7 +183,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 transition"
           >
             <Building2 className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold">{isAr ? '+ إضافة نشاط تجاري / مكان' : '+ Add Business / Place'}</span>
+            <span className="text-xs font-bold">{localize('+ Add Business / Place', '+ إضافة نشاط تجاري / مكان', '+ Ajouter un commerce / lieu')}</span>
           </button>
 
           <button
@@ -190,7 +194,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
             className="w-full p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 flex items-center gap-2.5 text-emerald-800 transition"
           >
             <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span className="text-xs font-bold">{isAr ? 'مشاركة الموقع المجهول' : 'Passive GPS Sharing'}</span>
+            <span className="text-xs font-bold">{localize('Optional GPS Contribution', 'مساهمة GPS اختيارية', 'Contribution GPS facultative')}</span>
           </button>
         </div>
 
@@ -198,7 +202,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
             <Globe2 className="w-4 h-4 text-slate-600" />
-            <span>{isAr ? 'اللغة' : 'Language'}</span>
+            <span>{localize('Language', 'اللغة', 'Langue')}</span>
           </div>
           <LanguageFlagSelector
             currentLanguage={language}
