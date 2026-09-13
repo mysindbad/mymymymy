@@ -21,6 +21,7 @@ export const PassiveDataModal: React.FC<PassiveDataModalProps> = ({
   const [isSendingSample, setIsSendingSample] = useState(false);
   const [sampleSentStatus, setSampleSentStatus] = useState<string | null>(null);
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
 
   if (!isOpen) return null;
 
@@ -55,10 +56,18 @@ export const PassiveDataModal: React.FC<PassiveDataModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold tracking-tight">
-                {isAr ? 'مشاركة الموقع غير المباشرة (Passive GPS)' : 'Passive Community Data Contribution'}
+                {isAr
+                  ? 'مساهمة GPS مجهولة اختيارية'
+                  : isFr
+                    ? 'Contribution GPS anonyme facultative'
+                    : 'Optional Anonymous GPS Contribution'}
               </h2>
               <p className="text-xs text-emerald-100">
-                {isAr ? 'تغذية خريطة الذكاء الاصطناعي وكشف المسارات غير الموثقة' : 'Crowdsourcing place discovery & route popularity'}
+                {isAr
+                  ? 'إرسال عينات يدوية لخريطة المجتمع'
+                  : isFr
+                    ? 'Envoyer des échantillons manuels à la carte communautaire'
+                    : 'Send manual samples to the community map'}
               </p>
             </div>
           </div>
@@ -80,8 +89,10 @@ export const PassiveDataModal: React.FC<PassiveDataModalProps> = ({
               </span>
               <p className="text-[11px] text-slate-500">
                 {isAr
-                  ? 'إرسال إحداثيات مشفرة ومجهولة الاسم أثناء تجولك لتحديث شعبية الدروب واكتشاف أماكن جديدة.'
-                  : 'Anonymously sends periodic GPS breadcrumbs as you travel to map trails and detect popular spots.'}
+                  ? 'بعد التفعيل، يمكنك إرسال عينة مجهولة يدوياً. لا يتم إرسال إحداثيات دورية أو تشغيل تتبع في الخلفية تلقائياً.'
+                  : isFr
+                    ? 'Après activation, vous pouvez envoyer un échantillon anonyme manuellement. Aucun envoi périodique ni suivi en arrière-plan n’est automatique.'
+                    : 'After opting in, you can send an anonymous sample manually. Periodic uploads and background tracking are not automatic.'}
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -103,7 +114,7 @@ export const PassiveDataModal: React.FC<PassiveDataModalProps> = ({
             </div>
             <ul className="space-y-1 text-[11px] text-emerald-800 list-disc list-inside leading-relaxed">
               <li>{isAr ? 'لا يتم ربط الإحداثيات بهويتك الشخصية أو بريدك الإلكتروني.' : 'Coordinates are never linked to personal identity or account email.'}</li>
-              <li>{isAr ? 'يتم تعتيم نقطة البداية والنهاية لحماية المنازل وأماكن الإقامة الخاصة.' : 'Start and end points are fuzzed to protect private hotel/home locations.'}</li>
+               <li>{isAr ? 'لا يبدأ الإرسال إلا بعد موافقتك وضغطك على زر العينة.' : isFr ? 'L’envoi ne commence qu’après votre consentement et votre action sur le bouton d’échantillon.' : 'Nothing is sent until you consent and press the sample button.'}</li>
               <li>{isAr ? 'تساعد في كشف الممرات الجبلية غير المرصودة في المناطق النائية مثل جبال الريف.' : 'Directly aids local discovery in underserved regions like northern Morocco.'}</li>
             </ul>
           </div>
