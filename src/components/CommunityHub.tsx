@@ -21,6 +21,8 @@ interface CommunityHubProps {
   isPassiveOptedIn: boolean;
   userXp: number;
   language?: SupportedLanguage;
+  currentUser?: { name: string; email: string; isLoggedIn?: boolean };
+  onOpenAuth?: () => void;
 }
 
 export const CommunityHub: React.FC<CommunityHubProps> = ({
@@ -29,11 +31,15 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   isPassiveOptedIn,
   userXp,
   language = 'en',
+  currentUser,
+  onOpenAuth,
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
   const isFr = language === 'fr';
   const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
+  const localize = (english: string, arabic: string, french: string) =>
+    isAr ? arabic : isFr ? french : english;
 
   const contributors = [
     { name: 'Karim Tazi', role: 'Rif Mountain Trail Guide', points: 1420, verifiedCount: 28, badge: 'Pioneer' },
@@ -44,6 +50,36 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 animate-in fade-in pb-24 select-none">
+      {/* Personal profile summary */}
+      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white text-xl shrink-0">
+            🧔
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-black text-slate-900 text-sm truncate">
+              {currentUser?.isLoggedIn && currentUser.name
+                ? currentUser.name
+                : localize('Guest traveler', 'مسافر زائر', 'Voyageur invité')}
+            </h2>
+            <p className="text-[11px] text-slate-500 truncate">
+              {currentUser?.isLoggedIn && currentUser.email
+                ? currentUser.email
+                : localize('Sign in to keep your XP with your account.', 'سجّل الدخول لحفظ نقاط خبرتك مع حسابك.', 'Connectez-vous pour conserver votre XP avec votre compte.')}
+            </p>
+          </div>
+        </div>
+        {!currentUser?.isLoggedIn && onOpenAuth && (
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="shrink-0 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold"
+          >
+            {localize('Sign in', 'تسجيل الدخول', 'Se connecter')}
+          </button>
+        )}
+      </div>
+
       {/* Header Banner */}
       <div className="p-5 rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white shadow-xl space-y-2">
         <div className="flex items-center justify-between">
