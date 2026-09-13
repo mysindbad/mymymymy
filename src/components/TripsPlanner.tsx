@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BedDouble, Bus, CalendarDays, Check, ChevronLeft, ChevronRight, Landmark, Loader2, MapPin, Plus, RefreshCw, Sparkles, Trash2, Utensils, Users, Wallet } from 'lucide-react';
-import { createTrip, deleteTrip, fetchPlaces, fetchTrips, planTrip, Trip, TripItinerary, updateTrip } from '../services/api';
+import { ApiAuthenticationError, createTrip, deleteTrip, fetchPlaces, fetchTrips, planTrip, Trip, TripItinerary, updateTrip } from '../services/api';
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 
@@ -68,7 +68,9 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en' }) =
       setTrips(loadedTrips);
       setPlaces(loadedPlaces);
     } catch (loadError) {
-      setError(messageFrom(loadError, isAr ? 'تعذر تحميل الرحلات.' : 'Unable to load trips.'));
+      setError(loadError instanceof ApiAuthenticationError
+        ? (isAr ? 'سجّل الدخول أولًا لإضافة رحلتك والاحتفاظ بها بأمان.' : 'Sign in first to add and securely save your trip.')
+        : messageFrom(loadError, isAr ? 'تعذر تحميل الرحلات.' : 'Unable to load trips.'));
     } finally {
       setLoading(false);
     }
