@@ -145,7 +145,7 @@ export const LanguageFlagSelector: React.FC<LanguageFlagSelectorProps> = ({
       {/* Dropdown Menu with Flags and Country Names */}
       {isOpen && (
         <div
-          className="absolute end-0 mt-2 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200/90 py-1.5 overflow-hidden animate-in fade-in zoom-in-95 z-50 text-slate-800"
+          className="absolute start-0 sm:start-auto sm:end-0 mt-2 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200/90 py-1.5 overflow-hidden animate-in fade-in zoom-in-95 z-50 text-slate-800"
           dir={currentLanguage === 'ar' ? 'rtl' : 'ltr'}
         >
           <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">

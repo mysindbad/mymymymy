@@ -67,6 +67,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+  const localize = (english: string, arabic: string, french: string) =>
+    language === 'ar' ? arabic : language === 'fr' ? french : english;
 
   const handleMicClick = () => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -74,7 +76,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         const SpeechRecognition =
           (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
-        recognition.lang = isAr ? 'ar-SA' : 'en-US';
+        recognition.lang = language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US';
         recognition.onstart = () => setIsListeningMic(true);
         recognition.onend = () => setIsListeningMic(false);
         recognition.onresult = (event: any) => {
@@ -87,7 +89,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         setIsListeningMic(false);
       }
     } else {
-      setSearchQuery(isAr ? 'شفشاون وأقشور' : 'Chefchaouen & Akchour');
+      setSearchQuery(localize("Chefchaouen & Akchour", "شفشاون وأقشور", "Chefchaouen & Akchour"));
     }
   };
 
@@ -103,35 +105,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     {
       id: 'istanbul',
       name: 'Istanbul',
+      nameAr: 'إسطنبول',
+      nameFr: 'Istanbul',
       tagline: 'History meets beauty',
+      taglineAr: 'حيث يلتقي التاريخ بالجمال',
+      taglineFr: 'Là où l’histoire rencontre la beauté',
       photo: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=600&auto=format&fit=crop&q=80',
       category: 'Turkey',
     },
     {
       id: 'marrakech',
       name: 'Marrakech',
+      nameAr: 'مراكش',
+      nameFr: 'Marrakech',
       tagline: 'Colors & culture',
+      taglineAr: 'الألوان والثقافة',
+      taglineFr: 'Couleurs & culture',
       photo: 'https://images.unsplash.com/photo-1597212618440-806262de4f6b?w=600&auto=format&fit=crop&q=80',
       category: 'Morocco',
     },
     {
       id: 'paris',
       name: 'Paris',
+      nameAr: 'باريس',
+      nameFr: 'Paris',
       tagline: 'The city of dreams',
+      taglineAr: 'مدينة الأحلام',
+      taglineFr: 'La ville des rêves',
       photo: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600&auto=format&fit=crop&q=80',
       category: 'France',
     },
     {
       id: 'bali',
       name: 'Bali',
+      nameAr: 'بالي',
+      nameFr: 'Bali',
       tagline: "Nature's paradise",
+      taglineAr: 'جنة الطبيعة',
+      taglineFr: 'Le paradis de la nature',
       photo: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600&auto=format&fit=crop&q=80',
       category: 'Indonesia',
     },
     {
       id: 'chefchaouen',
       name: 'Chefchaouen',
+      nameAr: 'شفشاون',
+      nameFr: 'Chefchaouen',
       tagline: 'Blue pearl of the Rif',
+      taglineAr: 'لؤلؤة الريف الزرقاء',
+      taglineFr: 'La perle bleue du Rif',
       photo: 'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&auto=format&fit=crop&q=80',
       category: 'Morocco',
     },
@@ -162,7 +184,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             id="home-side-menu-btn"
             onClick={onOpenSideMenu}
             className="w-9 h-9 rounded-full bg-blue-600/90 hover:bg-blue-700 text-white shadow-md flex items-center justify-center backdrop-blur-md transition active:scale-95"
-            title={isAr ? 'القائمة' : 'Open Menu'}
+            title={localize("Open Menu", "القائمة", "Ouvrir le menu")}
           >
             <Menu className="w-4 h-4 stroke-[2.5]" />
           </button>
@@ -195,10 +217,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
               <div className="text-left rtl:text-right leading-tight hidden xs:block">
                 <span className="text-[9px] text-slate-300 block">
-                  {currentUser?.isLoggedIn ? (isAr ? 'مرحباً،' : 'Welcome,') : (isAr ? 'أهلاً بك،' : 'Hello,')}
+                  {currentUser?.isLoggedIn ? (localize("Welcome,", "مرحباً،", "Bienvenue,")) : (localize("Hello,", "أهلاً بك،", "Bonjour,"))}
                 </span>
                 <span className="text-[11px] font-bold text-white max-w-[70px] truncate block">
-                  {currentUser?.name || (isAr ? 'المسافر' : 'Traveler!')}
+                  {currentUser?.name || (localize("Traveler!", "المسافر", "Voyageur !"))}
                 </span>
               </div>
               <ChevronRight className="w-3 h-3 text-slate-300 rtl:rotate-180" />
@@ -216,33 +238,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Main Brand Identity: Official 3D Robot Mascot & My Sindbad Logo */}
         <div className="relative z-20 max-w-md mx-auto px-4 pt-2 pb-1">
-          <BrandLogo size="lg" showSlogan={true} />
+          <BrandLogo size="lg" showSlogan={true} language={language} />
         </div>
 
         {/* Decorative Side Elements matching the image */}
         {/* Left: Rustic Wooden Signpost ("Good Trips Brighter Stories ♡") */}
         <div className="absolute left-3 rtl:left-auto rtl:right-3 top-24 z-10 hidden sm:flex flex-col items-center">
           <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md -rotate-3 border border-amber-700">
-            {isAr ? 'رحلات' : 'Good'}
+            {localize("Good", "رحلات", "Bons")}
           </div>
           <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md rotate-2 border border-amber-700 -mt-0.5">
-            {isAr ? 'سعيدة' : 'Trips'}
+            {localize("Trips", "سعيدة", "Voyages")}
           </div>
           <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md -rotate-2 border border-amber-700 -mt-0.5">
-            {isAr ? 'وقصص' : 'Brighter'}
+            {localize("Brighter", "وقصص", "Plus belles")}
           </div>
           <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md rotate-3 border border-amber-700 -mt-0.5">
-            {isAr ? 'ملهمة ♡' : 'Stories ♡'}
+            {localize("Stories ♡", "ملهمة ♡", "Histoires ♡")}
           </div>
           <div className="w-1.5 h-14 bg-amber-900 shadow-md" />
         </div>
 
         {/* Right: Elegant White Script ("Explore Discover Enjoy ✈") */}
         <div className="absolute right-4 rtl:right-auto rtl:left-4 top-28 z-10 hidden sm:block text-right rtl:text-left text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-          <div className="text-sm font-serif italic tracking-wide">{isAr ? 'استكشف' : 'Explore'}</div>
-          <div className="text-base font-serif italic tracking-wide font-bold">{isAr ? 'اكتشف' : 'Discover'}</div>
+          <div className="text-sm font-serif italic tracking-wide">{localize("Explore", "استكشف", "Explorer")}</div>
+          <div className="text-base font-serif italic tracking-wide font-bold">{localize("Discover", "اكتشف", "Découvrir")}</div>
           <div className="text-lg font-serif italic tracking-wide font-black flex items-center justify-end rtl:justify-start gap-1">
-            <span>{isAr ? 'استمتع' : 'Enjoy'}</span>
+            <span>{localize("Enjoy", "استمتع", "Profitez")}</span>
             <span className="text-xs">✈</span>
           </div>
         </div>
@@ -259,7 +281,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={isAr ? 'إلى أين ترغب بالسفر؟' : 'Where do you want to go?'}
+              placeholder={localize("Where do you want to go?", "إلى أين ترغب بالسفر؟", "Où souhaitez-vous aller ?")}
               className="flex-1 text-xs sm:text-sm text-slate-800 bg-transparent outline-none placeholder:text-slate-400 font-medium"
             />
             {/* Microphone Button */}
@@ -269,7 +291,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               className={`p-1.5 rounded-full transition ${
                 isListeningMic ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-slate-600'
               }`}
-              title={isAr ? 'بحث صوتي' : 'Voice Search'}
+              title={localize("Voice Search", "بحث صوتي", "Recherche vocale")}
             >
               <Mic className="w-3.5 h-3.5" />
             </button>
@@ -282,18 +304,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs shadow-md shadow-blue-500/25 flex items-center gap-1 transition active:scale-95 shrink-0"
             >
               <Sparkles className="w-3 h-3 fill-current text-amber-300" />
-              <span>{isAr ? 'اسأل AI' : 'Ask AI'}</span>
+              <span>{localize("Ask AI", "اسأل AI", "Demander à l’IA")}</span>
             </button>
           </form>
 
           {/* Destination Quick Chips: Morocco, Turkey, Egypt, Switzerland, More */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 justify-start sm:justify-center">
             {[
-              { label: 'Morocco', nameAr: 'المغرب', icon: '📍' },
-              { label: 'Turkey', nameAr: 'تركيا', icon: '✈' },
-              { label: 'Egypt', nameAr: 'مصر', icon: '🌴' },
-              { label: 'Switzerland', nameAr: 'سويسرا', icon: '⛰' },
-              { label: 'More', nameAr: 'المزيد', icon: '•••' },
+              { label: 'Morocco', nameAr: 'المغرب', nameFr: 'Maroc', icon: '📍' },
+              { label: 'Turkey', nameAr: 'تركيا', nameFr: 'Turquie', icon: '✈' },
+              { label: 'Egypt', nameAr: 'مصر', nameFr: 'Égypte', icon: '🌴' },
+              { label: 'Switzerland', nameAr: 'سويسرا', nameFr: 'Suisse', icon: '⛰' },
+              { label: 'More', nameAr: 'المزيد', nameFr: 'Plus', icon: '•••' },
             ].map((chip) => {
               const isSelected = activeCountry === chip.label;
               return (
@@ -310,7 +332,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   }`}
                 >
                   <span>{chip.icon}</span>
-                  <span>{isAr ? chip.nameAr : chip.label}</span>
+                  <span>{localize(chip.label, chip.nameAr, chip.nameFr)}</span>
                 </button>
               );
             })}
@@ -332,10 +354,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Plane className="w-5 h-5 -rotate-45 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">
-                {isAr ? 'الطيران' : 'Flights'}
+                {localize("Flights", "الطيران", "Vols")}
               </span>
               <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">
-                {isAr ? 'أفضل الأسعار' : 'Best deals'}
+                {localize("Best deals", "أفضل الأسعار", "Meilleures offres")}
               </span>
             </button>
 
@@ -352,10 +374,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Bed className="w-5 h-5 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">
-                {isAr ? 'الفنادق' : 'Hotels'}
+                {localize("Hotels", "الفنادق", "Hôtels")}
               </span>
               <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">
-                {isAr ? 'إقامة مريحة' : 'Stay your way'}
+                {localize("Stay your way", "إقامة مريحة", "Séjour à votre façon")}
               </span>
             </button>
 
@@ -369,10 +391,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <MapPin className="w-5 h-5 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">
-                {isAr ? 'الرحلات' : 'Trips'}
+                {localize("Trips", "الرحلات", "Voyages")}
               </span>
               <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">
-                {isAr ? 'برامج منظمة' : 'Itineraries'}
+                {localize("Itineraries", "برامج منظمة", "Itinéraires")}
               </span>
             </button>
 
@@ -389,10 +411,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Utensils className="w-5 h-5 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">
-                {isAr ? 'المطاعم' : 'Restaurants'}
+                {localize("Restaurants", "المطاعم", "Restaurants")}
               </span>
               <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">
-                {isAr ? 'أشهى المأكولات' : 'Local dining'}
+                {localize("Local dining", "أشهى المأكولات", "Cuisine locale")}
               </span>
             </button>
 
@@ -406,10 +428,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <CloudSun className="w-5 h-5 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">
-                {isAr ? 'الطقس' : 'Weather'}
+                {localize("Weather", "الطقس", "Météo")}
               </span>
               <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">
-                {isAr ? 'نشرة فورية' : 'Live forecast'}
+                {localize("Live forecast", "نشرة فورية", "Prévisions en direct")}
               </span>
             </button>
 
@@ -423,10 +445,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <ShoppingBag className="w-5 h-5 stroke-[2.2]" />
               </div>
               <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">
-                {isAr ? 'المزيد' : 'More'}
+                {localize("More", "المزيد", "Plus")}
               </span>
               <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">
-                {isAr ? 'أنشطة وتجارب' : 'Activities'}
+                {localize("Activities", "أنشطة وتجارب", "Activités")}
               </span>
             </button>
           </div>
@@ -450,19 +472,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <div className="absolute inset-0 p-3.5 flex flex-col justify-between text-white">
               <div>
                 <span className="text-[10px] font-black tracking-widest uppercase text-sky-200">
-                  {isAr ? 'استكشف' : 'DISCOVER'}
+                  {localize("DISCOVER", "استكشف", "DÉCOUVRIR")}
                 </span>
                 <h3 className="text-base font-bold leading-tight mt-0.5">
-                  {isAr ? 'وجهات سياحية ساحرة' : 'Amazing Destinations'}
+                  {localize("Amazing Destinations", "وجهات سياحية ساحرة", "Destinations exceptionnelles")}
                 </h3>
                 <p className="text-xs text-slate-200 mt-0.5">
-                  {isAr ? 'أماكن سياحية حقيقية موثوقة ومختارة بعناية' : 'Curated handpicked real-world gems'}
+                  {localize("Curated handpicked real-world gems", "أماكن سياحية حقيقية موثوقة ومختارة بعناية", "Joyaux réels sélectionnés avec soin")}
                 </p>
               </div>
 
               <div>
                 <button className="px-3 py-1 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-sm flex items-center gap-1 transition">
-                  <span>{isAr ? 'استكشف الآن' : 'Explore Now'}</span>
+                  <span>{localize("Explore Now", "استكشف الآن", "Explorer maintenant")}</span>
                   <ArrowRight className="w-3 h-3 rtl:rotate-180" />
                 </button>
               </div>
@@ -483,13 +505,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <div className="absolute inset-0 p-3.5 flex flex-col justify-between text-white">
               <div>
                 <span className="text-[10px] font-black tracking-widest uppercase text-amber-200">
-                  {isAr ? 'تخطيط ذكي' : 'PLAN SMARTER'}
+                  {localize("PLAN SMARTER", "تخطيط ذكي", "PLANIFIEZ PLUS INTELLIGEMMENT")}
                 </span>
                 <h3 className="text-base font-bold leading-tight mt-0.5">
-                  {isAr ? 'برامج سياحية متكاملة' : 'Tailored Travel Itineraries'}
+                  {localize("Tailored Travel Itineraries", "برامج سياحية متكاملة", "Itinéraires personnalisés")}
                 </h3>
                 <p className="text-xs text-slate-200 mt-0.5">
-                  {isAr ? 'جداول يومية مخصصة بحسب تفضيلاتك ووجهتك' : 'Personalized day-by-day schedules'}
+                  {localize("Personalized day-by-day schedules", "جداول يومية مخصصة بحسب تفضيلاتك ووجهتك", "Programmes jour par jour personnalisés")}
                 </p>
               </div>
 
@@ -501,7 +523,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   }}
                   className="px-3 py-1 rounded-full bg-white hover:bg-slate-100 text-blue-600 font-bold text-xs shadow-sm flex items-center gap-1 transition"
                 >
-                  <span>{isAr ? 'ابدأ التخطيط' : 'Start Planning'}</span>
+                  <span>{localize("Start Planning", "ابدأ التخطيط", "Commencer à planifier")}</span>
                   <Sparkles className="w-3 h-3 text-blue-600 fill-blue-600" />
                 </button>
               </div>
@@ -514,13 +536,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div className="max-w-md sm:max-w-2xl mx-auto px-4 mt-7 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-bold text-slate-900">
-            {isAr ? 'الوجهات الأكثر طلباً' : 'Popular Destinations'}
+            {localize("Popular Destinations", "الوجهات الأكثر طلباً", "Destinations populaires")}
           </h2>
           <button
             onClick={() => onNavigateTab('explore')}
             className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
           >
-            <span>{isAr ? 'عرض الكل' : 'See All'}</span>
+            <span>{localize("See All", "عرض الكل", "Tout voir")}</span>
             <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
           </button>
         </div>
@@ -537,7 +559,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               >
                 <img
                   src={dest.photo}
-                  alt={dest.name}
+                  alt={localize(dest.name, dest.nameAr, dest.nameFr)}
                   className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/20" />
@@ -558,10 +580,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {/* Bottom Destination Info */}
                 <div className="absolute bottom-3 left-3 right-3 text-white">
                   <h4 className="font-bold text-sm sm:text-base leading-tight drop-shadow-xs">
-                    {dest.name}
+                    {localize(dest.name, dest.nameAr, dest.nameFr)}
                   </h4>
                   <p className="text-[11px] text-slate-300 leading-snug drop-shadow-xs mt-0.5">
-                    {dest.tagline}
+                    {localize(dest.tagline, dest.taglineAr, dest.taglineFr)}
                   </p>
                 </div>
               </div>

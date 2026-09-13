@@ -1,17 +1,22 @@
 import React from 'react';
 import mySindbadTransparent from '../assets/images/my_sindbad_logo_transparent.png';
+import { SupportedLanguage } from '../data/translations';
 
 interface BrandLogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'icon';
   showSlogan?: boolean;
+  language?: SupportedLanguage;
 }
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   className = '',
   size = 'lg',
   showSlogan = true,
+  language = 'en',
 }) => {
+  const slogan = language === 'ar' ? 'رحلتك، أكثر ذكاءً مع الذكاء الاصطناعي' : language === 'fr' ? 'Votre voyage, plus intelligent avec l’IA' : 'Your trip, smarter with AI';
+  const aiTravel = language === 'ar' ? 'سفر ذكي' : language === 'fr' ? 'Voyage IA' : 'AI Travel';
   if (size === 'icon') {
     return (
       <div className={`relative flex items-center justify-center ${className}`}>
@@ -38,7 +43,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           <span className="text-sm font-black tracking-tight text-blue-900 block leading-none">
             My Sindbad
           </span>
-          <span className="text-[9px] font-bold text-blue-600 uppercase">AI Travel</span>
+          <span className="text-[9px] font-bold text-blue-600 uppercase">{aiTravel}</span>
         </div>
       </div>
     );
@@ -58,7 +63,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       {/* Slogan */}
       {showSlogan && (
         <p className="text-xs font-semibold text-slate-600 mt-1 tracking-wide text-center">
-          Your trip, smarter with AI
+          {slogan}
         </p>
       )}
     </div>

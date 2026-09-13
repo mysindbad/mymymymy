@@ -47,7 +47,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   onClose,
   initialScreen = 'welcome',
   onAuthSuccess,
-  language = 'ar',
+  language = 'en',
   onToggleLanguage,
 }) => {
   const [currentScreen, setCurrentScreen] = useState<AuthScreenType>(initialScreen);
@@ -73,6 +73,21 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   if (!isOpen) return null;
 
   const isAr = language === 'ar';
+  const localize = (english: string, arabic: string, french: string) =>
+    language === 'ar' ? arabic : language === 'fr' ? french : english;
+  const localizeAuthError = (message: string) => {
+    const normalized = message.trim().toLowerCase();
+    if (normalized.includes('invalid login credentials')) {
+      return localize('Invalid login credentials', 'بيانات تسجيل الدخول غير صحيحة', 'Identifiants de connexion invalides');
+    }
+    if (normalized.includes('email not confirmed')) {
+      return localize('Please confirm your email before signing in.', 'يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.', 'Veuillez confirmer votre e-mail avant de vous connecter.');
+    }
+    if (normalized.includes('user already registered')) {
+      return localize('This email is already registered.', 'هذا البريد الإلكتروني مسجل بالفعل.', 'Cette adresse e-mail est déjà inscrite.');
+    }
+    return message;
+  };
 
   const navigateTo = (screen: AuthScreenType) => {
     setScreenHistory((prev) => [...prev, currentScreen]);
@@ -105,7 +120,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
 
   const handleSocialAuth = async (provider: 'Google' | 'Facebook' | 'Apple') => {
     if (provider !== 'Google') {
-      setStatusMessage(isAr ? 'تسجيل الدخول متاح حالياً عبر Google أو البريد الإلكتروني.' : 'Sign in is currently available with Google or email.');
+      setStatusMessage(localize("Sign in is currently available with Google or email.", "تسجيل الدخول متاح حالياً عبر Google أو البريد الإلكتروني.", "Connexion disponible actuellement avec Google ou e-mail."));
       return;
     }
     setIsLoading(true);
@@ -113,7 +128,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(error.message);
+      setStatusMessage(localizeAuthError(error.message));
       return;
     }
   };
@@ -121,7 +136,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setStatusMessage('Please fill in both email and password.');
+      setStatusMessage(localize('Please fill in both email and password.', 'يرجى إدخال البريد الإلكتروني وكلمة المرور.', 'Veuillez saisir votre e-mail et votre mot de passe.'));
       return;
     }
     setIsLoading(true);
@@ -129,7 +144,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(error.message);
+      setStatusMessage(localizeAuthError(error.message));
       return;
     }
     if (data.user) completeAuth(data.user);
@@ -138,15 +153,15 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !fullName) {
-      setStatusMessage('Please enter your full name, email, and password.');
+      setStatusMessage(localize('Please enter your full name, email, and password.', 'يرجى إدخال الاسم الكامل والبريد الإلكتروني وكلمة المرور.', 'Veuillez saisir votre nom complet, votre e-mail et votre mot de passe.'));
       return;
     }
     if (password.length < 6) {
-      setStatusMessage('Password must be at least 6 characters.');
+      setStatusMessage(localize('Password must be at least 6 characters.', 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.', 'Le mot de passe doit comporter au moins 6 caractères.'));
       return;
     }
     if (password !== confirmPassword) {
-      setStatusMessage('Passwords do not match.');
+      setStatusMessage(localize('Passwords do not match.', 'كلمتا المرور غير متطابقتين.', 'Les mots de passe ne correspondent pas.'));
       return;
     }
     setIsLoading(true);
@@ -158,37 +173,37 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(error.message);
+      setStatusMessage(localizeAuthError(error.message));
       return;
     }
     if (data.user && data.session) {
       completeAuth(data.user);
     } else {
-      setStatusMessage(isAr ? 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.' : 'Account created. Check your email to confirm it.');
+      setStatusMessage(localize("Account created. Check your email to confirm it.", "تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.", "Compte créé. Vérifiez votre e-mail pour le confirmer."));
     }
   };
 
   const handleSendResetLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      setStatusMessage('Please enter your email address.');
+      setStatusMessage(localize('Please enter your email address.', 'يرجى إدخال بريدك الإلكتروني.', 'Veuillez saisir votre adresse e-mail.'));
       return;
     }
     setIsLoading(true);
     setStatusMessage(null);
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
     setIsLoading(false);
-    setStatusMessage(error?.message || (isAr ? 'تم إرسال رابط إعادة التعيين إلى بريدك.' : 'Reset link sent. Check your email inbox.'));
+    setStatusMessage(error ? localizeAuthError(error.message) : localize('Reset link sent. Check your email inbox.', 'تم إرسال رابط إعادة التعيين إلى بريدك.', 'Lien de réinitialisation envoyé. Consultez votre boîte e-mail.'));
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
-      setStatusMessage('Password must be at least 6 characters.');
+      setStatusMessage(localize('Password must be at least 6 characters.', 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.', 'Le mot de passe doit comporter au moins 6 caractères.'));
       return;
     }
     if (password !== confirmPassword) {
-      setStatusMessage('Passwords do not match.');
+      setStatusMessage(localize('Passwords do not match.', 'كلمتا المرور غير متطابقتين.', 'Les mots de passe ne correspondent pas.'));
       return;
     }
     setIsLoading(true);
@@ -196,10 +211,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { error } = await supabase.auth.updateUser({ password });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(error.message);
+      setStatusMessage(localizeAuthError(error.message));
       return;
     }
-    setStatusMessage(isAr ? 'تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.' : 'Password updated successfully. You can now sign in.');
+    setStatusMessage(localize("Password updated successfully. You can now sign in.", "تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.", "Mot de passe mis à jour. Vous pouvez maintenant vous connecter."));
     navigateTo('sign-in-email');
   };
 
@@ -233,7 +248,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               <button
                 onClick={handleBack}
                 className="w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white shadow-md flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-md"
-                title={isAr ? 'رجوع' : 'Go Back'}
+                title={localize("Go Back", "رجوع", "Retour")}
               >
                 <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
               </button>
@@ -251,7 +266,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
             <button
               onClick={onClose}
               className="w-8 h-8 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white shadow-md flex items-center justify-center transition active:scale-95 border border-white/20 backdrop-blur-md"
-              title={isAr ? 'إغلاق' : 'Close'}
+              title={localize("Close", "إغلاق", "Fermer")}
             >
               <X className="w-4 h-4" />
             </button>
@@ -269,32 +284,32 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
             <div className="absolute top-0 right-0 text-right pointer-events-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
               {currentScreen === 'welcome' && (
                 <span className="font-['Caveat',cursive] text-lg font-bold leading-tight block -rotate-3 text-sky-100">
-                  Explore & Discover ✈
+                  {localize('Explore & Discover ✈', 'استكشف واكتشف ✈', 'Explorer & découvrir ✈')}
                 </span>
               )}
               {currentScreen === 'sign-in-method' && (
                 <span className="font-['Caveat',cursive] text-base font-bold leading-tight block -rotate-3 text-sky-100">
-                  Travel Connect Belong ✈
+                  {localize('Travel Connect Belong ✈', 'سافر وتواصل وانتمِ ✈', 'Voyager, se connecter, appartenir ✈')}
                 </span>
               )}
               {currentScreen === 'sign-in-email' && (
                 <span className="font-['Caveat',cursive] text-base font-bold leading-tight block -rotate-3 text-sky-100">
-                  More Than A Trip ♡
+                  {localize('More Than A Trip ♡', 'أكثر من مجرد رحلة ♡', 'Bien plus qu’un voyage ♡')}
                 </span>
               )}
               {currentScreen === 'create-account' && (
                 <span className="font-['Caveat',cursive] text-base font-bold leading-tight block -rotate-3 text-sky-100">
-                  Travel Learn Connect Belong ✈
+                  {localize('Travel Learn Connect Belong ✈', 'سافر وتعلم وتواصل وانتمِ ✈', 'Voyager, apprendre, se connecter, appartenir ✈')}
                 </span>
               )}
               {currentScreen === 'forgot-password' && (
                 <span className="font-['Caveat',cursive] text-base font-bold leading-tight block -rotate-3 text-sky-100">
-                  Travel Smarter With AI ✈
+                  {localize('Travel Smarter With AI ✈', 'سافر بذكاء مع الذكاء الاصطناعي ✈', 'Voyagez plus intelligemment avec l’IA ✈')}
                 </span>
               )}
               {currentScreen === 'reset-password' && (
                 <span className="font-['Caveat',cursive] text-base font-bold leading-tight block -rotate-3 text-sky-100">
-                  Travel Learn Connect Belong ✈
+                  {localize('Travel Learn Connect Belong ✈', 'سافر وتعلم وتواصل وانتمِ ✈', 'Voyager, apprendre, se connecter, appartenir ✈')}
                 </span>
               )}
             </div>
@@ -302,18 +317,18 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
             {currentScreen !== 'welcome' && (
               <div className="absolute top-10 left-0 pointer-events-none text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
                 <span className="font-['Caveat',cursive] text-base font-bold leading-tight block rotate-3 text-sky-100">
-                  {currentScreen === 'sign-in-method' && 'Different Ways Same Journey ♡'}
-                  {currentScreen === 'sign-in-email' && 'Explore Discover Belong ✈'}
-                  {currentScreen === 'create-account' && 'New Adventures New You ♡'}
-                  {currentScreen === 'forgot-password' && 'Explore Discover Belong ✈'}
-                  {currentScreen === 'reset-password' && 'New Password Brighter Journeys ♡'}
+                   {currentScreen === 'sign-in-method' && localize('Different Ways Same Journey ♡', 'طرق مختلفة والرحلة واحدة ♡', 'Des méthodes différentes, le même voyage ♡')}
+                   {currentScreen === 'sign-in-email' && localize('Explore Discover Belong ✈', 'استكشف واكتشف وانتمِ ✈', 'Explorer, découvrir, appartenir ✈')}
+                   {currentScreen === 'create-account' && localize('New Adventures New You ♡', 'مغامرات جديدة، نسخة جديدة منك ♡', 'Nouvelles aventures, nouveau vous ♡')}
+                   {currentScreen === 'forgot-password' && localize('Explore Discover Belong ✈', 'استكشف واكتشف وانتمِ ✈', 'Explorer, découvrir, appartenir ✈')}
+                   {currentScreen === 'reset-password' && localize('New Password Brighter Journeys ♡', 'كلمة مرور جديدة، رحلات أكثر إشراقاً ♡', 'Nouveau mot de passe, voyages plus lumineux ♡')}
                 </span>
               </div>
             )}
 
             {/* Official 3D Transparent Logo */}
             <div className="flex flex-col items-center justify-center pt-2 pb-1">
-              <BrandLogo size="lg" showSlogan={true} />
+              <BrandLogo size="lg" showSlogan={true} language={language} />
             </div>
           </div>
 
@@ -332,10 +347,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               {/* Handwritten Display Title */}
               <div className="text-center mb-6">
                 <h2 className="font-['Kaushan_Script',cursive] text-3xl sm:text-4xl text-blue-950 font-black tracking-wide drop-shadow-[0_2px_8px_rgba(255,255,255,0.9)]">
-                  {isAr ? 'استكشف' : 'Explore'}
+                  {localize("Explore", "استكشف", "Explorer")}
                 </h2>
                 <h3 className="font-['Kaushan_Script',cursive] text-2xl sm:text-3xl text-blue-900 font-bold -mt-1 tracking-wide drop-shadow-[0_2px_8px_rgba(255,255,255,0.9)]">
-                  {isAr ? 'عالماً أكثر إشراقاً' : 'a Brighter World'}
+                  {localize("a Brighter World", "عالماً أكثر إشراقاً", "un monde plus lumineux")}
                 </h3>
               </div>
 
@@ -347,10 +362,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     <Compass className="w-5 h-5 stroke-[2.2]" />
                   </div>
                   <span className="font-bold text-xs text-slate-900 leading-tight">
-                    {isAr ? 'استكشف' : 'Discover'}
+                    {localize("Discover", "استكشف", "Découvrir")}
                   </span>
                   <span className="text-[9px] text-slate-600 leading-tight mt-0.5">
-                    {isAr ? 'أجمل الوجهات' : 'Amazing places'}
+                    {localize("Amazing places", "أجمل الوجهات", "De beaux endroits")}
                   </span>
                 </div>
 
@@ -360,10 +375,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     <Calendar className="w-5 h-5 stroke-[2.2]" />
                   </div>
                   <span className="font-bold text-xs text-slate-900 leading-tight">
-                    {isAr ? 'خطط' : 'Plan'}
+                    {localize("Plan", "خطط", "Planifier")}
                   </span>
                   <span className="text-[9px] text-slate-600 leading-tight mt-0.5">
-                    {isAr ? 'رحلتك بذكاء' : 'Your trip'}
+                    {localize("Your trip", "رحلتك بذكاء", "Votre voyage")}
                   </span>
                 </div>
 
@@ -373,10 +388,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     <Navigation className="w-5 h-5 stroke-[2.2] fill-current" />
                   </div>
                   <span className="font-bold text-xs text-slate-900 leading-tight">
-                    {isAr ? 'تنقل' : 'Navigate'}
+                    {localize("Navigate", "تنقل", "Naviguer")}
                   </span>
                   <span className="text-[9px] text-slate-600 leading-tight mt-0.5">
-                    {isAr ? 'بإرشاد ذكي' : 'With AI'}
+                    {localize("With AI", "بإرشاد ذكي", "Avec l’IA")}
                   </span>
                 </div>
 
@@ -386,10 +401,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     <Heart className="w-5 h-5 stroke-[2.2] fill-current" />
                   </div>
                   <span className="font-bold text-xs text-slate-900 leading-tight">
-                    {isAr ? 'انضم' : 'Belong'}
+                    {localize("Belong", "انضم", "Rejoignez-nous")}
                   </span>
                   <span className="text-[9px] text-slate-600 leading-tight mt-0.5">
-                    {isAr ? 'لمجتمع السفر' : 'Community'}
+                    {localize("Community", "لمجتمع السفر", "Communauté")}
                   </span>
                 </div>
               </div>
@@ -400,7 +415,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   onClick={() => navigateTo('sign-in-method')}
                   className="w-full py-3.5 rounded-full bg-gradient-to-r from-blue-600 via-sky-500 to-blue-600 hover:from-blue-700 hover:to-sky-600 text-white font-black text-sm tracking-wide shadow-lg shadow-blue-500/40 flex items-center justify-center gap-2 transition transform active:scale-95"
                 >
-                  <span>{isAr ? 'ابدأ الآن' : 'Get Started'}</span>
+                  <span>{localize("Get Started", "ابدأ الآن", "Commencer")}</span>
                   <ArrowRight className={`w-4 h-4 stroke-[2.5] ${isAr ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -409,7 +424,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     onClick={() => navigateTo('sign-in-email')}
                     className="text-xs font-bold text-blue-900 hover:text-blue-950 underline underline-offset-4 drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]"
                   >
-                    {isAr ? 'لدي حساب بالفعل' : 'I already have an account'}
+                    {localize("I already have an account", "لدي حساب بالفعل", "J’ai déjà un compte")}
                   </button>
                 </div>
               </div>
@@ -419,14 +434,14 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 2: SIGN IN YOUR WAY (OAuth Options & Email)        */}
           {/* ========================================================= */}
-          {currentScreen === 'sign-in-method' && (
+                   {currentScreen === 'sign-in-method' && localize('Different Ways Same Journey ♡', 'طرق مختلفة والرحلة واحدة ♡', 'Des méthodes différentes, le même voyage ♡')}
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-4">
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  {isAr ? 'سجل دخولك بالطريقة المناسبة' : 'Sign In Your Way'}
+                  {localize("Sign In Your Way", "سجل دخولك بالطريقة المناسبة", "Connectez-vous comme vous le souhaitez")}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isAr ? 'اختر الوسيلة التي تفضلها للبدء' : 'Choose the method that’s best for you'}
+                  {localize("Choose the method that’s best for you", "اختر الوسيلة التي تفضلها للبدء", "Choisissez la méthode qui vous convient")}
                 </p>
                 <div className="w-12 h-1 bg-gradient-to-r from-blue-500 to-sky-400 mx-auto rounded-full mt-2" />
               </div>
@@ -459,7 +474,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     </svg>
                     <div className="text-start leading-tight">
                       <span className="text-[10px] text-slate-400 block font-normal">
-                        {isAr ? 'المتابعة مع' : 'Continue with'}
+                        {localize("Continue with", "المتابعة مع", "Continuer avec")}
                       </span>
                       <span className="text-xs font-bold text-slate-900">Google</span>
                     </div>
@@ -478,7 +493,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     </div>
                     <div className="text-start leading-tight">
                       <span className="text-[10px] text-slate-400 block font-normal">
-                        {isAr ? 'المتابعة مع' : 'Continue with'}
+                        {localize("Continue with", "المتابعة مع", "Continuer avec")}
                       </span>
                       <span className="text-xs font-bold text-slate-900">Facebook</span>
                     </div>
@@ -497,7 +512,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     </svg>
                     <div className="text-start leading-tight">
                       <span className="text-[10px] text-slate-400 block font-normal">
-                        {isAr ? 'المتابعة مع' : 'Continue with'}
+                        {localize("Continue with", "المتابعة مع", "Continuer avec")}
                       </span>
                       <span className="text-xs font-bold text-slate-900">Apple</span>
                     </div>
@@ -510,7 +525,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               <div className="relative my-3 flex items-center justify-center">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  {isAr ? 'أو استخدم بريدك الإلكتروني' : 'Or use your email'}
+                  {localize("Or use your email", "أو استخدم بريدك الإلكتروني", "Ou utilisez votre e-mail")}
                 </span>
               </div>
 
@@ -525,10 +540,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   </div>
                   <div className="text-start leading-tight">
                     <span className="text-xs font-bold text-slate-900 block">
-                      {isAr ? 'تسجيل الدخول بالبريد' : 'Sign in with Email'}
+                      {localize("Sign in with Email", "تسجيل الدخول بالبريد", "Se connecter avec e-mail")}
                     </span>
                     <span className="text-[10px] text-slate-500">
-                      {isAr ? 'باستخدام بريدك وكلمة المرور' : 'Use your email and password'}
+                      {localize("Use your email and password", "باستخدام بريدك وكلمة المرور", "Utilisez votre e-mail et votre mot de passe")}
                     </span>
                   </div>
                 </div>
@@ -540,7 +555,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <div className="leading-tight text-start">
                   <span className="text-[11px] font-bold text-blue-950 block">
-                    {isAr ? 'بياناتك وخصوصيتك في أمان تام' : 'Your data is safe with us'}
+                    {localize("Your data is safe with us", "بياناتك وخصوصيتك في أمان تام", "Vos données sont en sécurité")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
                     {isAr
@@ -555,11 +570,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 3: WELCOME BACK (Email Sign In)                    */}
           {/* ========================================================= */}
-          {currentScreen === 'sign-in-email' && (
+                   {currentScreen === 'sign-in-email' && localize('Explore Discover Belong ✈', 'استكشف واكتشف وانتمِ ✈', 'Explorer, découvrir, appartenir ✈')}
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-4">
                 <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-1.5">
-                  <span>{isAr ? 'مرحباً بعودتك' : 'Welcome Back'}</span>
+                  <span>{localize("Welcome Back", "مرحباً بعودتك", "Bon retour")}</span>
                   <span>👋</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -577,7 +592,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={isAr ? 'البريد الإلكتروني' : 'Email address'}
+                    placeholder={localize("Email address", "البريد الإلكتروني", "Adresse e-mail")}
                     className="w-full ps-10 pe-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     required
                   />
@@ -590,7 +605,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isAr ? 'كلمة المرور' : 'Password'}
+                    placeholder={localize("Password", "كلمة المرور", "Mot de passe")}
                     className="w-full ps-10 pe-10 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     required
                   />
@@ -610,7 +625,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     onClick={() => navigateTo('forgot-password')}
                     className="text-[11px] font-bold text-blue-600 hover:underline"
                   >
-                    {isAr ? 'نسيت كلمة المرور؟' : 'Forgot Password?'}
+                    {localize("Forgot Password?", "نسيت كلمة المرور؟", "Mot de passe oublié ?")}
                   </button>
                 </div>
 
@@ -619,7 +634,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   type="submit"
                   className="w-full py-3 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs tracking-wide shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition active:scale-95"
                 >
-                  <span>{isAr ? 'تسجيل الدخول' : 'Sign In'}</span>
+                  <span>{localize("Sign In", "تسجيل الدخول", "Se connecter")}</span>
                   <ArrowRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-180' : ''}`} />
                 </button>
               </form>
@@ -628,7 +643,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               <div className="relative my-3 flex items-center justify-center">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  {isAr ? 'أو المتابعة عبر' : 'Or continue with'}
+                  {localize("Or continue with", "أو المتابعة عبر", "Ou continuer avec")}
                 </span>
               </div>
 
@@ -675,21 +690,21 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               {/* Sign up prompt */}
               <div className="text-center mb-2">
                 <span className="text-xs text-slate-500">
-                  {isAr ? 'ليس لديك حساب بعد؟ ' : "Don't have an account? "}
+                  {localize("Don't have an account? ", "ليس لديك حساب بعد؟ ", "Vous n’avez pas encore de compte ? ")}
                 </span>
                 <button
                   type="button"
                   onClick={() => navigateTo('create-account')}
                   className="text-xs font-bold text-blue-600 hover:underline"
                 >
-                  {isAr ? 'إنشاء حساب جديد' : 'Sign Up'}
+                  {localize("Sign Up", "إنشاء حساب جديد", "S’inscrire")}
                 </button>
               </div>
 
               {/* Safe Note */}
               <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
                 <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                <span>{isAr ? 'بياناتك في أمان تام ومعاملاتك مشفرة' : 'Your data is safe with us'}</span>
+                <span>{localize("Your data is safe with us", "بياناتك في أمان تام ومعاملاتك مشفرة", "Vos données sont en sécurité")}</span>
               </div>
             </div>
           )}
@@ -697,11 +712,11 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 4: CREATE YOUR ACCOUNT (Sign Up)                   */}
           {/* ========================================================= */}
-          {currentScreen === 'create-account' && (
+                   {currentScreen === 'create-account' && localize('New Adventures New You ♡', 'مغامرات جديدة، نسخة جديدة منك ♡', 'Nouvelles aventures, nouveau vous ♡')}
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-4 sm:p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-3">
                 <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                  {isAr ? 'إنشاء حساب جديد' : 'Create Your Account'}
+                  {localize("Create Your Account", "إنشاء حساب جديد", "Créez votre compte")}
                 </h2>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   {isAr
@@ -719,7 +734,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder={isAr ? 'الاسم الكامل (مثال: أحمد المنصوري)' : 'Full name (e.g. Ahmed Benali)'}
+                    placeholder={localize("Full name (e.g. Ahmed Benali)", "الاسم الكامل (مثال: أحمد المنصوري)", "Nom complet (ex. Ahmed Benali)")}
                     className="w-full ps-9 pe-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-500 transition"
                     required
                   />
@@ -732,7 +747,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={isAr ? 'البريد الإلكتروني (مثال: ahmed@example.com)' : 'Email address (e.g. ahmed@example.com)'}
+                    placeholder={localize("Email address (e.g. ahmed@example.com)", "البريد الإلكتروني (مثال: ahmed@example.com)", "Adresse e-mail (ex. ahmed@example.com)")}
                     className="w-full ps-9 pe-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-500 transition"
                     required
                   />
@@ -745,7 +760,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isAr ? 'كلمة المرور (6 أحرف على الأقل)' : 'Password (at least 6 characters)'}
+                    placeholder={localize("Password (at least 6 characters)", "كلمة المرور (6 أحرف على الأقل)", "Mot de passe (6 caractères minimum)")}
                     className="w-full ps-9 pe-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-500 transition"
                     required
                   />
@@ -765,7 +780,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={isAr ? 'تأكيد كلمة المرور' : 'Confirm password'}
+                    placeholder={localize("Confirm password", "تأكيد كلمة المرور", "Confirmer le mot de passe")}
                     className="w-full ps-9 pe-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-500 transition"
                     required
                   />
@@ -786,15 +801,15 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     onChange={(e) => setCountry(e.target.value)}
                     className="w-full ps-9 pe-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 transition appearance-none cursor-pointer"
                   >
-                    <option value="Saudi Arabia">🇸🇦 {isAr ? 'المملكة العربية السعودية' : 'Saudi Arabia'}</option>
-                    <option value="Morocco">🇲🇦 {isAr ? 'المملكة المغربية' : 'Morocco'}</option>
-                    <option value="UAE">🇦🇪 {isAr ? 'الإمارات العربية المتحدة' : 'United Arab Emirates'}</option>
-                    <option value="Egypt">🇪🇬 {isAr ? 'جمهورية مصر العربية' : 'Egypt'}</option>
-                    <option value="Qatar">🇶🇦 {isAr ? 'دولة قطر' : 'Qatar'}</option>
-                    <option value="Kuwait">🇰🇼 {isAr ? 'دولة الكويت' : 'Kuwait'}</option>
-                    <option value="Turkey">🇹🇷 {isAr ? 'تركيا' : 'Turkey'}</option>
-                    <option value="France">🇫🇷 {isAr ? 'فرنسا' : 'France'}</option>
-                    <option value="UK">🇬🇧 {isAr ? 'المملكة المتحدة' : 'United Kingdom'}</option>
+                    <option value="Saudi Arabia">🇸🇦 {localize("Saudi Arabia", "المملكة العربية السعودية", "Arabie saoudite")}</option>
+                    <option value="Morocco">🇲🇦 {localize("Morocco", "المملكة المغربية", "Maroc")}</option>
+                    <option value="UAE">🇦🇪 {localize("United Arab Emirates", "الإمارات العربية المتحدة", "Émirats arabes unis")}</option>
+                    <option value="Egypt">🇪🇬 {localize("Egypt", "جمهورية مصر العربية", "Égypte")}</option>
+                    <option value="Qatar">🇶🇦 {localize("Qatar", "دولة قطر", "Qatar")}</option>
+                    <option value="Kuwait">🇰🇼 {localize("Kuwait", "دولة الكويت", "Koweït")}</option>
+                    <option value="Turkey">🇹🇷 {localize("Turkey", "تركيا", "Turquie")}</option>
+                    <option value="France">🇫🇷 {localize("France", "فرنسا", "France")}</option>
+                    <option value="UK">🇬🇧 {localize("United Kingdom", "المملكة المتحدة", "Royaume-Uni")}</option>
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute end-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
@@ -808,17 +823,12 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-[10px] text-slate-600 leading-tight">
-                    {isAr ? (
-                      <>
-                        أوافق على <span className="text-blue-600 underline">شروط الخدمة</span> و{' '}
-                        <span className="text-blue-600 underline">سياسة الخصوصية</span>
-                      </>
-                    ) : (
-                      <>
-                        I agree to the <span className="text-blue-600 underline">Terms of Service</span> and{' '}
-                        <span className="text-blue-600 underline">Privacy Policy</span>
-                      </>
-                    )}
+                    <>
+                      {localize('I agree to the', 'أوافق على', 'J’accepte les')}{' '}
+                      <span className="text-blue-600 underline">{localize('Terms of Service', 'شروط الخدمة', 'Conditions d’utilisation')}</span>{' '}
+                      {localize('and', 'و', 'et')}{' '}
+                      <span className="text-blue-600 underline">{localize('Privacy Policy', 'سياسة الخصوصية', 'Politique de confidentialité')}</span>
+                    </>
                   </span>
                 </label>
 
@@ -828,7 +838,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   disabled={!agreedToTerms}
                   className="w-full py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs tracking-wide shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition disabled:opacity-50 active:scale-95 mt-1"
                 >
-                  <span>{isAr ? 'إنشاء الحساب' : 'Create Account'}</span>
+                  <span>{localize("Create Account", "إنشاء الحساب", "Créer le compte")}</span>
                   <ArrowRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-180' : ''}`} />
                 </button>
               </form>
@@ -836,14 +846,14 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               {/* Already have an account */}
               <div className="text-center mt-3">
                 <span className="text-xs text-slate-500">
-                  {isAr ? 'لديك حساب بالفعل؟ ' : 'Already have an account? '}
+                  {localize("Already have an account? ", "لديك حساب بالفعل؟ ", "Vous avez déjà un compte ? ")}
                 </span>
                 <button
                   type="button"
                   onClick={() => navigateTo('sign-in-email')}
                   className="text-xs font-bold text-blue-600 hover:underline"
                 >
-                  {isAr ? 'تسجيل الدخول' : 'Sign In'}
+                  {localize("Sign In", "تسجيل الدخول", "Se connecter")}
                 </button>
               </div>
             </div>
@@ -852,14 +862,14 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 5: FORGOT YOUR PASSWORD?                           */}
           {/* ========================================================= */}
-          {currentScreen === 'forgot-password' && (
+                   {currentScreen === 'forgot-password' && localize('Explore Discover Belong ✈', 'استكشف واكتشف وانتمِ ✈', 'Explorer, découvrir, appartenir ✈')}
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-4">
                 <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
                   <Lock className="w-6 h-6 stroke-[2.2]" />
                 </div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  {isAr ? 'استعادة كلمة المرور' : 'Forgot Your Password?'}
+                  {localize("Forgot Your Password?", "استعادة كلمة المرور", "Mot de passe oublié ?")}
                 </h2>
                 <p className="text-xs text-slate-500 mt-1 max-w-[260px] mx-auto leading-relaxed">
                   {isAr
@@ -875,7 +885,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={isAr ? 'البريد الإلكتروني' : 'Email address'}
+                    placeholder={localize("Email address", "البريد الإلكتروني", "Adresse e-mail")}
                     className="w-full ps-10 pe-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 transition"
                     required
                   />
@@ -885,7 +895,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   type="submit"
                   className="w-full py-3 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs tracking-wide shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition active:scale-95"
                 >
-                  <span>{isAr ? 'إرسال رابط التعيين' : 'Send Reset Link'}</span>
+                  <span>{localize("Send Reset Link", "إرسال رابط التعيين", "Envoyer le lien")}</span>
                   <ArrowRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-180' : ''}`} />
                 </button>
               </form>
@@ -894,7 +904,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               <div className="relative my-4 flex items-center justify-center">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  {isAr ? 'الرجوع إلى' : 'Back to'}
+                  {localize("Back to", "الرجوع إلى", "Retour à")}
                 </span>
               </div>
 
@@ -904,7 +914,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 onClick={() => navigateTo('sign-in-email')}
                 className="w-full py-2.5 rounded-full border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs transition active:scale-95 mb-3"
               >
-                {isAr ? 'تسجيل الدخول' : 'Sign In'}
+                {localize("Sign In", "تسجيل الدخول", "Se connecter")}
               </button>
 
               {/* Security info note */}
@@ -912,7 +922,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <div className="leading-tight text-start">
                   <span className="text-[11px] font-bold text-blue-950 block">
-                    {isAr ? 'حماية وأمان كامل لمعلوماتك' : 'Your data is safe with us'}
+                    {localize("Your data is safe with us", "حماية وأمان كامل لمعلوماتك", "Vos données sont en sécurité")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
                     {isAr
@@ -927,17 +937,17 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 6: RESET YOUR PASSWORD                             */}
           {/* ========================================================= */}
-          {currentScreen === 'reset-password' && (
+                   {currentScreen === 'reset-password' && localize('New Password Brighter Journeys ♡', 'كلمة مرور جديدة، رحلات أكثر إشراقاً ♡', 'Nouveau mot de passe, voyages plus lumineux ♡')}
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-3">
                 <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
                   <Lock className="w-6 h-6 stroke-[2.2]" />
                 </div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  {isAr ? 'تعيين كلمة مرور جديدة' : 'Reset Your Password'}
+                  {localize("Reset Your Password", "تعيين كلمة مرور جديدة", "Réinitialiser votre mot de passe")}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isAr ? 'أنشئ كلمة مرور قوية لحماية حسابك' : 'Create a new password for your account'}
+                  {localize("Create a new password for your account", "أنشئ كلمة مرور قوية لحماية حسابك", "Créez un nouveau mot de passe pour votre compte")}
                 </p>
               </div>
 
@@ -949,7 +959,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isAr ? 'كلمة المرور الجديدة' : 'New password (at least 6 characters)'}
+                    placeholder={localize("New password (at least 6 characters)", "كلمة المرور الجديدة", "Nouveau mot de passe (6 caractères minimum)")}
                     className="w-full ps-10 pe-10 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 transition"
                     required
                   />
@@ -969,7 +979,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={isAr ? 'تأكيد كلمة المرور الجديدة' : 'Confirm new password'}
+                    placeholder={localize("Confirm new password", "تأكيد كلمة المرور الجديدة", "Confirmer le nouveau mot de passe")}
                     className="w-full ps-10 pe-10 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 transition"
                     required
                   />
@@ -985,7 +995,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 {/* Password Strength Meter */}
                 <div className="pt-1">
                   <div className="flex items-center justify-between text-[11px] mb-1">
-                    <span className="text-slate-500">{isAr ? 'قوة كلمة المرور' : 'Password strength'}</span>
+                    <span className="text-slate-500">{localize("Password strength", "قوة كلمة المرور", "Robustesse du mot de passe")}</span>
                     <span
                       className={`font-bold ${
                         hasMinLength && hasLettersAndNumbers && passwordsMatch
@@ -994,8 +1004,8 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                       }`}
                     >
                       {hasMinLength && hasLettersAndNumbers && passwordsMatch
-                        ? (isAr ? 'قوية وممتازة' : 'Strong')
-                        : (isAr ? 'جيدة' : 'Good')}
+                        ? (localize("Strong", "قوية وممتازة", "Fort"))
+                        : (localize("Good", "جيدة", "Bons"))}
                     </span>
                   </div>
 
@@ -1026,7 +1036,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                         }`}
                       />
                       <span className={hasMinLength ? 'text-slate-800' : 'text-slate-400'}>
-                        {isAr ? '6 أحرف على الأقل' : 'At least 6 characters'}
+                        {localize("At least 6 characters", "6 أحرف على الأقل", "Au moins 6 caractères")}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1036,7 +1046,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                         }`}
                       />
                       <span className={hasLettersAndNumbers ? 'text-slate-800' : 'text-slate-400'}>
-                        {isAr ? 'مزيج من الحروف والأرقام' : 'Use a mix of letters and numbers'}
+                        {localize("Use a mix of letters and numbers", "مزيج من الحروف والأرقام", "Utilisez un mélange de lettres et de chiffres")}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1046,7 +1056,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                         }`}
                       />
                       <span className={passwordsMatch ? 'text-slate-800' : 'text-slate-400'}>
-                        {isAr ? 'تطابق كلمتي المرور' : 'Both passwords match'}
+                        {localize("Both passwords match", "تطابق كلمتي المرور", "Les deux mots de passe correspondent")}
                       </span>
                     </div>
                   </div>
@@ -1058,7 +1068,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   disabled={!hasMinLength || !passwordsMatch}
                   className="w-full py-3 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs tracking-wide shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 mt-1"
                 >
-                  <span>{isAr ? 'تحديث كلمة المرور' : 'Update Password'}</span>
+                  <span>{localize("Update Password", "تحديث كلمة المرور", "Mettre à jour le mot de passe")}</span>
                   <ArrowRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-180' : ''}`} />
                 </button>
               </form>
@@ -1067,7 +1077,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               <div className="relative my-3 flex items-center justify-center">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  {isAr ? 'أو الرجوع إلى' : 'Or go back to'}
+                  {localize("Or go back to", "أو الرجوع إلى", "Ou revenir à")}
                 </span>
               </div>
 
@@ -1077,7 +1087,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 onClick={() => navigateTo('sign-in-email')}
                 className="w-full py-2.5 rounded-full border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs transition active:scale-95 mb-2.5"
               >
-                {isAr ? 'تسجيل الدخول' : 'Sign In'}
+                {localize("Sign In", "تسجيل الدخول", "Se connecter")}
               </button>
 
               {/* Security info note */}
@@ -1085,7 +1095,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <div className="leading-tight text-start">
                   <span className="text-[11px] font-bold text-blue-950 block">
-                    {isAr ? 'بياناتك مشفرة ومحمية' : 'Your data is safe with us'}
+                    {localize("Your data is safe with us", "بياناتك مشفرة ومحمية", "Vos données sont en sécurité")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
                     {isAr

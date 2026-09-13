@@ -35,6 +35,7 @@ import { AIIcon } from './components/AIIcon';
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
 type ExploreView = 'feed' | 'map';
 const PASSIVE_GPS_CONSENT_KEY = 'sindbad_passive_gps_consent';
+const LANGUAGE_KEY = 'sindbad_language';
 
 type CurrentUser = {
   name: string;
@@ -72,7 +73,14 @@ export default function App() {
     avatar: '🧔',
     isLoggedIn: false,
   });
-  const [language, setLanguage] = useState<SupportedLanguage>('en');
+  const [language, setLanguage] = useState<SupportedLanguage>(() => {
+    try {
+      const stored = localStorage.getItem(LANGUAGE_KEY);
+      return stored === 'ar' || stored === 'fr' || stored === 'en' ? stored : 'en';
+    } catch {
+      return 'en';
+    }
+  });
   const [currency, setCurrency] = useState<string>('MAD');
   const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(() => {
     try {
@@ -102,6 +110,14 @@ export default function App() {
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LANGUAGE_KEY, language);
+    } catch {
+      // Storage may be unavailable; keep the current session language.
+    }
+  }, [language]);
 
   // Apply RTL direction when Arabic is selected
   useEffect(() => {
