@@ -88,6 +88,8 @@ export async function fetchPlaces(params?: {
   query?: string;
   hiddenGemsOnly?: boolean;
   minRating?: number;
+  userLat?: number;
+  userLng?: number;
 }): Promise<Place[]> {
   const searchParams = new URLSearchParams();
   if (params?.category && params.category !== 'All') searchParams.set('category', params.category);
@@ -95,7 +97,12 @@ export async function fetchPlaces(params?: {
   if (params?.query) searchParams.set('query', params.query);
   if (params?.hiddenGemsOnly) searchParams.set('hiddenGemsOnly', 'true');
   if (params?.minRating) searchParams.set('minRating', params.minRating.toString());
-  const data = await apiRequest<{ places?: Place[] }>(`/api/places?${searchParams.toString()}`);
+  if (params?.userLat !== undefined && params?.userLng !== undefined) {
+    searchParams.set('userLat', params.userLat.toString());
+    searchParams.set('userLng', params.userLng.toString());
+  }
+  const queryString = searchParams.toString();
+  const data = await apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
   return data.places || [];
 }
 
