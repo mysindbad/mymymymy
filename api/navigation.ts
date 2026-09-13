@@ -1,5 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
+function normalizedSupabaseUrl() {
+  const raw = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  if (!raw) throw new Error('Supabase configuration is missing');
+
+  let value = raw.trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Supabase URL is invalid');
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Supabase URL must use http or https');
+  }
+  return parsed.origin;
+}
+
 function numberField(value: unknown, name: string) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw Object.assign(new Error(`${name} must be a number`), { status: 400 });
@@ -15,9 +40,9 @@ function coordinates(lat: unknown, lng: unknown) {
 }
 
 function placesClient() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const url = normalizedSupabaseUrl();
   const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) throw new Error('Supabase configuration is missing');
+  if (!anonKey) throw new Error('Supabase configuration is missing');
   return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 

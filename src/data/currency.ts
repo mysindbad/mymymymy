@@ -32,6 +32,6 @@ export function formatPriceLevel(
   level: '$' | '$$' | '$$$' | '$$$$' | undefined,
   currencyCode: string = 'MAD'
 ): string {
-  if (!level) return '$$';
+  if (!level) return '—';
   return level;
 }
