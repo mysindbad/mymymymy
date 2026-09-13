@@ -37,21 +37,19 @@ update public.places
 set seed_rating = coalesce(seed_rating, rating),
     seed_review_count = case when seed_review_count = 0 then review_count else seed_review_count end,
     seed_owner_verified = case when seed_owner_verified = false then owner_verified else seed_owner_verified end,
-    seed_source = coalesce(seed_source, source)
+    seed_source = coalesce(seed_source, source::text)
 where seed_data = true;
 
--- Remove preloaded reviews from the live social graph after archiving them.
 delete from public.reviews where seed_data = true;
 
--- Live/organic metrics must start from real post-hardening activity only.
 update public.places
 set rating = 0,
     review_count = 0,
     ratings_breakdown = '{}'::jsonb,
     owner_verified = false,
-    source = case when seed_data then 'seed_baseline' else source end,
-    ai_confidence_score = case when seed_data then 0 else ai_confidence_score end,
-    is_under_documented_gem = case when seed_data then false else is_under_documented_gem end
+    source = 'seed_baseline',
+    ai_confidence_score = 0,
+    is_under_documented_gem = false
 where seed_data = true;
 
 comment on table public.review_seed_archive is
