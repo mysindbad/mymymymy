@@ -47,6 +47,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
 
   useEffect(() => {
     setIsCheckedIn(false);
@@ -77,6 +78,12 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
     }
   };
 
+  const baselineLabel = isAr
+    ? 'بيانات تأسيسية منسّقة'
+    : isFr
+      ? 'Base éditoriale'
+      : 'Curated baseline';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in select-none">
       <div className="bg-white w-full max-w-xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
@@ -89,7 +96,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
 
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase text-white bg-black/50 backdrop-blur-md border border-white/20">
                 {place.category === 'accommodation'
                   ? '🛏️ Stay & Riad'
@@ -101,6 +108,11 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                   ? '🍽️ Dining'
                   : '⛺ Campsite'}
               </span>
+              {place.seedData && (
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-sky-100/95 text-sky-900 border border-sky-200 shadow-md">
+                  {baselineLabel}
+                </span>
+              )}
               {place.isUnderDocumentedGem && (
                 <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase bg-amber-400 text-slate-950 flex items-center gap-1 shadow-md">
                   <Sparkles className="w-3 h-3 fill-slate-950" />
@@ -153,6 +165,22 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-slate-700 text-xs sm:text-sm">
+          {place.seedData && (
+            <div className="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
+              <div>
+                <strong>{baselineLabel}.</strong>{' '}
+                <span>
+                  {isAr
+                    ? 'هذا المكان جزء من الدليل التأسيسي المنسّق. التقييمات والمراجعات وتسجيلات الوصول والتحقق من المالك المعروضة كبيانات حية تبدأ فقط من نشاط حي موثوق.'
+                    : isFr
+                      ? 'Ce lieu fait partie de la base éditoriale initiale. Les avis, notes, check-ins et vérifications affichés comme données actives proviennent uniquement d’activité réelle confirmée.'
+                      : 'This place is part of the curated starting catalog. Ratings, reviews, check-ins, and owner verification shown as live data come only from confirmed live activity.'}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-center">
             <div>
               <div className="flex items-center justify-center text-amber-500 font-black text-base">
@@ -160,7 +188,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 <span>{place.rating.toFixed(1)}</span>
               </div>
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                {place.reviewCount} {isAr ? 'تقييم مجتمعي' : 'Reviews'}
+                {place.reviewCount} {isAr ? 'تقييم حي' : isFr ? 'avis actifs' : 'Live reviews'}
               </span>
             </div>
 
@@ -282,7 +310,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
               </div>
             ) : (
               <p className="text-xs text-slate-400 italic">
-                {isAr ? 'كن أول من يقيّم هذا المكان ويفيد مجتمع المسافرين!' : 'Be the first traveler to rate and review this place!'}
+                {isAr ? 'لا توجد مراجعات حية بعد. كن أول من يضيف مراجعة بعد زيارة فعلية.' : isFr ? 'Aucun avis actif pour le moment. Ajoutez-en un après une visite réelle.' : 'No live reviews yet. Be the first to add one after a real visit.'}
               </p>
             )}
           </div>
