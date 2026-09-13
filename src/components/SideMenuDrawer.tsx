@@ -44,7 +44,6 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   onSignOut,
   authStatus = 'anonymous',
   authUser = null,
-  userXp,
   language,
   canInstall = false,
   onInstall,
@@ -55,7 +54,6 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   const isAr = language === 'ar';
   const isFr = language === 'fr';
   const localize = (english: string, arabic: string, french: string) => isAr ? arabic : isFr ? french : english;
-  const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
   const navItems = [
     { key: 'home' as const, label: localize('Home', 'الرئيسية', 'Accueil'), icon: <Home className="h-5 w-5" /> },
     { key: 'map' as const, label: localize('Map', 'الخريطة', 'Carte'), icon: <Map className="h-5 w-5" /> },
@@ -86,10 +84,12 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
                 {authStatus === 'authed' && authUser?.name ? authUser.name : localize('Hello, traveler', 'مرحباً، أيها المسافر', 'Bonjour, voyageur')}
               </div>
               <div className="truncate text-[11px] text-slate-500">
-                {authStatus === 'authed' && authUser?.email ? authUser.email : localize('Level ' + userLevel + ' · ' + userXp + ' XP', 'المستوى ' + userLevel + ' · ' + userXp + ' نقطة', 'Niveau ' + userLevel + ' · ' + userXp + ' XP')}
+                {authStatus === 'authed' && authUser?.email
+                  ? authUser.email
+                  : localize('Sign in to manage trips and contributions', 'سجّل الدخول لإدارة الرحلات والمساهمات', 'Connectez-vous pour gérer voyages et contributions')}
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-800">{localize('Explorer', 'مستكشف', 'Explorateur')}</span>
+            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-800">{localize('Traveler', 'مسافر', 'Voyageur')}</span>
             {authStatus === 'authed' && onSignOut && (
               <button type="button" onClick={onSignOut} aria-label={localize('Sign out', 'تسجيل الخروج', 'Déconnexion')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">
                 <LogOut className="h-4 w-4" />
