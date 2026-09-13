@@ -101,9 +101,13 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   const [step, setStep] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [placesLoading, setPlacesLoading] = useState(true);
+  const [placesLoaded, setPlacesLoaded] = useState(false);
+  const [placesError, setPlacesError] = useState('');
   const [planning, setPlanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [isAuthLoadError, setIsAuthLoadError] = useState(false);
   const [planError, setPlanError] = useState('');
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
   const [overBudget, setOverBudget] = useState(false);
@@ -141,18 +145,36 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
 
   const loadData = async () => {
     setLoading(true);
+    setPlacesLoading(true);
+    setPlacesLoaded(false);
     setError('');
-    try {
-      const [loadedTrips, loadedPlaces] = await Promise.all([fetchTrips(), fetchPlaces()]);
-      setTrips(loadedTrips);
-      setPlaces(loadedPlaces);
-    } catch (loadError) {
-      setError(loadError instanceof ApiAuthenticationError
-        ? (isAr ? 'سجّل الدخول أولًا لإضافة رحلتك والاحتفاظ بها بأمان.' : 'Sign in first to add and securely save your trip.')
-        : messageFrom(loadError, isAr ? 'تعذر تحميل الرحلات.' : 'Unable to load trips.'));
-    } finally {
-      setLoading(false);
+    setPlacesError('');
+    setIsAuthLoadError(false);
+
+    const [tripsResult, placesResult] = await Promise.allSettled([fetchTrips(), fetchPlaces()]);
+
+    if (tripsResult.status === 'fulfilled') {
+      setTrips(tripsResult.value);
+    } else {
+      const authFailure = tripsResult.reason instanceof ApiAuthenticationError;
+      setIsAuthLoadError(authFailure);
+      setError(authFailure
+        ? (isAr ? 'تعذر التحقق من جلسة الدخول. حاول مرة أخرى أو سجّل الدخول مجدداً.' : 'We could not verify your session. Retry or sign in again.')
+        : messageFrom(tripsResult.reason, isAr ? 'تعذر تحميل الرحلات.' : 'Unable to load trips.'));
     }
+
+    if (placesResult.status === 'fulfilled') {
+      setPlaces(placesResult.value);
+      setPlacesLoaded(true);
+    } else {
+      setPlaces([]);
+      setPlacesError(placesResult.reason instanceof Error
+        ? placesResult.reason.message
+        : (isAr ? 'تعذر تحميل الوجهات.' : 'Unable to load destinations.'));
+    }
+
+    setLoading(false);
+    setPlacesLoading(false);
   };
 
   useEffect(() => {
@@ -386,6 +408,9 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       overBudget: 'تجاوزت الميزانية بـ',
       showBudget: 'عرض الميزانية',
       hideBudget: 'إخفاء الميزانية',
+      loginAgain: 'تسجيل الدخول مجدداً',
+      placesError: 'تعذر تحميل الوجهات.',
+      noPlaceMatch: 'لا توجد وجهة مطابقة — الأماكن المتاحة حالياً في شمال المغرب',
     }
     : {
       title: 'AI Trip Planner',
@@ -429,6 +454,9 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       overBudget: 'Over budget by',
       showBudget: 'Show budget',
       hideBudget: 'Hide budget',
+      loginAgain: 'Sign in again',
+      placesError: 'Unable to load destinations.',
+      noPlaceMatch: 'No matching destination — places currently available in Northern Morocco',
     };
   const statusLabel = (status: Trip['status']) => labels[status];
 
@@ -467,14 +495,14 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
         </div>
       </section>
 
-      {error && <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><span>{error}</span><button onClick={() => void loadData()} className="flex items-center gap-1 font-bold"><RefreshCw className="h-4 w-4" /> {labels.retry}</button></div>}
+      {error && <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><span>{error}</span><div className="flex items-center gap-3"><button onClick={() => void loadData()} className="flex items-center gap-1 font-bold text-indigo-700"><RefreshCw className="h-4 w-4" /> {labels.retry}</button>{isAuthLoadError && onOpenAuth && <button onClick={onOpenAuth} className="font-bold text-slate-600 underline underline-offset-2">{labels.loginAgain}</button>}</div></div>}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div><h2 className="text-lg font-black text-slate-900">{labels.create}</h2><p className="text-xs text-slate-500">{step}/5</p></div>
           <div className="flex gap-1">{[1, 2, 3, 4, 5].map((item) => <span key={item} className={'h-2 w-8 rounded-full ' + (item <= step ? 'bg-indigo-600' : 'bg-slate-200')} />)}</div>
         </div>
-        {step === 1 && <div className="space-y-4"><label className="block text-sm font-bold text-slate-700">{labels.destination}</label><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={labels.search} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500" />{loading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> {labels.loading}</div> : <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{visiblePlaces.map((place) => <button key={place.id} onClick={() => updateForm({ destinationId: place.id })} className={'flex items-center gap-3 rounded-2xl border p-3 text-start transition ' + (form.destinationId === place.id ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-300')}><MapPin className="h-5 w-5 shrink-0 text-indigo-600" /><span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{isAr && place.arabicName ? place.arabicName : place.name}</strong><small className="block truncate text-slate-500">{place.area} · {place.region}</small></span>{form.destinationId === place.id && <Check className="ms-auto h-4 w-4 text-indigo-600" />}</button>)}</div>}</div>}
+        {step === 1 && <div className="space-y-4"><label className="block text-sm font-bold text-slate-700">{labels.destination}</label><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={labels.search} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500" />{placesLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> {labels.loading}</div> : placesError ? <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><span>{labels.placesError}</span><button onClick={() => void loadData()} className="flex items-center gap-1 font-bold"><RefreshCw className="h-4 w-4" /> {labels.retry}</button></div> : placesLoaded && visiblePlaces.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm font-semibold text-slate-600">{labels.noPlaceMatch}</div> : <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{visiblePlaces.map((place) => <button key={place.id} onClick={() => updateForm({ destinationId: place.id })} className={'flex items-center gap-3 rounded-2xl border p-3 text-start transition ' + (form.destinationId === place.id ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-300')}><MapPin className="h-5 w-5 shrink-0 text-indigo-600" /><span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{isAr && place.arabicName ? place.arabicName : place.name}</strong><small className="block truncate text-slate-500">{place.area} · {place.region}</small></span>{form.destinationId === place.id && <Check className="ms-auto h-4 w-4 text-indigo-600" />}</button>)}</div>}</div>}
         {step === 2 && <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">{labels.start}<input type="date" value={form.startDate} onChange={(event) => updateForm({ startDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500" /></label><label className="text-sm font-bold text-slate-700">{labels.end}<input type="date" value={form.endDate} min={form.startDate} onChange={(event) => updateForm({ endDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500" /></label></div>}
         {step === 3 && <div className="grid gap-4 sm:grid-cols-[1fr_160px]"><label className="text-sm font-bold text-slate-700">{labels.budget}<div className="relative mt-2"><Wallet className="absolute start-4 top-3.5 h-4 w-4 text-slate-400" /><input type="number" min="1" value={form.budget} onChange={(event) => updateForm({ budget: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-10 py-3 font-normal outline-none focus:border-indigo-500" /></div></label><label className="text-sm font-bold text-slate-700">{labels.currency}<select value={form.currency} onChange={(event) => updateForm({ currency: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500"><option>MAD</option><option>EUR</option><option>USD</option></select></label></div>}
         {step === 4 && <div className="max-w-sm"><label className="text-sm font-bold text-slate-700">{labels.participants}<div className="mt-3 flex items-center gap-4 rounded-2xl border border-slate-200 p-4"><Users className="h-5 w-5 text-indigo-600" /><input type="number" min="1" max="50" value={form.participants} onChange={(event) => updateForm({ participants: Math.max(1, Number(event.target.value)) })} className="w-full text-xl font-black outline-none" /><span className="text-sm text-slate-500">{labels.people}</span></div></label></div>}
