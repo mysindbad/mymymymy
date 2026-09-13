@@ -1,21 +1,17 @@
 import React from 'react';
 import {
-  X,
-  MapPin,
-  Compass,
-  Radio,
   Building2,
-  Calendar,
-  Sparkles,
-  ShieldCheck,
-  Heart,
-  ChevronRight,
-  Info,
+  CalendarDays,
+  Compass,
   Download,
-  X as CloseIcon
+  Home,
+  LogOut,
+  Map,
+  Radio,
+  Users,
+  X,
 } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
-import { MascotSindbad } from './MascotSindbad';
 import { AuthStatus, AuthUser } from '../lib/authSession';
 import { UserAvatar } from './UserAvatar';
 
@@ -44,7 +40,6 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   onNavigateTab,
   onOpenAddPlace,
   onOpenPassiveGps,
-  onOpenAIChat,
   onOpenAuth,
   onSignOut,
   authStatus = 'anonymous',
@@ -59,200 +54,96 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   if (!isOpen) return null;
   const isAr = language === 'ar';
   const isFr = language === 'fr';
+  const localize = (english: string, arabic: string, french: string) => isAr ? arabic : isFr ? french : english;
   const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
-  const localize = (english: string, arabic: string, french: string) =>
-    isAr ? arabic : isFr ? french : english;
+  const navItems = [
+    { key: 'home' as const, label: localize('Home', 'الرئيسية', 'Accueil'), icon: <Home className="h-5 w-5" /> },
+    { key: 'map' as const, label: localize('Map', 'الخريطة', 'Carte'), icon: <Map className="h-5 w-5" /> },
+    { key: 'explore' as const, label: localize('Explore', 'استكشاف', 'Explorer'), icon: <Compass className="h-5 w-5" /> },
+    { key: 'trips' as const, label: localize('My trips', 'رحلاتي', 'Mes voyages'), icon: <CalendarDays className="h-5 w-5" /> },
+    { key: 'community' as const, label: localize('Community', 'المجتمع', 'Communauté'), icon: <Users className="h-5 w-5" /> },
+  ];
 
   return (
-    <div className="fixed inset-0 z-50 flex animate-in fade-in">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-        onClick={onClose}
-      />
-
-      {/* Drawer Panel */}
-      <div className="relative w-80 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-300">
-        {/* Header with Mascot */}
-        <div className="p-5 bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <MascotSindbad size="md" mood="happy" showBadge={true} />
-            <div>
-              <h2 className="font-black text-lg tracking-tight">My Sindbad</h2>
-              <p className="text-xs text-blue-100">
-                {localize('Your trip, smarter with AI', 'رحلتك أذكى مع الذكاء الاصطناعي', 'Votre voyage, plus intelligent avec l’IA') }
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex animate-in fade-in" dir={isAr ? 'rtl' : 'ltr'}>
+      <button type="button" aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="fixed inset-0 cursor-default bg-black/45 backdrop-blur-xs" onClick={onClose} />
+      <aside className="relative z-10 flex h-full w-[292px] max-w-[86vw] flex-col bg-white shadow-2xl animate-in slide-in-from-left duration-300 rtl:slide-in-from-right">
+        <div className="flex items-center justify-between bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 p-4 text-white">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-black tracking-tight">My Sindbad</h2>
+            <p className="mt-0.5 truncate text-[11px] text-blue-100">{localize('Your travel guide', 'دليلك للسفر', 'Votre guide de voyage')}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition"
-          >
-            <X className="w-4 h-4" />
+          <button type="button" onClick={onClose} aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition hover:bg-white/30">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* User Card */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200">
-          {authStatus === 'restoring' ? (
-            <div className="flex items-center gap-2.5 animate-pulse" aria-label={localize('Restoring session', 'جارٍ استعادة الجلسة', 'Restauration de la session')}>
-              <div className="h-10 w-10 rounded-full bg-slate-200" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-28 rounded-full bg-slate-200" />
-                <div className="h-2.5 w-36 rounded-full bg-slate-200" />
+        <div className="bg-slate-50 p-3">
+          <div className="flex items-center gap-2.5">
+            <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-bold text-slate-800">
+                {authStatus === 'authed' && authUser?.name ? authUser.name : localize('Hello, traveler', 'مرحباً، أيها المسافر', 'Bonjour, voyageur')}
+              </div>
+              <div className="truncate text-[11px] text-slate-500">
+                {authStatus === 'authed' && authUser?.email ? authUser.email : localize('Level ' + userLevel + ' · ' + userXp + ' XP', 'المستوى ' + userLevel + ' · ' + userXp + ' نقطة', 'Niveau ' + userLevel + ' · ' + userXp + ' XP')}
               </div>
             </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} />
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800 truncate">
-                      {authStatus === 'authed' && authUser?.name
-                        ? authUser.name
-                        : localize('Hello, Traveler!', 'مرحباً، أيها المسافر!', 'Bonjour, voyageur !')}
-                    </div>
-                    {authStatus === 'authed' && authUser?.email ? (
-                      <div className="text-[11px] text-slate-500 truncate">{authUser.email}</div>
-                    ) : (
-                      <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        <span>{localize(`Level ${userLevel} • ${userXp} XP`, `المستوى ${userLevel} • ${userXp} نقطة خبرة`, `Niveau ${userLevel} • ${userXp} XP`)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                  Explorer
-                </span>
-              </div>
-
-              {authStatus === 'authed' ? (
-                onSignOut && (
-                  <button
-                    onClick={onSignOut}
-                    className="mt-3 w-full py-1.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs text-center hover:bg-slate-100 transition"
-                  >
-                    {localize('Sign out', 'تسجيل الخروج', 'Déconnexion')}
-                  </button>
-                )
-              ) : onOpenAuth && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenAuth('welcome');
-                  }}
-                  className="mt-3 w-full py-1.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold text-xs shadow-xs text-center hover:from-blue-700 hover:to-sky-600 transition"
-                >
-                  {localize('Sign in / Account', 'تسجيل الدخول / الحساب', 'Connexion / compte')}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Navigation Menu Links */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1 text-sm text-slate-700">
-          <button
-            onClick={() => {
-              onNavigateTab('home');
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
-          >
-            <span className="font-semibold">{localize('Home', 'الرئيسية', 'Accueil')}</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
-          </button>
-
-          {canInstall && onInstall && (
-            <button
-              onClick={onInstall}
-              className="w-full p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 flex items-center gap-2.5 text-blue-800 transition"
-            >
-              <Download className="w-4 h-4 text-blue-600" />
-              <span className="text-xs font-bold">{localize('Install app', 'تثبيت التطبيق', 'Installer l’application')}</span>
+            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-800">{localize('Explorer', 'مستكشف', 'Explorateur')}</span>
+            {authStatus === 'authed' && onSignOut && (
+              <button type="button" onClick={onSignOut} aria-label={localize('Sign out', 'تسجيل الخروج', 'Déconnexion')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {authStatus !== 'authed' && onOpenAuth && (
+            <button type="button" onClick={() => { onClose(); onOpenAuth('welcome'); }} className="mt-3 h-9 w-full rounded-xl bg-blue-600 text-xs font-bold text-white transition hover:bg-blue-700">
+              {localize('Sign in', 'تسجيل الدخول', 'Se connecter')}
             </button>
           )}
-
-          {showIosInstallHint && onDismissIosInstallHint && (
-            <div className="flex items-start gap-2 rounded-2xl border border-blue-100 bg-blue-50 p-3 text-[11px] text-blue-800">
-              <span className="flex-1">{localize('In Safari: Share, then Add to Home Screen', 'من Safari: مشاركة ثم إضافة إلى الشاشة الرئيسية', 'Dans Safari : Partager, puis Ajouter à l’écran d’accueil')}</span>
-              <button onClick={onDismissIosInstallHint} className="shrink-0 rounded-lg p-0.5 hover:bg-blue-100" aria-label={localize('Dismiss', 'إغلاق', 'Fermer')}><CloseIcon className="h-3.5 w-3.5" /></button>
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              onNavigateTab('map');
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
-          >
-            <span className="font-semibold">{localize('Interactive Live Map', 'الخريطة التفاعلية الحية', 'Carte interactive en direct')}</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
-          </button>
-
-          <button
-            onClick={() => {
-              onNavigateTab('explore');
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
-          >
-            <span className="font-semibold">{localize('Explore & AI Memory', 'استكشاف الأماكن والذاكرة', 'Explorer et mémoire IA')}</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
-          </button>
-
-          <button
-            onClick={() => {
-              onNavigateTab('trips');
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
-          >
-            <span className="font-semibold">{localize('Trips & Saved Places', 'مخطط الرحلات والأماكن المحفوظة', 'Voyages et lieux enregistrés')}</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
-          </button>
-
-          <button
-            onClick={() => {
-              onNavigateTab('community');
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl hover:bg-blue-50 hover:text-blue-600 flex items-center justify-between transition text-left rtl:text-right"
-          >
-            <span className="font-semibold">{localize('Community & Business Hub', 'بوابة المجتمع وأصحاب الأعمال', 'Communauté et entreprises')}</span>
-            <ChevronRight className="w-4 h-4 text-slate-400 rtl:rotate-180" />
-          </button>
-
-          <div className="pt-2 border-t border-slate-100 my-2" />
-
-          {/* Quick Actions */}
-          <button
-            onClick={() => {
-              onOpenAddPlace();
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 flex items-center gap-2.5 text-slate-800 transition"
-          >
-            <Building2 className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold">{localize('+ Add Business / Place', '+ إضافة نشاط تجاري / مكان', '+ Ajouter un commerce / lieu')}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              onOpenPassiveGps();
-              onClose();
-            }}
-            className="w-full p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 flex items-center gap-2.5 text-emerald-800 transition"
-          >
-            <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span className="text-xs font-bold">{localize('Optional GPS Contribution', 'مساهمة GPS اختيارية', 'Contribution GPS facultative')}</span>
-          </button>
         </div>
 
-      </div>
+        <nav className="flex-1 px-3 py-3">
+          <div className="space-y-1">
+            {navItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => { onNavigateTab(item.key); onClose(); }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-start text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+              >
+                <span className="text-slate-500">{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={() => { onOpenAddPlace(); onClose(); }} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-50 px-3 text-[11px] font-bold text-blue-700 transition hover:bg-blue-100">
+              <Building2 className="h-4 w-4" />
+              {localize('Add place', 'إضافة مكان', 'Ajouter un lieu')}
+            </button>
+            <button type="button" onClick={() => { onOpenPassiveGps(); onClose(); }} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-50 px-3 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100">
+              <Radio className="h-4 w-4" />
+              {localize('Optional GPS', 'GPS اختياري', 'GPS facultatif')}
+            </button>
+            {canInstall && onInstall && (
+              <button type="button" onClick={onInstall} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[11px] font-bold text-slate-700 transition hover:bg-slate-200">
+                <Download className="h-4 w-4" />
+                {localize('Install', 'تثبيت', 'Installer')}
+              </button>
+            )}
+          </div>
+          {showIosInstallHint && onDismissIosInstallHint && (
+            <div className="mt-3 rounded-xl bg-blue-50 p-2.5 text-[11px] text-blue-800">
+              <div className="flex items-start gap-2">
+                <span className="flex-1">{localize('In Safari: Share, then Add to Home Screen', 'في Safari: مشاركة ثم إضافة إلى الشاشة الرئيسية', 'Dans Safari : Partager, puis Ajouter à l’écran d’accueil')}</span>
+                <button type="button" onClick={onDismissIosInstallHint} aria-label={localize('Dismiss', 'إغلاق', 'Fermer')} className="shrink-0">×</button>
+              </div>
+            </div>
+          )}
+        </nav>
+      </aside>
     </div>
   );
 };
