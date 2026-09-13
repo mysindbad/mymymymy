@@ -105,6 +105,11 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   }, []);
 
   const loadRoute = async (mode: TravelMode) => {
+    if (mode === 'transit') {
+      setRouteData(null);
+      setRouteError(isAr ? 'التوجيه عبر النقل العام غير متاح حالياً.' : 'Public-transit routing is not available yet.');
+      return;
+    }
     if (!userLocation) {
       setRouteData(null);
       setRouteError(isAr ? 'يلزم موقعك الحالي لحساب المسار.' : 'Your current location is required to calculate a route.');
@@ -273,28 +278,39 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                 { mode: 'taxi' as const, label: t.modes.taxi, icon: Car },
               ].map((item) => {
                 const isSelected = travelMode === item.mode;
+                const isUnavailable = item.mode === 'transit';
                 const Icon = item.icon;
                 return (
                   <button
                     key={item.mode}
-                    onClick={() => setTravelMode(item.mode)}
+                    disabled={isUnavailable}
+                    onClick={() => {
+                      if (!isUnavailable) setTravelMode(item.mode);
+                    }}
                     className={`p-2.5 rounded-2xl border flex flex-col items-center gap-1 transition ${
-                      isSelected
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-500 text-white font-bold shadow-lg shadow-blue-500/25'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                      isUnavailable
+                        ? 'bg-slate-950 border-slate-800 text-slate-600 cursor-not-allowed opacity-70'
+                        : isSelected
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-500 text-white font-bold shadow-lg shadow-blue-500/25'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="text-[11px] whitespace-nowrap">{item.label}</span>
                     <span className="text-[10px] text-slate-300 font-normal">
-                      {isSelected && routeData?.travelMode === item.mode
-                        ? (isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`)
-                        : '—'}
+                      {isUnavailable
+                        ? (isAr ? 'غير متاح' : 'Unavailable')
+                        : isSelected && routeData?.travelMode === item.mode
+                          ? (isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`)
+                          : '—'}
                     </span>
                   </button>
                 );
               })}
             </div>
+            <p className="mt-2 text-[11px] text-slate-500">
+              {isAr ? 'التوجيه الحقيقي عبر النقل العام سيظهر هنا عند ربط مزود نقل يدعمه.' : 'Public-transit routing will be enabled here when a supported transit provider is connected.'}
+            </p>
           </div>
 
           {isLocating ? (
