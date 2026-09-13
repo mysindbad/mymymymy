@@ -22,17 +22,19 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package.json
-      - run: npm install --no-audit --no-fund
+      - name: Apply final server-only check-in patch
+        run: python3 scripts/apply-final-checkin-patch.py
+      - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
-      - name: Persist tested lockfile
+      - name: Persist tested check-in hardening
         if: github.event_name == 'push'
         run: |
-          if git diff --quiet -- package-lock.json && git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+          if git diff --quiet -- server.ts server/dal.ts; then
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "build: lock tested npm dependencies"
+          git add server.ts server/dal.ts
+          git commit -m "security: route check-ins through verified server identity"
           git push origin HEAD:audit/hardening-20260913
