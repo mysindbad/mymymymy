@@ -154,6 +154,30 @@ export class DalAuthenticationError extends Error {
   }
 }
 
+export class DalServiceUnavailableError extends Error {
+  status = 503;
+  code = 'DATA_SERVICE_UNAVAILABLE';
+  constructor(message = 'Live data service temporarily unavailable') {
+    super(message);
+    this.name = 'DalServiceUnavailableError';
+  }
+}
+
+function seedFallbackAllowed(): boolean {
+  const productionRuntime = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  return !productionRuntime && process.env.ALLOW_SEED_FALLBACK === 'true';
+}
+
+function seedFallbackOrThrow<T>(operation: string, fallback: () => T, error?: { code?: unknown } | null): T {
+  const code = error?.code ? String(error.code) : undefined;
+  if (seedFallbackAllowed()) {
+    console.warn(`${operation}; serving explicitly enabled seed data`, { code });
+    return fallback();
+  }
+  console.error(`${operation}; seed fallback blocked`, { code });
+  throw new DalServiceUnavailableError();
+}
+
 const CATEGORIES = ['accommodation', 'tourist_poi', 'restaurant', 'emergency', 'campsite', 'service'] as const;
 const REVIEW_ROLES = ['traveler', 'local_resident', 'guide', 'owner'] as const;
 
@@ -590,7 +614,9 @@ export function createDal(accessToken?: string) {
   return {
     places: {
       async getAll(filters: { category?: string; region?: string; query?: string; hiddenGemsOnly?: boolean; minRating?: number } = {}) {
-        if (!supabaseAdmin) return getSeedPlaces(filters);
+        if (!supabaseAdmin) {
+          return seedFallbackOrThrow('Supabase places unavailable', () => getSeedPlaces(filters));
+        }
         let query = getSupabaseAdmin().from('places').select('*, reviews(*)').order('created_at', { ascending: false });
         if (filters.category && filters.category !== 'All') query = query.eq('category', filters.category);
         if (filters.region && filters.region !== 'All') query = query.ilike('region', filters.region);
@@ -602,17 +628,17 @@ export function createDal(accessToken?: string) {
         }
         const { data, error } = await query;
         if (error) {
-          console.warn('Supabase places read failed; serving bundled seed data', error.message);
-          return getSeedPlaces(filters);
+          return seedFallbackOrThrow('Supabase places read failed', () => getSeedPlaces(filters), error);
         }
         return (data || []).map(mapPlace);
       },
       async getById(id: string) {
-        if (!supabaseAdmin) return getSeedPlaces().find((place) => place.id === id) || null;
+        if (!supabaseAdmin) {
+          return seedFallbackOrThrow('Supabase place unavailable', () => getSeedPlaces().find((place) => place.id === id) || null);
+        }
         const { data, error } = await getSupabaseAdmin().from('places').select('*, reviews(*)').eq('id', id).maybeSingle();
         if (error) {
-          console.warn('Supabase place read failed; serving bundled seed data', error.message);
-          return getSeedPlaces().find((place) => place.id === id) || null;
+          return seedFallbackOrThrow('Supabase place read failed', () => getSeedPlaces().find((place) => place.id === id) || null, error);
         }
         return data ? mapPlace(data) : null;
       },
@@ -840,27 +866,29 @@ export function createDal(accessToken?: string) {
       },
       async getSummary() {
         if (!supabaseAdmin) {
-          return { totalTraces: seedTraces.length, recent: seedTraces };
+          return seedFallbackOrThrow('Supabase traces unavailable', () => ({ totalTraces: seedTraces.length, recent: seedTraces }));
         }
         const { data, error } = await getSupabaseAdmin().from('traces').select('*').order('timestamp', { ascending: false }).limit(50);
         if (error) {
-          console.warn('Supabase traces read failed; serving bundled seed data', error.message);
-          return { totalTraces: seedTraces.length, recent: seedTraces };
+          return seedFallbackOrThrow('Supabase traces read failed', () => ({ totalTraces: seedTraces.length, recent: seedTraces }), error);
         }
         return { totalTraces: data?.length || 0, recent: data || [] };
       },
     },
     getSummary: async () => {
       if (!supabaseAdmin) {
-        return { totalPlaces: seedPlaces.length, totalTraces: seedTraces.length };
+        return seedFallbackOrThrow('Supabase summary unavailable', () => ({ totalPlaces: seedPlaces.length, totalTraces: seedTraces.length }));
       }
       const [places, traces] = await Promise.all([
         getSupabaseAdmin().from('places').select('id', { count: 'exact', head: true }),
         getSupabaseAdmin().from('traces').select('id', { count: 'exact', head: true }),
       ]);
       if (places.error || traces.error) {
-        console.warn('Supabase summary read failed; serving bundled seed data', places.error || traces.error);
-        return { totalPlaces: seedPlaces.length, totalTraces: seedTraces.length };
+        return seedFallbackOrThrow(
+          'Supabase summary read failed',
+          () => ({ totalPlaces: seedPlaces.length, totalTraces: seedTraces.length }),
+          places.error || traces.error,
+        );
       }
       return { totalPlaces: places.count || 0, totalTraces: traces.count || 0 };
     },
