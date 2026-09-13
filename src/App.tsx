@@ -12,6 +12,7 @@ import {
 import { Place } from './types';
 import { fetchPlaces } from './services/api';
 import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
+import { useAuthSession } from './lib/authSession';
 
 // Components
 import { HomeScreen } from './components/HomeScreen';
@@ -79,17 +80,19 @@ export default function App() {
   const [isWeatherOpen, setIsWeatherOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [isSessionResolved, setIsSessionResolved] = useState(false);
   const [authInitialScreen, setAuthInitialScreen] = useState<AuthScreenType>('welcome');
+  const { status: authStatus, user: authUser } = useAuthSession();
 
   // User Settings & Profile
-  const [currentUser, setCurrentUser] = useState<CurrentUser>({
-    id: '',
-    name: '',
-    email: '',
-    avatar: '🧔',
-    isLoggedIn: false,
-  });
+  const currentUser: CurrentUser = authUser
+    ? {
+      id: authUser.id,
+      name: authUser.name,
+      email: authUser.email,
+      avatar: authUser.avatarUrl || '🧔',
+      isLoggedIn: true,
+    }
+    : { id: '', name: '', email: '', avatar: '🧔', isLoggedIn: false };
   const [language, setLanguage] = useState<SupportedLanguage>(() => {
     try {
       const stored = localStorage.getItem(LANGUAGE_KEY);
@@ -150,18 +153,18 @@ export default function App() {
       // Storage may be unavailable; keep the current session XP.
     }
 
-    if (isSessionResolved && currentUser.isLoggedIn) {
+    if (authStatus === 'authed' && currentUser.isLoggedIn) {
       void supabase.auth.updateUser({ data: { community_xp: userXp } });
     }
-  }, [userXp, currentUser.isLoggedIn, isSessionResolved]);
+  }, [userXp, authStatus, currentUser.isLoggedIn]);
 
   useEffect(() => {
-    if (!isSessionResolved || !currentUser.isLoggedIn || !currentUser.id) {
+    if (authStatus !== 'authed' || !currentUser.isLoggedIn || !currentUser.id) {
       setIsOnboardingOpen(false);
       return;
     }
     setIsOnboardingOpen(!hasCompletedOnboarding(currentUser.id));
-  }, [currentUser.id, currentUser.isLoggedIn, isSessionResolved]);
+  }, [authStatus, currentUser.id, currentUser.isLoggedIn]);
 
   // Apply RTL direction when Arabic is selected
   useEffect(() => {
@@ -186,27 +189,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const applySession = (session: { user?: { id?: string; email?: string; user_metadata?: Record<string, unknown> } } | null) => {
-      const user = session?.user;
-      if (!user) {
-        setCurrentUser({ id: '', name: '', email: '', avatar: '🧔', isLoggedIn: false });
-        setUserXp(readStoredXp());
-        return;
-      }
-      const metadata = user.user_metadata || {};
-      const metadataXp = Number(metadata.community_xp);
-      setUserXp(Number.isFinite(metadataXp) && metadataXp >= 0 ? Math.floor(metadataXp) : readStoredXp());
-      setCurrentUser({
-        id: user.id || '',
-        name: typeof metadata.full_name === 'string' && metadata.full_name.trim()
-          ? metadata.full_name
-          : user.email?.split('@')[0] || 'Traveler',
-        email: user.email || '',
-        avatar: typeof metadata.avatar_url === 'string' && metadata.avatar_url ? metadata.avatar_url : '🧔',
-        isLoggedIn: true,
-      });
-    };
-
     const resolveAuthCallback = async () => {
       const callbackUrl = new URL(window.location.href);
       const isAuthCallback = callbackUrl.pathname === AUTH_CALLBACK_PATH;
@@ -219,22 +201,12 @@ export default function App() {
         }
       }
 
-      const { data } = await supabase.auth.getSession();
-      applySession(data.session);
-
       if (isAuthCallback) {
         window.history.replaceState({}, document.title, '/');
       }
     };
 
-    void resolveAuthCallback().finally(() => {
-      setIsSessionResolved(true);
-    });
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
-    });
-
-    return () => authListener.subscription.unsubscribe();
+    void resolveAuthCallback();
   }, []);
 
   const handleToggleSave = (placeId: string) => {
@@ -395,7 +367,10 @@ export default function App() {
               <div className="w-16" />
             </div>
 
-            <TripsPlanner language={language} isSessionResolved={isSessionResolved} />
+            <TripsPlanner
+              language={language}
+              isSessionResolved={authStatus !== 'restoring'}
+            />
           </div>
         )}
 
@@ -538,13 +513,6 @@ export default function App() {
         language={language}
         onToggleLanguage={setLanguage}
         onAuthSuccess={(user) => {
-          setCurrentUser({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-            isLoggedIn: true,
-          });
           if (typeof user.xp === 'number' && Number.isFinite(user.xp) && user.xp >= 0) {
             setUserXp(Math.floor(user.xp));
           }

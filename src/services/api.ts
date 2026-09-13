@@ -1,5 +1,6 @@
 import { Place, PlaceReview, NavigationRouteData, TravelMode } from '../types';
 import { supabase } from '../lib/supabase';
+import { getAuthSessionSnapshot, waitForSessionReady } from '../lib/authSession';
 
 export class ApiAuthenticationError extends Error {
   status = 401;
@@ -65,15 +66,11 @@ async function getAccessToken(forceRefresh = false): Promise<string | null> {
 
 async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Promise<T> {
   const { requiresAuth = false, body, headers, ...requestOptions } = options;
+  await waitForSessionReady();
   let token = await getAccessToken();
-  if (requiresAuth && !token) {
-    try {
-      token = await getAccessToken(true);
-    } catch {
-      // The authentication error below provides the user-facing state.
-    }
+  if (requiresAuth && (getAuthSessionSnapshot().status !== 'authed' || !token)) {
+    throw new ApiAuthenticationError();
   }
-  if (requiresAuth && !token) throw new ApiAuthenticationError();
 
   const sendRequest = (requestToken: string | null) => {
     const requestHeaders = new Headers(headers);
@@ -88,12 +85,13 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   };
 
   let response = await sendRequest(token);
-  if (requiresAuth && response.status === 401) {
+  if (response.status === 401 && getAuthSessionSnapshot().status === 'authed') {
     try {
       const refreshedToken = await getAccessToken(true);
-      if (refreshedToken) response = await sendRequest(refreshedToken);
+      if (!refreshedToken) throw new ApiAuthenticationError();
+      response = await sendRequest(refreshedToken);
     } catch {
-      // Keep the original authentication response for consistent handling.
+      throw new ApiAuthenticationError();
     }
   }
   const payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
