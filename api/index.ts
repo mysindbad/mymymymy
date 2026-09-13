@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 let appPromise: Promise<any> | null = null;
 let authClient: ReturnType<typeof createClient> | null = null;
-let adminClient: ReturnType<typeof createClient> | null = null;
+let adminClient: any = null;
 let geminiClient: GoogleGenAI | null = null;
 
 function getApp() {
@@ -28,7 +28,7 @@ function getAuthClient() {
   return authClient;
 }
 
-function getAdminClient() {
+function getAdminClient(): any {
   if (adminClient) return adminClient;
   const { url, serviceRoleKey } = supabaseConfig();
   if (!serviceRoleKey) throw new Error('Supabase server configuration is missing');
@@ -147,8 +147,6 @@ async function handleAiChat(req: any, res: any) {
   const ai = getGeminiClient();
   if (!ai) return res.status(503).json({ error: 'AI service temporarily unavailable' });
 
-  // Only curated/verified structural fields are sent to Gemini. User-authored
-  // descriptions and reviews are deliberately excluded to prevent stored prompt injection.
   const { data: rows, error } = await getAdminClient()
     .from('places')
     .select('name, arabic_name, french_name, category, region, area, rating, seed_data, owner_verified')
@@ -234,8 +232,6 @@ async function handlePlanTrip(req: any, res: any) {
   const ai = getGeminiClient();
   if (!ai) return res.status(503).json({ error: 'AI planning temporarily unavailable' });
 
-  // Do not send community descriptions/review text to the model. The planner
-  // receives only structural destination metadata plus the user's own preferences.
   const destinationData = {
     id: destination.id,
     name: text(destination.name, 100),
