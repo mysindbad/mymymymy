@@ -266,7 +266,8 @@ app.post('/api/ai/navigation-guidance', async (req, res, next) => {
     const destination = await createDal().places.getById(destinationId);
     if (!destination) return res.status(404).json({ error: 'Destination not found' });
     const [destLatitude, destLongitude] = destination.coordinates;
-    const url = `https://router.project-osrm.org/route/v1/driving/${startLongitude},${startLatitude};${destLongitude},${destLatitude}?steps=true&geometries=geojson&overview=full`;
+    const routingEndpoint = getRoutingEndpoint(travelMode);
+    const url = `${routingEndpoint}/${startLongitude},${startLatitude};${destLongitude},${destLatitude}?steps=true&geometries=geojson&overview=full`;
     const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error(`Routing service returned ${response.status}`);
     const route = await response.json();
