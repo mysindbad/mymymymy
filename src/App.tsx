@@ -36,6 +36,16 @@ type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
 type ExploreView = 'feed' | 'map';
 const PASSIVE_GPS_CONSENT_KEY = 'sindbad_passive_gps_consent';
 const LANGUAGE_KEY = 'sindbad_language';
+const USER_XP_KEY = 'sindbad_user_xp';
+
+function readStoredXp(): number {
+  try {
+    const stored = Number(localStorage.getItem(USER_XP_KEY));
+    return Number.isFinite(stored) && stored >= 0 ? Math.floor(stored) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 type CurrentUser = {
   name: string;
@@ -89,7 +99,7 @@ export default function App() {
       return false;
     }
   });
-  const [userXp, setUserXp] = useState<number>(320);
+  const [userXp, setUserXp] = useState<number>(() => readStoredXp());
   const [savedPlaceIds, setSavedPlaceIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('sindbad_saved_ids');
@@ -119,6 +129,18 @@ export default function App() {
     }
   }, [language]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(USER_XP_KEY, String(userXp));
+    } catch {
+      // Storage may be unavailable; keep the current session XP.
+    }
+
+    if (currentUser.isLoggedIn) {
+      void supabase.auth.updateUser({ data: { community_xp: userXp } });
+    }
+  }, [userXp, currentUser.isLoggedIn]);
+
   // Apply RTL direction when Arabic is selected
   useEffect(() => {
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
@@ -146,9 +168,12 @@ export default function App() {
       const user = session?.user;
       if (!user) {
         setCurrentUser({ name: '', email: '', avatar: '🧔', isLoggedIn: false });
+        setUserXp(readStoredXp());
         return;
       }
       const metadata = user.user_metadata || {};
+      const metadataXp = Number(metadata.community_xp);
+      setUserXp(Number.isFinite(metadataXp) && metadataXp >= 0 ? Math.floor(metadataXp) : readStoredXp());
       setCurrentUser({
         name: typeof metadata.full_name === 'string' && metadata.full_name.trim()
           ? metadata.full_name
@@ -343,7 +368,7 @@ export default function App() {
                 ← {isAr ? 'الرئيسية' : 'Home'}
               </button>
               <h2 className="text-sm font-bold text-slate-900">
-                {isAr ? 'الملف الشخصي ومجتمع سندباد' : 'Profile & Community Hub'}
+                {isAr ? 'ملفي الشخصي ومجتمع سندباد' : language === 'fr' ? 'Mon profil et la communauté' : 'My Profile & Community'}
               </h2>
               <div className="w-16" />
             </div>
@@ -354,6 +379,8 @@ export default function App() {
               isPassiveOptedIn={isPassiveOptedIn}
               userXp={userXp}
               language={language}
+              currentUser={currentUser}
+              onOpenAuth={() => handleOpenAuth('welcome')}
             />
           </div>
         )}
@@ -472,7 +499,6 @@ export default function App() {
             avatar: user.avatar,
             isLoggedIn: true,
           });
-          setUserXp((prev) => prev + 150);
         }}
       />
 
