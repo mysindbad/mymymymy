@@ -32,6 +32,8 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
+  const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
 
   const contributors = [
     { name: 'Karim Tazi', role: 'Rif Mountain Trail Guide', points: 1420, verifiedCount: 28, badge: 'Pioneer' },
@@ -51,7 +53,13 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
           </span>
           <div className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-black text-amber-300 flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 fill-current" />
-            <span>Level 2 • {userXp} XP</span>
+            <span>
+              {isAr
+                ? `المستوى ${userLevel} • ${userXp} نقطة خبرة`
+                : isFr
+                  ? `Niveau ${userLevel} • ${userXp} XP`
+                  : `Level ${userLevel} • ${userXp} XP`}
+            </span>
           </div>
         </div>
         <h1 className="text-xl sm:text-2xl font-black">
@@ -99,7 +107,11 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
             </div>
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">
-                {isAr ? 'مشاركة المسار غير المباشرة (Passive GPS)' : 'Passive GPS Route Sharing'}
+                {isAr
+                  ? 'مساهمة GPS اختيارية'
+                  : isFr
+                    ? 'Contribution GPS facultative'
+                    : 'Optional GPS Contribution'}
               </h3>
               <span
                 className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
@@ -108,13 +120,25 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
                     : 'bg-slate-100 text-slate-600'
                 }`}
               >
-                {isPassiveOptedIn ? 'Active • Opted-In' : 'Paused'}
+                {isPassiveOptedIn
+                  ? isAr
+                    ? 'مفعّل • تمت الموافقة'
+                    : isFr
+                      ? 'Activé • consentement enregistré'
+                      : 'Enabled • Consent saved'
+                  : isAr
+                    ? 'متوقف'
+                    : isFr
+                      ? 'En pause'
+                      : 'Paused'}
               </span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
               {isAr
-                ? 'بموافقتك الاختيارية، يرسل جهازك إحداثيات مشفرة مجهولة أثناء تنقلك. هذه البيانات ترسم خرائط المسارات الجبلية غير الموثقة وتكشف أوقات الازدحام لحماية الطبيعة.'
-                : 'Opt-in to securely and anonymously stream GPS breadcrumbs while hiking or driving. Your traces map unchartered rural footpaths and detect trail popularity.'}
+                ? 'بعد موافقتك، يمكنك إرسال عينة مجهولة يدوياً من زر الإرسال. لا يتم تشغيل تتبع مستمر في الخلفية في هذا الإصدار.'
+                : isFr
+                  ? 'Après votre consentement, vous pouvez envoyer un échantillon anonyme avec le bouton ci-dessous. Le suivi continu en arrière-plan n’est pas activé dans cette version.'
+                  : 'After opting in, you can send an anonymous sample with the button below. Continuous background tracking is not enabled in this version.'}
             </p>
           </div>
 
@@ -137,7 +161,9 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
               {isAr ? 'رواد استكشاف وتوثيق شمال المغرب' : 'Top Regional Contributors'}
             </h3>
           </div>
-          <span className="text-xs text-slate-400 font-medium">Updated live</span>
+            <span className="text-xs text-slate-400 font-medium">
+              {isAr ? 'بيانات تجريبية' : isFr ? 'Données d’exemple' : 'Preview data'}
+            </span>
         </div>
 
         <div className="divide-y divide-slate-100">
