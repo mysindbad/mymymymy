@@ -434,7 +434,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 2: SIGN IN YOUR WAY (OAuth Options & Email)        */}
           {/* ========================================================= */}
-                   {currentScreen === 'sign-in-method' && localize('Different Ways Same Journey ♡', 'طرق مختلفة والرحلة واحدة ♡', 'Des méthodes différentes, le même voyage ♡')}
+                   {currentScreen === 'sign-in-method' && (
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-4">
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">
@@ -570,7 +570,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 3: WELCOME BACK (Email Sign In)                    */}
           {/* ========================================================= */}
-                   {currentScreen === 'sign-in-email' && localize('Explore Discover Belong ✈', 'استكشف واكتشف وانتمِ ✈', 'Explorer, découvrir, appartenir ✈')}
+                   {currentScreen === 'sign-in-email' && (
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-4">
                 <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-1.5">
@@ -712,7 +712,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 4: CREATE YOUR ACCOUNT (Sign Up)                   */}
           {/* ========================================================= */}
-                   {currentScreen === 'create-account' && localize('New Adventures New You ♡', 'مغامرات جديدة، نسخة جديدة منك ♡', 'Nouvelles aventures, nouveau vous ♡')}
+                   {currentScreen === 'create-account' && (
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-4 sm:p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-3">
                 <h2 className="text-lg font-black text-slate-900 tracking-tight">
@@ -862,7 +862,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 5: FORGOT YOUR PASSWORD?                           */}
           {/* ========================================================= */}
-                   {currentScreen === 'forgot-password' && localize('Explore Discover Belong ✈', 'استكشف واكتشف وانتمِ ✈', 'Explorer, découvrir, appartenir ✈')}
+                   {currentScreen === 'forgot-password' && (
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-4">
                 <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
@@ -937,7 +937,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {/* ========================================================= */}
           {/* SCREEN 6: RESET YOUR PASSWORD                             */}
           {/* ========================================================= */}
-                   {currentScreen === 'reset-password' && localize('New Password Brighter Journeys ♡', 'كلمة مرور جديدة، رحلات أكثر إشراقاً ♡', 'Nouveau mot de passe, voyages plus lumineux ♡')}
+                   {currentScreen === 'reset-password' && (
             <div className="w-full max-w-sm mx-auto my-auto bg-white/95 backdrop-blur-lg rounded-[28px] p-5 shadow-2xl border border-white/80 animate-in fade-in slide-in-from-bottom-3 duration-300">
               <div className="text-center mb-3">
                 <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
