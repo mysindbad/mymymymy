@@ -22,10 +22,10 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Fix generator escaping
+        run: python3 scripts/fix-hardening-escaping.py
       - name: Apply final hardening patch
         run: python3 scripts/apply-final-hardening.py
-      - name: Show generated syntax context
-        run: nl -ba server.ts | sed -n '680,700p'
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
