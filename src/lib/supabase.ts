@@ -23,3 +23,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: 'pkce',
   },
 });
+
+export async function getAccessToken(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error(error.message);
+  return data.session?.access_token || null;
+}
+
+export async function updateUserLocation(lat: number, lng: number, accuracy?: number) {
+  const token = await getAccessToken();
+  if (!token) return;
+  return fetch('/api/user/location', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ latitude: lat, longitude: lng, accuracy }),
+  });
+}
