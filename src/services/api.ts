@@ -4,15 +4,20 @@ import { getAuthSessionSnapshot, waitForSessionReady } from '../lib/authSession'
 
 export class ApiAuthenticationError extends Error {
   status = 401;
+  code: string;
 
-  constructor(message = 'Authentication required') {
+  constructor(message = 'Authentication required', code = 'AUTH_REQUIRED') {
     super(message);
     this.name = 'ApiAuthenticationError';
+    this.code = code;
   }
 }
 
 interface ApiErrorPayload {
   error?: string;
+  code?: string;
+  ar?: string;
+  en?: string;
 }
 
 interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
@@ -68,13 +73,16 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   const { requiresAuth = false, body, headers, ...requestOptions } = options;
   await waitForSessionReady();
   let token = await getAccessToken();
-  if (requiresAuth && (getAuthSessionSnapshot().status !== 'authed' || !token)) {
-    throw new ApiAuthenticationError();
+  if (requiresAuth && (!token || getAuthSessionSnapshot().status !== 'authed')) {
+    throw new ApiAuthenticationError('SESSION_TOKEN_MISSING', 'SESSION_TOKEN_MISSING');
   }
 
   const sendRequest = (requestToken: string | null) => {
     const requestHeaders = new Headers(headers);
     if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
+    if (typeof document !== 'undefined') {
+      requestHeaders.set('Accept-Language', document.documentElement.lang || 'en');
+    }
     if (requestToken) requestHeaders.set('Authorization', `Bearer ${requestToken}`);
     return fetch(url, {
       ...requestOptions,
@@ -85,18 +93,22 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   };
 
   let response = await sendRequest(token);
-  if (response.status === 401 && getAuthSessionSnapshot().status === 'authed') {
+  let payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
+  if (response.status === 401 && payload.code === 'TOKEN_INVALID' && getAuthSessionSnapshot().status === 'authed') {
     try {
       const refreshedToken = await getAccessToken(true);
-      if (!refreshedToken) throw new ApiAuthenticationError();
+      if (!refreshedToken) throw new ApiAuthenticationError('TOKEN_INVALID', 'TOKEN_INVALID');
+      token = refreshedToken;
       response = await sendRequest(refreshedToken);
+      payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
     } catch {
-      throw new ApiAuthenticationError();
+      throw new ApiAuthenticationError('TOKEN_INVALID', 'TOKEN_INVALID');
     }
   }
-  const payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
-  if (response.status === 401) throw new ApiAuthenticationError(payload.error);
-  if (!response.ok) throw new Error(payload.error || `Request failed with status ${response.status}`);
+  if (response.status === 401) {
+    throw new ApiAuthenticationError(payload.error || payload.en || 'Authentication required', payload.code || 'AUTH_REQUIRED');
+  }
+  if (!response.ok) throw new Error(payload.error || payload.en || `Request failed with status ${response.status}`);
   return payload;
 }
 
