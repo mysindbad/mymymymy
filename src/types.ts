@@ -64,6 +64,14 @@ export interface Place {
   lastActivityTimestamp?: string;
   rankText?: string;
   distanceKm?: number;
+  seedData?: boolean;
+  seedCheckInsCount?: number;
+  photoProvenance?: string | null;
+  ratingProvenance?: string | null;
+  seedRating?: number | null;
+  seedReviewCount?: number;
+  seedOwnerVerified?: boolean;
+  seedSource?: string | null;
 }
 
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'taxi';
