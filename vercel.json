@@ -9,10 +9,10 @@
   },
   "builds": [
     {
-      "src": "api/index.ts",
+      "src": "api/runtime.ts",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["server.ts", "server/**/*.ts"]
+        "includeFiles": ["api/index.ts", "server.ts", "server/**/*.ts"]
       }
     },
     {
@@ -36,7 +36,7 @@
   "routes": [
     { "src": "/api/ai/navigation-guidance", "dest": "/api/navigation.ts" },
     { "src": "/api/traces/summary", "dest": "/api/trace-summary.ts" },
-    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "src": "/api/(.*)", "dest": "/api/runtime.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
