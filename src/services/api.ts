@@ -273,6 +273,7 @@ export interface Trip {
   startDate: string;
   endDate: string;
   budget: number;
+  spentTotal: number;
   currency: string;
   participantsCount: number;
   status: 'planning' | 'active' | 'completed' | 'cancelled';
@@ -306,6 +307,29 @@ export interface TripPatchPayload {
   preferences?: string[];
 }
 
+export type TripExpenseCategory = 'accommodation' | 'food' | 'transport' | 'activity' | 'souvenir' | 'other';
+
+export interface TripExpense {
+  id: string;
+  tripId: string;
+  category: TripExpenseCategory;
+  amount: number;
+  currency: string;
+  description?: string | null;
+  expenseDate: string;
+  createdByUserId: string;
+  createdAt: string;
+}
+
+export interface TripBudget {
+  expenses: TripExpense[];
+  budget: number;
+  currency: string;
+  spentTotal: number;
+  remaining: number;
+  overBudget: boolean;
+}
+
 export async function fetchTrips(): Promise<Trip[]> {
   const data = await apiRequest<{ trips?: Trip[] }>('/api/trips', { requiresAuth: true });
   return data.trips || [];
@@ -335,4 +359,42 @@ export async function planTrip(payload: {
   preferences: string[];
 }): Promise<{ itinerary: TripItinerary; overBudget: boolean; aiGenerated: true }> {
   return apiRequest('/api/ai/plan-trip', { method: 'POST', body: payload, requiresAuth: true });
+}
+
+export async function fetchTripExpenses(tripId: string): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, { requiresAuth: true });
+}
+
+export async function addTripExpense(tripId: string, payload: {
+  category: TripExpenseCategory;
+  amount: number;
+  currency: string;
+  description?: string;
+  expenseDate: string;
+}): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, {
+    method: 'POST',
+    body: payload,
+    requiresAuth: true,
+  });
+}
+
+export async function updateTripExpense(tripId: string, expenseId: string, patch: Partial<{
+  category: TripExpenseCategory;
+  amount: number;
+  description: string | null;
+  expenseDate: string;
+}>): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
+    method: 'PATCH',
+    body: patch,
+    requiresAuth: true,
+  });
+}
+
+export async function deleteTripExpense(tripId: string, expenseId: string): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
+    method: 'DELETE',
+    requiresAuth: true,
+  });
 }
