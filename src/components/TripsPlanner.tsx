@@ -40,10 +40,12 @@ import {
 } from '../services/api';
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
+import { AuthStatus } from '../lib/authSession';
 
 interface TripsPlannerProps {
   language?: SupportedLanguage;
-  isSessionResolved?: boolean;
+  authStatus?: AuthStatus;
+  onOpenAuth?: () => void;
 }
 
 const preferences = [
@@ -88,7 +90,11 @@ function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en', isSessionResolved = true }) => {
+export const TripsPlanner: React.FC<TripsPlannerProps> = ({
+  language = 'en',
+  authStatus = 'restoring',
+  onOpenAuth,
+}) => {
   const isAr = language === 'ar';
   const [trips, setTrips] = useState<Trip[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
@@ -150,8 +156,13 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en', isS
   };
 
   useEffect(() => {
-    if (isSessionResolved) void loadData();
-  }, [isSessionResolved]);
+    if (authStatus === 'authed') {
+      void loadData();
+    } else if (authStatus === 'anonymous') {
+      setLoading(false);
+      setTrips([]);
+    }
+  }, [authStatus]);
 
   const updateForm = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const togglePreference = (value: string) => updateForm({
@@ -420,6 +431,29 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en', isS
       hideBudget: 'Hide budget',
     };
   const statusLabel = (status: Trip['status']) => labels[status];
+
+  if (authStatus === 'restoring') {
+    return (
+      <div className="mx-auto flex max-w-5xl items-center justify-center gap-2 p-8 pb-24 text-sm text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+        {labels.loading}
+      </div>
+    );
+  }
+
+  if (authStatus === 'anonymous') {
+    return (
+      <div className="mx-auto flex max-w-5xl items-center justify-center p-6 pb-24">
+        <button
+          type="button"
+          onClick={onOpenAuth}
+          className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
+        >
+          {isAr ? 'سجّل الدخول لعرض رحلاتك' : 'Sign in to view your trips'}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div dir={isAr ? 'rtl' : 'ltr'} className="mx-auto max-w-5xl space-y-6 p-4 pb-24 sm:p-6">

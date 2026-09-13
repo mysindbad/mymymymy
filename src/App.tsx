@@ -12,7 +12,7 @@ import {
 import { Place } from './types';
 import { fetchPlaces } from './services/api';
 import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
-import { useAuthSession } from './lib/authSession';
+import { signOut, useAuthSession } from './lib/authSession';
 
 // Components
 import { HomeScreen } from './components/HomeScreen';
@@ -55,7 +55,7 @@ type CurrentUser = {
   id: string;
   name: string;
   email: string;
-  avatar: string;
+  avatarUrl: string;
   isLoggedIn: boolean;
 };
 
@@ -89,10 +89,10 @@ export default function App() {
       id: authUser.id,
       name: authUser.name,
       email: authUser.email,
-      avatar: authUser.avatarUrl || '🧔',
+      avatarUrl: authUser.avatarUrl,
       isLoggedIn: true,
     }
-    : { id: '', name: '', email: '', avatar: '🧔', isLoggedIn: false };
+    : { id: '', name: '', email: '', avatarUrl: '', isLoggedIn: false };
   const [language, setLanguage] = useState<SupportedLanguage>(() => {
     try {
       const stored = localStorage.getItem(LANGUAGE_KEY);
@@ -369,7 +369,8 @@ export default function App() {
 
             <TripsPlanner
               language={language}
-              isSessionResolved={authStatus !== 'restoring'}
+              authStatus={authStatus}
+              onOpenAuth={() => handleOpenAuth('welcome')}
             />
           </div>
         )}
@@ -499,6 +500,16 @@ export default function App() {
         userXp={userXp}
         language={language}
         onOpenAuth={handleOpenAuth}
+        authStatus={authStatus}
+        authUser={authUser}
+        onSignOut={async () => {
+          try {
+            await signOut();
+            setIsSideMenuOpen(false);
+          } catch (error) {
+            console.error('Sign out failed:', error);
+          }
+        }}
         canInstall={canInstall}
         onInstall={() => { void promptInstall(); }}
         showIosInstallHint={showIosInstallHint}
@@ -519,7 +530,7 @@ export default function App() {
         }}
       />
 
-      {isOnboardingOpen && currentUser.isLoggedIn && currentUser.id && (
+      {isOnboardingOpen && authStatus === 'authed' && currentUser.id && (
         <OnboardingModal
           userId={currentUser.id}
           language={language}

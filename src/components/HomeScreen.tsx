@@ -22,6 +22,7 @@ import {
 import { Place } from '../types';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { BrandLogo } from './BrandLogo';
+import { UserAvatar } from './UserAvatar';
 
 interface HomeScreenProps {
   onOpenAIChat: () => void;
@@ -38,7 +39,7 @@ interface HomeScreenProps {
   onToggleSave: (placeId: string) => void;
   language?: SupportedLanguage;
   onOpenAuth?: (screen?: any) => void;
-  currentUser?: { name: string; email: string; avatar: string; isLoggedIn?: boolean };
+  currentUser?: { name: string; email: string; avatarUrl: string; isLoggedIn?: boolean };
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -198,9 +199,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               className="px-2.5 sm:px-3 py-1 rounded-full bg-slate-900/85 hover:bg-slate-900 text-white shadow-sm flex items-center gap-1.5 backdrop-blur-md transition active:scale-95 text-xs font-semibold"
             >
-              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-[10px] overflow-hidden">
-                {currentUser?.avatar || '🧔'}
-              </div>
+              <UserAvatar
+                name={currentUser?.name}
+                avatarUrl={currentUser?.avatarUrl}
+                className="h-5 w-5"
+                textClassName="text-[8px]"
+              />
               <div className="text-left rtl:text-right leading-tight hidden xs:block">
                 <span className="text-[9px] text-slate-300 block">
                   {currentUser?.isLoggedIn ? (localize("Welcome,", "مرحباً،", "Bienvenue,")) : (localize("Hello,", "أهلاً بك،", "Bonjour,"))}

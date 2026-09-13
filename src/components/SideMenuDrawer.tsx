@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import { MascotSindbad } from './MascotSindbad';
+import { AuthStatus, AuthUser } from '../lib/authSession';
+import { UserAvatar } from './UserAvatar';
 
 interface SideMenuDrawerProps {
   isOpen: boolean;
@@ -25,6 +27,9 @@ interface SideMenuDrawerProps {
   onOpenPassiveGps: () => void;
   onOpenAIChat: () => void;
   onOpenAuth?: (screen?: any) => void;
+  onSignOut?: () => void;
+  authStatus?: AuthStatus;
+  authUser?: AuthUser | null;
   userXp: number;
   language: SupportedLanguage;
   canInstall?: boolean;
@@ -41,6 +46,9 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   onOpenPassiveGps,
   onOpenAIChat,
   onOpenAuth,
+  onSignOut,
+  authStatus = 'anonymous',
+  authUser = null,
   userXp,
   language,
   canInstall = false,
@@ -86,38 +94,61 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
 
         {/* User Card */}
         <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold text-sm shadow-xs">
-                🧔
-              </div>
-              <div>
-                <div className="text-xs font-bold text-slate-800">
-                  {localize('Hello, Traveler!', 'مرحباً، أيها المسافر!', 'Bonjour, voyageur !')}
-                </div>
-                <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  <span>{localize(`Level ${userLevel} • ${userXp} XP`, `المستوى ${userLevel} • ${userXp} نقطة خبرة`, `Niveau ${userLevel} • ${userXp} XP`)}</span>
-                </div>
+          {authStatus === 'restoring' ? (
+            <div className="flex items-center gap-2.5 animate-pulse" aria-label={localize('Restoring session', 'جارٍ استعادة الجلسة', 'Restauration de la session')}>
+              <div className="h-10 w-10 rounded-full bg-slate-200" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-28 rounded-full bg-slate-200" />
+                <div className="h-2.5 w-36 rounded-full bg-slate-200" />
               </div>
             </div>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-              Explorer
-            </span>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-800 truncate">
+                      {authStatus === 'authed' && authUser?.name
+                        ? authUser.name
+                        : localize('Hello, Traveler!', 'مرحباً، أيها المسافر!', 'Bonjour, voyageur !')}
+                    </div>
+                    {authStatus === 'authed' && authUser?.email ? (
+                      <div className="text-[11px] text-slate-500 truncate">{authUser.email}</div>
+                    ) : (
+                      <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        <span>{localize(`Level ${userLevel} • ${userXp} XP`, `المستوى ${userLevel} • ${userXp} نقطة خبرة`, `Niveau ${userLevel} • ${userXp} XP`)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                  Explorer
+                </span>
+              </div>
 
-          {onOpenAuth && (
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenAuth('welcome');
-                }}
-                className="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold text-xs shadow-xs text-center hover:from-blue-700 hover:to-sky-600 transition"
-              >
-                {localize('Sign In / Account', 'تسجيل الدخول / الحساب', 'Connexion / compte')}
-              </button>
-            </div>
+              {authStatus === 'authed' ? (
+                onSignOut && (
+                  <button
+                    onClick={onSignOut}
+                    className="mt-3 w-full py-1.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs text-center hover:bg-slate-100 transition"
+                  >
+                    {localize('Sign out', 'تسجيل الخروج', 'Déconnexion')}
+                  </button>
+                )
+              ) : onOpenAuth && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenAuth('welcome');
+                  }}
+                  className="mt-3 w-full py-1.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold text-xs shadow-xs text-center hover:from-blue-700 hover:to-sky-600 transition"
+                >
+                  {localize('Sign in / Account', 'تسجيل الدخول / الحساب', 'Connexion / compte')}
+                </button>
+              )}
+            </>
           )}
         </div>
 
