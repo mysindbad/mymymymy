@@ -7,6 +7,7 @@ import {
   createDal,
   DalAuthenticationError,
   DataValidationError,
+  supabaseAdmin,
   throwMappedSupabaseError,
 } from './server/dal.ts';
 
@@ -144,6 +145,32 @@ function appErrorHandler(error: any, _req: Request, res: Response, _next: NextFu
   res.status(status).json({ error: status >= 500 ? 'Internal server error' : error.message || 'Request failed' });
 }
 
+function haversineDistanceKm([lat1, lng1]: [number, number], [lat2, lng2]: [number, number]) {
+  const radiusKm = 6371;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLng / 2) ** 2;
+  return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function addDistanceProjection(places: any[], userLocation?: [number, number]) {
+  if (!userLocation) return places;
+  return places
+    .map((place) => ({
+      ...place,
+      distanceKm: Array.isArray(place.coordinates) && place.coordinates.length === 2
+        ? Number(haversineDistanceKm(userLocation, place.coordinates as [number, number]).toFixed(2))
+        : null,
+    }))
+    .sort((a, b) => {
+      const distanceA = typeof a.distanceKm === 'number' ? a.distanceKm : Number.POSITIVE_INFINITY;
+      const distanceB = typeof b.distanceKm === 'number' ? b.distanceKm : Number.POSITIVE_INFINITY;
+      return distanceA - distanceB;
+    });
+}
+
 app.use(express.json({ limit: '1mb' }));
 app.use('/api', authMiddleware);
 
@@ -153,6 +180,15 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/places', async (req, res, next) => {
   try {
+    let userLocation: [number, number] | undefined;
+    if (req.query.userLat !== undefined || req.query.userLng !== undefined) {
+      if (req.query.userLat === undefined || req.query.userLng === undefined) {
+        throw new DataValidationError('userLat and userLng must be provided together');
+      }
+      const { latitude, longitude } = validateLatitudeLongitude(req.query.userLat, req.query.userLng);
+      userLocation = [latitude, longitude];
+    }
+
     const places = await createDal().places.getAll({
       category: typeof req.query.category === 'string' ? req.query.category : undefined,
       region: typeof req.query.region === 'string' ? req.query.region : undefined,
@@ -160,7 +196,43 @@ app.get('/api/places', async (req, res, next) => {
       hiddenGemsOnly: req.query.hiddenGemsOnly === 'true',
       minRating: req.query.minRating === undefined ? undefined : parseNumber(req.query.minRating, 'minRating'),
     });
-    res.json({ places, total: places.length });
+    res.json({ places: addDistanceProjection(places, userLocation), total: places.length });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/user/profile', requireAuth, async (req, res, next) => {
+  try {
+    if (!supabaseAdmin || !req.user) throw new Error('Supabase server configuration is missing');
+    const { data, error } = await supabaseAdmin
+      .from('user_profiles')
+      .select('user_id, display_name, avatar_url, preferred_language, last_known_location, home_location, created_at, updated_at')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (error) throwMappedSupabaseError(error);
+    res.json({ profile: data || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/user/location', requireAuth, async (req, res, next) => {
+  try {
+    const { latitude, longitude } = validateLatitudeLongitude(req.body?.latitude, req.body?.longitude);
+    const accuracy = req.body?.accuracy === undefined || req.body?.accuracy === null || req.body?.accuracy === ''
+      ? undefined
+      : parseNumber(req.body.accuracy, 'accuracy');
+    if (accuracy !== undefined && accuracy < 0) throw new DataValidationError('accuracy must be a non-negative number');
+    if (!supabaseAdmin) throw new Error('Supabase server configuration is missing');
+
+    const { error } = await supabaseAdmin.rpc('update_user_location', {
+      p_lat: latitude,
+      p_lng: longitude,
+      p_accuracy: accuracy ?? null,
+    });
+    if (error) throwMappedSupabaseError(error);
+    res.json({ success: true });
   } catch (error) {
     next(error);
   }
