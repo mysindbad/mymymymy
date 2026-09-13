@@ -225,6 +225,7 @@ export async function sendChatMessage(
   const data = await apiRequest<{ text: string }>('/api/ai/chat', {
     method: 'POST',
     body: { message, destination, language, history },
+    requiresAuth: true,
   });
   return data.text;
 }
@@ -250,7 +251,6 @@ export async function fetchAiMemoryInsights(): Promise<AiMemoryInsights> {
 export async function getWeather(latitude: number, longitude: number): Promise<WeatherData> {
   return apiRequest<WeatherData>(`/api/weather?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`);
 }
-
 
 export interface TripItineraryItem {
   time: string;
@@ -368,7 +368,11 @@ export async function planTrip(payload: {
   participants: number;
   preferences: string[];
 }): Promise<{ itinerary: TripItinerary; overBudget: boolean; aiGenerated: true }> {
-  return apiRequest('/api/ai/plan-trip', { method: 'POST', body: payload, requiresAuth: true });
+  return apiRequest('/api/ai/plan-trip', {
+    method: 'POST',
+    body: { ...payload, name: 'AI itinerary request' },
+    requiresAuth: true,
+  });
 }
 
 export async function fetchTripExpenses(tripId: string): Promise<TripBudget> {
