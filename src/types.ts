@@ -95,6 +95,7 @@ export interface NavigationRouteData {
   steps: NavigationStep[];
   trafficCondition: string;
   aiSummary: string;
+  modeNote?: string;
 }
 
 export interface PassiveTrace {

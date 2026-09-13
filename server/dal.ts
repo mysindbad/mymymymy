@@ -179,14 +179,9 @@ export interface PlacePayload {
   priceLevel?: '$' | '$$' | '$$$' | '$$$$';
   openingHours?: string;
   contactPhone?: string;
-  isUnderDocumentedGem?: boolean;
-  source?: string;
-  ownerVerified?: boolean;
   businessOwnerName?: string;
   checkInsCount?: number;
-  aiConfidenceScore?: number;
   lastActivityTimestamp?: string;
-  rankText?: string;
 }
 
 export interface ReviewPayload {
@@ -425,11 +420,6 @@ export function validatePlacePayload(input: unknown): PlacePayload {
   const category = requiredText(value.category, 'category');
   if (!CATEGORIES.includes(category as (typeof CATEGORIES)[number])) throw new DataValidationError('Invalid category');
   const rating = optionalNumber(value.rating, 'rating', 0, 5);
-  const aiConfidenceScore = optionalNumber(value.aiConfidenceScore, 'aiConfidenceScore', 0, 100);
-  const source = optionalText(value.source) || 'community_traveler';
-  if (!['initial_seed', 'community_traveler', 'business_owner'].includes(source)) {
-    throw new DataValidationError('Invalid source');
-  }
   const priceLevel = optionalText(value.priceLevel);
   if (priceLevel && !['$', '$$', '$$$', '$$$$'].includes(priceLevel)) throw new DataValidationError('Invalid priceLevel');
   return {
@@ -452,14 +442,9 @@ export function validatePlacePayload(input: unknown): PlacePayload {
     priceLevel: priceLevel as PlacePayload['priceLevel'],
     openingHours: optionalText(value.openingHours),
     contactPhone: optionalText(value.contactPhone),
-    isUnderDocumentedGem: Boolean(value.isUnderDocumentedGem),
-    source,
-    ownerVerified: Boolean(value.ownerVerified),
     businessOwnerName: optionalText(value.businessOwnerName),
     checkInsCount: nonNegativeInteger(value.checkInsCount, 'checkInsCount'),
-    aiConfidenceScore,
     lastActivityTimestamp: optionalText(value.lastActivityTimestamp),
-    rankText: optionalText(value.rankText),
   };
 }
 
@@ -646,14 +631,14 @@ export function createDal(accessToken?: string) {
           price_level: payload.priceLevel,
           opening_hours: payload.openingHours,
           contact_phone: payload.contactPhone,
-          is_under_documented_gem: payload.isUnderDocumentedGem,
-          source: payload.source,
-          owner_verified: payload.ownerVerified,
+          is_under_documented_gem: false,
+          source: 'community_traveler',
+          owner_verified: false,
           business_owner_name: payload.businessOwnerName,
           check_ins_count: 0,
-          ai_confidence_score: payload.aiConfidenceScore,
+          ai_confidence_score: null,
           last_activity_timestamp: payload.lastActivityTimestamp,
-          rank_text: payload.rankText,
+          rank_text: null,
           created_by_user_id: user.id,
         };
         const { data, error } = await userClient!.from('places').insert(row).select('*, reviews(*)').single();
