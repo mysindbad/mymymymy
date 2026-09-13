@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { X, Star, Check, Loader2, Sparkles, Camera } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Check, Loader2, Sparkles, Star, X } from 'lucide-react';
 import { Place } from '../types';
-import { submitPlaceReview } from '../services/api';
-import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
+import { ApiAuthenticationError, submitPlaceReview } from '../services/api';
+import { SupportedLanguage } from '../data/translations';
+import { useAuthSession } from '../lib/authSession';
 
 interface RatePlaceModalProps {
   isOpen: boolean;
@@ -13,228 +14,179 @@ interface RatePlaceModalProps {
   language?: SupportedLanguage;
 }
 
+const tags = [
+  'Scenery',
+  'Hidden Gem',
+  'Cleanliness',
+  'Authentic Food',
+  'Quiet & Calm',
+  'Good Value',
+  'Helpful Staff',
+  'Scenic Sunset',
+];
+
 export const RatePlaceModal: React.FC<RatePlaceModalProps> = ({
   isOpen,
   onClose,
   place,
   onReviewSuccess,
-  onUserEarnedXp,
   language = 'en',
 }) => {
   const isAr = language === 'ar';
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-
-  const [rating, setRating] = useState(5);
-  const [authorName, setAuthorName] = useState('Ahmed Benali');
-  const [authorRole, setAuthorRole] = useState<'traveler' | 'local_resident' | 'guide'>('traveler');
+  const { status: authStatus, user } = useAuthSession();
+  const [rating, setRating] = useState(0);
+  const [authorName, setAuthorName] = useState('');
   const [reviewText, setReviewText] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>(['Scenery', 'Hidden Gem']);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [photoUrl, setPhotoUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const text = (en: string, ar: string) => (isAr ? ar : en);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setRating(0);
+    setReviewText('');
+    setSelectedTags([]);
+    setPhotoUrl('');
+    setIsSuccess(false);
+    setErrorMessage('');
+    setAuthorName(user?.name || '');
+  }, [isOpen, place?.id, user?.name]);
 
   if (!isOpen || !place) return null;
 
-  const ASPECT_TAGS = [
-    { key: 'Scenery', label: isAr ? 'المناظر الطبيعية' : 'Scenery' },
-    { key: 'Hidden Gem', label: isAr ? 'جوهرة مخفية' : 'Hidden Gem' },
-    { key: 'Cleanliness', label: isAr ? 'النظافة' : 'Cleanliness' },
-    { key: 'Authentic Food', label: isAr ? 'طعام أصيل' : 'Authentic Food' },
-    { key: 'Quiet & Calm', label: isAr ? 'هدوء وراحة' : 'Quiet & Calm' },
-    { key: 'Good Value', label: isAr ? 'سعر مناسب' : 'Good Value' },
-    { key: 'Helpful Staff', label: isAr ? 'معاملة طيبة' : 'Helpful Staff' },
-    { key: 'Scenic Sunset', label: isAr ? 'غروب ساحر' : 'Scenic Sunset' },
-  ];
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorMessage('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    if (authStatus !== 'authed') {
+      setErrorMessage(text('Sign in before publishing a review.', 'سجّل الدخول قبل نشر التقييم.'));
+      return;
+    }
+    if (!authorName.trim()) {
+      setErrorMessage(text('Enter the name or alias you want displayed with this review.', 'أدخل الاسم أو الاسم المستعار الذي تريد عرضه مع التقييم.'));
+      return;
+    }
+    if (rating < 1 || rating > 5) {
+      setErrorMessage(text('Choose a rating from 1 to 5.', 'اختر تقييماً من 1 إلى 5.'));
+      return;
+    }
+    if (!reviewText.trim()) {
+      setErrorMessage(text('Write your own experience before publishing.', 'اكتب تجربتك الفعلية قبل النشر.'));
+      return;
+    }
+    if (photoUrl.trim()) {
+      try {
+        const parsed = new URL(photoUrl.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid protocol');
+      } catch {
+        setErrorMessage(text('Photo URL must be a valid http(s) URL.', 'يجب أن يكون رابط الصورة صالحاً ويبدأ بـ http أو https.'));
+        return;
+      }
+    }
+
     setIsSubmitting(true);
+    try {
+      const result = await submitPlaceReview(place.id, {
+        authorName: authorName.trim(),
+        authorRole: 'traveler',
+        rating,
+        text: reviewText.trim(),
+        tags: selectedTags,
+        photo: photoUrl.trim() || undefined,
+      });
 
-    const res = await submitPlaceReview(place.id, {
-      authorName: authorName.trim() || 'Traveler',
-      authorRole,
-      rating,
-      text: reviewText.trim() || 'Verified review from my recent visit.',
-      tags: selectedTags,
-      photo: photoUrl.trim() || undefined,
-    });
+      if (!result.success || !result.updatedPlace) {
+        setErrorMessage(text('The review was not confirmed by the server. Nothing was published.', 'لم يؤكد الخادم التقييم، لذلك لم يتم نشر شيء.'));
+        return;
+      }
 
-    setIsSubmitting(false);
-    if (res.success && res.updatedPlace) {
       setIsSuccess(true);
-      onUserEarnedXp(50);
-      onReviewSuccess(res.updatedPlace);
-      setTimeout(() => {
+      onReviewSuccess(result.updatedPlace);
+      window.setTimeout(() => {
         setIsSuccess(false);
         onClose();
-      }, 1200);
+      }, 900);
+    } catch (error) {
+      setErrorMessage(error instanceof ApiAuthenticationError
+        ? text('Your sign-in session is not available. Sign in again and retry.', 'جلسة الدخول غير متاحة. سجّل الدخول مجدداً وحاول مرة أخرى.')
+        : text('Could not publish the review. Try again.', 'تعذر نشر التقييم. حاول مرة أخرى.'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
-        {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div>
-            <div className="flex items-center gap-1 text-amber-500 font-bold text-[11px]">
+            <div className="flex items-center gap-1 text-blue-600 font-bold text-[11px]">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{isAr ? '+50 نقطة خبرة للمجتمع' : '+50 Community XP Earned'}</span>
+              <span>{text('Traveler review', 'تقييم مسافر')}</span>
             </div>
-            <h3 className="text-base font-bold text-slate-900">
-              {isAr ? `تقييم: ${place.name}` : `Rate: ${place.name}`}
-            </h3>
+            <h3 className="text-base font-bold text-slate-900">{text(`Rate: ${place.name}`, `تقييم: ${place.arabicName || place.name}`)}</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition shadow-xs"
-          >
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400" aria-label={text('Close', 'إغلاق')}>
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 text-xs text-slate-700">
-          {/* Star Selector */}
+          {errorMessage && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 font-bold text-rose-700">{errorMessage}</div>}
+
           <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/60 text-center space-y-2">
-            <span className="text-xs font-bold text-slate-600 block">
-              {isAr ? 'تقييمك الإجمالي للتجربة' : 'Your Overall Rating'}
-            </span>
+            <span className="text-xs font-bold text-slate-600 block">{text('Your rating', 'تقييمك')}</span>
             <div className="flex items-center justify-center gap-2 text-amber-400">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  className="p-1 hover:scale-125 transition transform"
-                >
+                <button key={star} type="button" onClick={() => setRating(star)} className="p-1 hover:scale-110 transition" aria-label={`${star}/5`}>
                   <Star className={`w-8 h-8 ${star <= rating ? 'fill-current text-amber-400' : 'text-slate-300'}`} />
                 </button>
               ))}
             </div>
-            <div className="text-xs font-bold text-amber-600">
-              {rating === 5 && (isAr ? 'تجربة استثنائية (5/5)' : 'Exceptional (5/5)')}
-              {rating === 4 && (isAr ? 'ممتاز جداً (4/5)' : 'Very Good (4/5)')}
-              {rating === 3 && (isAr ? 'جيد (3/5)' : 'Good (3/5)')}
-              {rating <= 2 && (isAr ? 'يحتاج تحسين (2/5)' : 'Needs Improvement')}
-            </div>
+            <div className="text-[11px] text-slate-500">{rating ? `${rating}/5` : text('Choose a rating', 'اختر تقييماً')}</div>
           </div>
 
-          {/* Author Name and Role */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAr ? 'اسمك المستعار' : 'Your Name'}
-              </label>
-              <input
-                type="text"
-                required
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAr ? 'صفتك' : 'Your Traveler Type'}
-              </label>
-              <select
-                value={authorRole}
-                onChange={(e) => setAuthorRole(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 outline-none bg-white font-medium"
-              >
-                <option value="traveler">{isAr ? 'مسافر زائر' : 'Traveler / Visitor'}</option>
-                <option value="local_resident">{isAr ? 'مقيم محلي' : 'Local Resident'}</option>
-                <option value="guide">{isAr ? 'مرشد سياحي معتمد' : 'Local Guide'}</option>
-              </select>
-            </div>
-          </div>
+          <label className="block">
+            <span className="block text-[11px] font-bold text-slate-600 mb-1">{text('Display name / alias', 'الاسم الظاهر / المستعار')}</span>
+            <input value={authorName} onChange={(event) => setAuthorName(event.target.value)} required className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+            <span className="block mt-1 text-[10px] text-slate-400">{text('Trust-bearing roles such as guide or owner are not self-assigned here.', 'الأدوار الموثوقة مثل المرشد أو صاحب النشاط لا يحددها المستخدم بنفسه هنا.')}</span>
+          </label>
 
-          {/* Aspect tags */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
-              {isAr ? 'ما أبرز ما لفت انتباهك؟ (اختر الوسوم)' : 'What stood out? (Select tags)'}
-            </label>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1.5">{text('Tags (optional)', 'وسوم (اختيارية)')}</label>
             <div className="flex flex-wrap gap-1.5">
-              {ASPECT_TAGS.map((tag) => {
-                const isSelected = selectedTags.includes(tag.key);
+              {tags.map((tag) => {
+                const selected = selectedTags.includes(tag);
                 return (
-                  <button
-                    key={tag.key}
-                    type="button"
-                    onClick={() =>
-                      setSelectedTags(
-                        isSelected ? selectedTags.filter((t) => t !== tag.key) : [...selectedTags, tag.key]
-                      )
-                    }
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                      isSelected
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {tag.label}
+                  <button key={tag} type="button" onClick={() => setSelectedTags(selected ? selectedTags.filter((item) => item !== tag) : [...selectedTags, tag])} className={`px-3 py-1.5 rounded-full text-xs border ${selected ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                    {tag}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Detailed Review Text */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-              {isAr ? 'ملاحظاتك ونصائحك للمسافرين القادمين' : 'Your Detailed Experience & Tips'}
-            </label>
-            <textarea
-              rows={3}
-              required
-              value={reviewText}
-              onChange={(e) => setReviewText(e.target.value)}
-              placeholder={
-                isAr
-                  ? 'شارك أفضل وقت للزيارة، الأسعار، نصيحة حول المسار أو أطباق الطعام الموصى بها...'
-                  : 'Share best arrival times, trail conditions, parking advice, or must-try dishes...'
-              }
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+          <label className="block">
+            <span className="block text-[11px] font-bold text-slate-600 mb-1">{text('Your experience *', 'تجربتك *')}</span>
+            <textarea rows={4} required value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder={text('Share only what you actually experienced.', 'شارك فقط ما عشته أو لاحظته فعلاً.')} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+          </label>
+
+          <label className="block">
+            <span className="block text-[11px] font-bold text-slate-600 mb-1">{text('Photo URL (optional)', 'رابط صورة (اختياري)')}</span>
+            <input type="url" value={photoUrl} onChange={(event) => setPhotoUrl(event.target.value)} placeholder="https://..." className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+          </label>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+            {text('The review is shown as published only after the server confirms it. This screen does not award XP or claim an AI-memory update.', 'لا يظهر التقييم كمنشور إلا بعد تأكيد الخادم. هذه الشاشة لا تمنح XP ولا تدّعي تحديث ذاكرة الذكاء الاصطناعي.')}
           </div>
 
-          {/* Photo URL / Upload option */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">
-              {isAr ? 'إرفاق صورة موثقة (Photo URL)' : 'Attach Photo URL (Optional)'}
-            </label>
-            <input
-              type="url"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-slate-800 text-xs focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-
-          {/* Submit */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>{isAr ? 'جاري نشر التقييم...' : 'Publishing Review...'}</span>
-                </>
-              ) : isSuccess ? (
-                <>
-                  <Check className="w-4 h-4 text-white stroke-[3]" />
-                  <span>{isAr ? 'تم النشر! +50 XP' : 'Published! +50 Community XP'}</span>
-                </>
-              ) : (
-                <span>{isAr ? 'نشر التقييم وتحديث الذاكرة (+50 XP)' : 'Publish Review & Update AI Memory (+50 XP)'}</span>
-              )}
-            </button>
-          </div>
+          <button type="submit" disabled={isSubmitting || isSuccess} className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+            {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" />{text('Publishing...', 'جاري النشر...')}</> : isSuccess ? <><Check className="w-4 h-4" />{text('Published', 'تم النشر')}</> : text('Publish review', 'نشر التقييم')}
+          </button>
         </form>
       </div>
     </div>
