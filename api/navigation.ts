@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getNormalizedSupabaseUrl } from './supabase-url';
 
 function numberField(value: unknown, name: string) {
   const parsed = Number(value);
@@ -15,9 +16,9 @@ function coordinates(lat: unknown, lng: unknown) {
 }
 
 function placesClient() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const url = getNormalizedSupabaseUrl();
   const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) throw new Error('Supabase configuration is missing');
+  if (!anonKey) throw new Error('Supabase configuration is missing');
   return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
