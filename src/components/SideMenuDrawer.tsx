@@ -8,14 +8,12 @@ import {
   Calendar,
   Sparkles,
   ShieldCheck,
-  Globe2,
   Heart,
   ChevronRight,
   Info
 } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import { MascotSindbad } from './MascotSindbad';
-import { LanguageFlagSelector } from './LanguageFlagSelector';
 
 interface SideMenuDrawerProps {
   isOpen: boolean;
@@ -27,7 +25,6 @@ interface SideMenuDrawerProps {
   onOpenAuth?: (screen?: any) => void;
   userXp: number;
   language: SupportedLanguage;
-  onToggleLanguage: (lang: SupportedLanguage) => void;
 }
 
 export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
@@ -40,7 +37,6 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   onOpenAuth,
   userXp,
   language,
-  onToggleLanguage,
 }) => {
   if (!isOpen) return null;
   const isAr = language === 'ar';
@@ -198,18 +194,6 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
           </button>
         </div>
 
-        {/* Language selector footer with national flags */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
-            <Globe2 className="w-4 h-4 text-slate-600" />
-            <span>{localize('Language', 'اللغة', 'Langue')}</span>
-          </div>
-          <LanguageFlagSelector
-            currentLanguage={language}
-            onSelectLanguage={onToggleLanguage}
-            variant="compact"
-          />
-        </div>
       </div>
     </div>
   );
