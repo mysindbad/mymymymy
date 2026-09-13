@@ -270,7 +270,6 @@ export default function App() {
             savedPlaceIds={savedPlaceIds}
             onToggleSave={handleToggleSave}
             language={language}
-            onToggleLanguage={setLanguage}
             onOpenAuth={handleOpenAuth}
             currentUser={currentUser}
           />
@@ -371,7 +370,7 @@ export default function App() {
                 ← {isAr ? 'الرئيسية' : 'Home'}
               </button>
               <h2 className="text-sm font-bold text-slate-900">
-                {isAr ? 'ملفي الشخصي ومجتمع سندباد' : language === 'fr' ? 'Mon profil et la communauté' : 'My Profile & Community'}
+                {isAr ? 'حسابي' : language === 'fr' ? 'Mon compte' : 'My Account'}
               </h2>
               <div className="w-16" />
             </div>
@@ -484,7 +483,6 @@ export default function App() {
         onOpenAIChat={() => setIsAIChatOpen(true)}
         userXp={userXp}
         language={language}
-        onToggleLanguage={setLanguage}
         onOpenAuth={handleOpenAuth}
       />
 
