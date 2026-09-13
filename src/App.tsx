@@ -388,13 +388,7 @@ export default function App() {
               <div className="w-16" />
             </div>
 
-            <TripsPlanner
-              savedPlaces={savedPlacesList}
-              onStartRoute={(p) => setActiveNavDestination(p)}
-              onSelectPlace={(p) => setSelectedPlace(p)}
-              onRemoveSaved={handleToggleSave}
-              language={language}
-            />
+            <TripsPlanner language={language} />
           </div>
         )}
 

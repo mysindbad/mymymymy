@@ -220,3 +220,99 @@ export async function fetchAiMemoryInsights(): Promise<AiMemoryInsights> {
 export async function getWeather(latitude: number, longitude: number): Promise<WeatherData> {
   return apiRequest<WeatherData>(`/api/weather?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`);
 }
+
+
+export interface TripItineraryItem {
+  time: string;
+  activity: string;
+  category: 'food' | 'sight' | 'activity' | 'transport' | 'accommodation';
+  estimatedCost: number;
+  note: string;
+}
+
+export interface TripItineraryDay {
+  day: number;
+  title: string;
+  items: TripItineraryItem[];
+  dailyCost: number;
+}
+
+export interface TripItinerary {
+  days: TripItineraryDay[];
+  totalEstimatedCost: number;
+  currency: string;
+  tips: string[];
+}
+
+export interface Trip {
+  id: string;
+  userId: string;
+  name: string;
+  destinationId?: string | null;
+  destinationName?: string | null;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  currency: string;
+  participantsCount: number;
+  status: 'planning' | 'active' | 'completed' | 'cancelled';
+  preferences: string[];
+  aiItinerary?: TripItinerary | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TripCreatePayload {
+  name: string;
+  destinationId?: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  currency: string;
+  participantsCount: number;
+  preferences: string[];
+  aiItinerary?: TripItinerary | null;
+}
+
+export interface TripPatchPayload {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  budget?: number;
+  currency?: string;
+  participantsCount?: number;
+  status?: Trip['status'];
+  aiItinerary?: TripItinerary | null;
+  preferences?: string[];
+}
+
+export async function fetchTrips(): Promise<Trip[]> {
+  const data = await apiRequest<{ trips?: Trip[] }>('/api/trips', { requiresAuth: true });
+  return data.trips || [];
+}
+
+export async function createTrip(payload: TripCreatePayload): Promise<Trip> {
+  const data = await apiRequest<{ trip: Trip }>('/api/trips', { method: 'POST', body: payload, requiresAuth: true });
+  return data.trip;
+}
+
+export async function updateTrip(id: string, patch: TripPatchPayload): Promise<Trip> {
+  const data = await apiRequest<{ trip: Trip }>('/api/trips/' + encodeURIComponent(id), { method: 'PATCH', body: patch, requiresAuth: true });
+  return data.trip;
+}
+
+export async function deleteTrip(id: string): Promise<void> {
+  await apiRequest('/api/trips/' + encodeURIComponent(id), { method: 'DELETE', requiresAuth: true });
+}
+
+export async function planTrip(payload: {
+  destinationId: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  currency: string;
+  participants: number;
+  preferences: string[];
+}): Promise<{ itinerary: TripItinerary; overBudget: boolean; aiGenerated: true }> {
+  return apiRequest('/api/ai/plan-trip', { method: 'POST', body: payload, requiresAuth: true });
+}
