@@ -282,6 +282,68 @@ export interface TripPatchPayload {
   preferences?: string[];
 }
 
+export const EXPENSE_CATEGORIES = ['accommodation', 'food', 'transport', 'activity', 'souvenir', 'other'] as const;
+export type TripExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+export interface TripExpenseCreatePayload {
+  category: TripExpenseCategory;
+  amount: number;
+  currency: string;
+  description?: string;
+  expenseDate: string;
+}
+
+export interface TripExpensePatchPayload {
+  category?: TripExpenseCategory;
+  amount?: number;
+  description?: string | null;
+  expenseDate?: string;
+}
+
+function validateExpenseAmount(value: unknown): number {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) throw new DataValidationError('amount must be greater than 0');
+  return amount;
+}
+
+function validateExpenseCategory(value: unknown): TripExpenseCategory {
+  const category = requiredText(value, 'category');
+  if (!EXPENSE_CATEGORIES.includes(category as TripExpenseCategory)) {
+    throw new DataValidationError('Invalid expense category');
+  }
+  return category as TripExpenseCategory;
+}
+
+export function validateTripExpenseCreatePayload(input: unknown): TripExpenseCreatePayload {
+  const value = (input || {}) as Record<string, unknown>;
+  const currency = optionalText(value.currency) || 'MAD';
+  return {
+    category: validateExpenseCategory(value.category),
+    amount: validateExpenseAmount(value.amount),
+    currency,
+    description: optionalText(value.description),
+    expenseDate: validateTripDate(value.expenseDate ?? value.expense_date ?? new Date().toISOString().slice(0, 10), 'expenseDate'),
+  };
+}
+
+export function validateTripExpensePatchPayload(input: unknown): TripExpensePatchPayload {
+  const value = (input || {}) as Record<string, unknown>;
+  const patch: TripExpensePatchPayload = {};
+  if ('category' in value) patch.category = validateExpenseCategory(value.category);
+  if ('amount' in value) patch.amount = validateExpenseAmount(value.amount);
+  if ('description' in value) {
+    if (value.description !== null && typeof value.description !== 'string') {
+      throw new DataValidationError('description must be a string or null');
+    }
+    patch.description = value.description === null ? null : optionalText(value.description) || null;
+  }
+  if ('expenseDate' in value || 'expense_date' in value) {
+    patch.expenseDate = validateTripDate(value.expenseDate ?? value.expense_date, 'expenseDate');
+  }
+  if (Object.keys(patch).length === 0) throw new DataValidationError('At least one expense field is required');
+  return patch;
+}
+
 function validateTripDate(value: unknown, field: string): string {
   const date = requiredText(value, field);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
@@ -457,6 +519,8 @@ function mapPlace(row: any): any {
 }
 
 function mapTrip(row: any): any {
+  const embeddedExpenses = Array.isArray(row.trip_expenses) ? row.trip_expenses : [];
+  const spentTotal = embeddedExpenses.reduce((sum: number, expense: any) => sum + Number(expense.amount || 0), 0);
   return {
     id: row.id,
     userId: row.user_id,
@@ -466,6 +530,7 @@ function mapTrip(row: any): any {
     startDate: row.start_date,
     endDate: row.end_date,
     budget: Number(row.budget),
+    spentTotal: Number(spentTotal.toFixed(2)),
     currency: row.currency,
     participantsCount: row.participants_count,
     status: row.status,
@@ -473,6 +538,20 @@ function mapTrip(row: any): any {
     aiItinerary: row.ai_itinerary,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapTripExpense(row: any): any {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    category: row.category,
+    amount: Number(row.amount),
+    currency: row.currency,
+    description: row.description,
+    expenseDate: row.expense_date,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
   };
 }
 
@@ -598,7 +677,7 @@ export function createDal(accessToken?: string) {
     trips: {
       async list() {
         const user = await verifyUser();
-        const { data, error } = await userClient!.from('trips').select('*, destination:places(name)').eq('user_id', user.id).order('created_at', { ascending: false });
+        const { data, error } = await userClient!.from('trips').select('*, destination:places(name), trip_expenses(amount)').eq('user_id', user.id).order('created_at', { ascending: false });
         if (error) throwMappedSupabaseError(error);
         return (data || []).map(mapTrip);
       },
@@ -627,7 +706,7 @@ export function createDal(accessToken?: string) {
         const user = await verifyUser();
         const owned = await getOwnedTrip(id, user.id);
         if (!owned) return null;
-        const { data, error } = await getSupabaseAdmin().from('trips').select('*, destination:places(name)').eq('id', id).single();
+        const { data, error } = await getSupabaseAdmin().from('trips').select('*, destination:places(name), trip_expenses(amount)').eq('id', id).single();
         if (error) throwMappedSupabaseError(error);
         return mapTrip(data);
       },
@@ -656,6 +735,82 @@ export function createDal(accessToken?: string) {
         const { error } = await userClient!.from('trips').delete().eq('id', id).eq('user_id', user.id);
         if (error) throwMappedSupabaseError(error);
         return true;
+      },
+    },
+    expenses: {
+      async list(tripId: string) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(tripId, user.id);
+        if (!owned) return null;
+        const [{ data: expenses, error: expensesError }, { data: trip, error: tripError }] = await Promise.all([
+          userClient!.from('trip_expenses').select('*').eq('trip_id', tripId).order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
+          userClient!.from('trips').select('budget, currency').eq('id', tripId).eq('user_id', user.id).single(),
+        ]);
+        if (expensesError) throwMappedSupabaseError(expensesError);
+        if (tripError) throwMappedSupabaseError(tripError);
+        const spentTotal = Number((expenses || []).reduce((sum, expense) => sum + Number(expense.amount || 0), 0).toFixed(2));
+        const budget = Number(trip.budget);
+        return {
+          expenses: (expenses || []).map(mapTripExpense),
+          budget,
+          currency: trip.currency,
+          spentTotal,
+          remaining: Number((budget - spentTotal).toFixed(2)),
+          overBudget: spentTotal > budget,
+        };
+      },
+      async add(tripId: string, input: unknown) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(tripId, user.id);
+        if (!owned) return null;
+        const payload = validateTripExpenseCreatePayload(input);
+        const { data, error } = await userClient!.from('trip_expenses').insert({
+          trip_id: tripId,
+          category: payload.category,
+          amount: payload.amount,
+          currency: payload.currency,
+          description: payload.description || null,
+          expense_date: payload.expenseDate,
+          created_by_user_id: user.id,
+        }).select('*').single();
+        if (error) throwMappedSupabaseError(error);
+        const budget = await this.list(tripId);
+        return budget ? { ...budget, expense: mapTripExpense(data) } : null;
+      },
+      async update(tripId: string, expenseId: string, input: unknown) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(tripId, user.id);
+        if (!owned) return null;
+        const patch = validateTripExpensePatchPayload(input);
+        const row: Record<string, unknown> = {};
+        if (patch.category !== undefined) row.category = patch.category;
+        if (patch.amount !== undefined) row.amount = patch.amount;
+        if (patch.description !== undefined) row.description = patch.description;
+        if (patch.expenseDate !== undefined) row.expense_date = patch.expenseDate;
+        const { data, error } = await userClient!.from('trip_expenses')
+          .update(row)
+          .eq('id', expenseId)
+          .eq('trip_id', tripId)
+          .select('*')
+          .maybeSingle();
+        if (error) throwMappedSupabaseError(error);
+        if (!data) return null;
+        const budget = await this.list(tripId);
+        return budget ? { ...budget, expense: mapTripExpense(data) } : null;
+      },
+      async remove(tripId: string, expenseId: string) {
+        const user = await verifyUser();
+        const owned = await getOwnedTrip(tripId, user.id);
+        if (!owned) return null;
+        const { data, error } = await userClient!.from('trip_expenses')
+          .delete()
+          .eq('id', expenseId)
+          .eq('trip_id', tripId)
+          .select('id')
+          .maybeSingle();
+        if (error) throwMappedSupabaseError(error);
+        if (!data) return null;
+        return this.list(tripId);
       },
     },
     traces: {

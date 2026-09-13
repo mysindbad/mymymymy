@@ -10,6 +10,8 @@ import {
   supabaseAdmin,
   throwMappedSupabaseError,
   validateTripCreatePayload,
+  validateTripExpenseCreatePayload,
+  validateTripExpensePatchPayload,
   validateTripPatchPayload,
 } from './server/dal.ts';
 
@@ -266,6 +268,50 @@ app.delete('/api/trips/:id', requireAuth, async (req, res, next) => {
     const removed = await createDal(token).trips.remove(req.params.id);
     if (!removed) return res.status(404).json({ error: 'Trip not found' });
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/trips/:id/expenses', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const budget = await createDal(token).expenses.list(req.params.id);
+    if (!budget) return res.status(404).json({ error: 'Trip not found' });
+    res.json(budget);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/trips/:id/expenses', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const budget = await createDal(token).expenses.add(req.params.id, validateTripExpenseCreatePayload(req.body));
+    if (!budget) return res.status(404).json({ error: 'Trip not found' });
+    res.status(201).json(budget);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/trips/:id/expenses/:expenseId', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const budget = await createDal(token).expenses.update(req.params.id, req.params.expenseId, validateTripExpensePatchPayload(req.body));
+    if (!budget) return res.status(404).json({ error: 'Expense not found' });
+    res.json(budget);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/trips/:id/expenses/:expenseId', requireAuth, async (req, res, next) => {
+  try {
+    const { token } = requestUser(req);
+    const budget = await createDal(token).expenses.remove(req.params.id, req.params.expenseId);
+    if (!budget) return res.status(404).json({ error: 'Expense not found' });
+    res.json(budget);
   } catch (error) {
     next(error);
   }
