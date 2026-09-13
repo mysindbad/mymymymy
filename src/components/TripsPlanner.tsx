@@ -6,6 +6,7 @@ import { SupportedLanguage } from '../data/translations';
 
 interface TripsPlannerProps {
   language?: SupportedLanguage;
+  isSessionResolved?: boolean;
 }
 
 const preferences = [
@@ -39,7 +40,7 @@ function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en' }) => {
+export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en', isSessionResolved = true }) => {
   const isAr = language === 'ar';
   const [trips, setTrips] = useState<Trip[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
@@ -76,7 +77,9 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({ language = 'en' }) =
     }
   };
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => {
+    if (isSessionResolved) void loadData();
+  }, [isSessionResolved]);
   const updateForm = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const togglePreference = (value: string) => updateForm({ preferences: form.preferences.includes(value) ? form.preferences.filter((item) => item !== value) : form.preferences.concat(value) });
 

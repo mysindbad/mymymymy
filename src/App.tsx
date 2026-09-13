@@ -388,7 +388,7 @@ export default function App() {
               <div className="w-16" />
             </div>
 
-            <TripsPlanner language={language} />
+            <TripsPlanner language={language} isSessionResolved={isSessionResolved} />
           </div>
         )}
 
