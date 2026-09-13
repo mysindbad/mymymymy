@@ -11,11 +11,13 @@ to authenticated
 using (false)
 with check (false);
 
--- Authenticated users may update only their own profile through RLS, so this
--- helper does not need SECURITY DEFINER privileges.
 alter function public.update_user_location(uuid, numeric, numeric, numeric) security invoker;
 
--- Fixed 60-second cooldown. Clients cannot weaken it by supplying parameters.
+-- Remove configurable/default overloads first so the fixed signatures are not
+-- ambiguous. They are re-created below only as compatibility wrappers.
+drop function if exists public.record_place_checkin(uuid, integer);
+drop function if exists public.consume_ai_quota(text, integer, integer);
+
 create or replace function public.record_place_checkin(place_id_input uuid)
 returns integer
 language plpgsql
@@ -66,28 +68,22 @@ begin
   return updated_count;
 end;
 $$;
-
 revoke all on function public.record_place_checkin(uuid) from public, anon;
 grant execute on function public.record_place_checkin(uuid) to authenticated;
 
--- Backward-compatible overload: the supplied cooldown is intentionally ignored.
--- Existing deployed code can keep calling the old signature without being able
--- to weaken the database-enforced 60-second rule.
-create or replace function public.record_place_checkin(
-  place_id_input uuid,
-  cooldown_seconds integer default 60
-)
+-- Existing Vercel code passes two arguments. Keep that signature, but ignore
+-- the client-supplied cooldown and delegate to the fixed 60-second function.
+create function public.record_place_checkin(place_id_input uuid, cooldown_seconds integer)
 returns integer
 language sql
 security invoker
 set search_path = ''
 as $$
-  select public.record_place_checkin(place_id_input);
+  select public.record_place_checkin(place_id_input::uuid);
 $$;
 revoke all on function public.record_place_checkin(uuid, integer) from public, anon;
 grant execute on function public.record_place_checkin(uuid, integer) to authenticated;
 
--- Endpoint limits are fixed server-side: chat=30/hour, plan_trip=10/hour.
 create or replace function public.consume_ai_quota(endpoint_input text)
 returns integer
 language plpgsql
@@ -132,23 +128,18 @@ begin
   return request_limit - used - 1;
 end;
 $$;
-
 revoke all on function public.consume_ai_quota(text) from public, anon;
 grant execute on function public.consume_ai_quota(text) to authenticated;
 
--- Backward-compatible overload: max_requests/window_seconds are intentionally
--- ignored so clients cannot weaken the fixed database quota.
-create or replace function public.consume_ai_quota(
-  endpoint_input text,
-  max_requests integer default 30,
-  window_seconds integer default 3600
-)
+-- Existing Vercel code passes three arguments. Keep that signature, but ignore
+-- max_requests/window_seconds so callers cannot weaken the fixed quota.
+create function public.consume_ai_quota(endpoint_input text, max_requests integer, window_seconds integer)
 returns integer
 language sql
 security invoker
 set search_path = ''
 as $$
-  select public.consume_ai_quota(endpoint_input);
+  select public.consume_ai_quota(endpoint_input::text);
 $$;
 revoke all on function public.consume_ai_quota(text, integer, integer) from public, anon;
 grant execute on function public.consume_ai_quota(text, integer, integer) to authenticated;
