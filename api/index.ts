@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
@@ -52,7 +53,7 @@ function bearerToken(req: any): string | null {
   return token || null;
 }
 
-async function verifiedToken(req: any, res: any): Promise<string | null> {
+async function verifiedSession(req: any, res: any): Promise<{ token: string; userId: string } | null> {
   const token = bearerToken(req);
   if (!token) {
     res.status(401).json({ error: 'Authentication required', code: 'TOKEN_MISSING' });
@@ -64,19 +65,11 @@ async function verifiedToken(req: any, res: any): Promise<string | null> {
       res.status(401).json({ error: 'Session expired', code: 'TOKEN_INVALID' });
       return null;
     }
-    return token;
+    return { token, userId: data.user.id };
   } catch {
     res.status(503).json({ error: 'Authentication service unavailable' });
     return null;
   }
-}
-
-function userClient(token: string) {
-  const { url, anonKey } = supabaseConfig();
-  return createClient(url, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
 }
 
 function text(value: unknown, max = 200): string {
@@ -90,35 +83,49 @@ function jsonBodySize(req: any) {
   return Number.isFinite(contentLength) ? contentLength : 0;
 }
 
-async function consumeAiQuota(token: string, endpoint: 'chat' | 'plan_trip', maxRequests: number) {
-  const { data, error } = await userClient(token).rpc('consume_ai_quota', {
-    endpoint_input: endpoint,
-    max_requests: maxRequests,
-    window_seconds: 3600,
+async function consumeAiQuota(userId: string, scope: 'ai-chat' | 'ai-plan-trip', maxRequests: number, windowSeconds: number) {
+  const { serviceRoleKey } = supabaseConfig();
+  const salt = process.env.RATE_LIMIT_SALT || serviceRoleKey;
+  if (!salt) throw new Error('AI rate-limit configuration is missing');
+  const keyHash = createHmac('sha256', salt).update(`${scope}:user:${userId}`).digest('hex');
+  const admin = getAdminClient();
+  const { data, error } = await admin.rpc('consume_api_rate_limit', {
+    p_key_hash: keyHash,
+    p_scope: scope,
+    p_limit: maxRequests,
+    p_window_seconds: windowSeconds,
   });
-  if (error) {
-    if (String(error.message || '').includes('ai_rate_limited')) {
-      const rateError = new Error('AI request limit reached') as Error & { status?: number };
-      rateError.status = 429;
-      throw rateError;
-    }
-    throw error;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.allowed) {
+    const rateError = new Error('AI request limit reached') as Error & { status?: number; retryAfterSeconds?: number };
+    rateError.status = 429;
+    rateError.retryAfterSeconds = Math.max(1, Number(row?.retry_after_seconds || 1));
+    throw rateError;
   }
-  return Number(data ?? 0);
+  const { data: state, error: stateError } = await admin
+    .from('api_rate_limits')
+    .select('request_count')
+    .eq('key_hash', keyHash)
+    .eq('scope', scope)
+    .maybeSingle();
+  if (stateError) throw stateError;
+  return Math.max(0, maxRequests - Number(state?.request_count || 0));
 }
 
 async function handleCheckin(req: any, res: any, placeId: string) {
-  const token = await verifiedToken(req, res);
-  if (!token) return;
+  const session = await verifiedSession(req, res);
+  if (!session) return;
 
-  const { data, error } = await userClient(token).rpc('record_place_checkin', {
-    place_id_input: placeId,
-    cooldown_seconds: 60,
+  const { data, error } = await getAdminClient().rpc('record_place_checkin_server', {
+    p_user_id: session.userId,
+    p_place_id: placeId,
   });
 
   if (error) {
     const message = String(error.message || '');
     if (message.includes('check_in_rate_limited')) {
+      res.setHeader('Retry-After', '60');
       return res.status(429).json({
         error: 'Please wait before checking in to this place again',
         retryAfterSeconds: 60,
@@ -130,20 +137,22 @@ async function handleCheckin(req: any, res: any, placeId: string) {
     throw error;
   }
 
-  return res.status(200).json({ success: true, checkInsCount: data });
+  return res.status(200).json({ success: true, checkInsCount: Number(data || 0) });
 }
 
 async function handleAiChat(req: any, res: any) {
   if (jsonBodySize(req) > 16_384) return res.status(413).json({ error: 'Request too large' });
-  const token = await verifiedToken(req, res);
-  if (!token) return;
+  const session = await verifiedSession(req, res);
+  if (!session) return;
 
-  const message = text(req.body?.message, 2000);
+  const rawMessage = typeof req.body?.message === 'string' ? req.body.message : '';
+  if (!rawMessage.trim()) return res.status(400).json({ error: 'Message is required' });
+  if (rawMessage.length > 2000) return res.status(400).json({ error: 'Message must be 2000 characters or fewer' });
+  const message = text(rawMessage, 2000);
   const requestedLanguage = text(req.body?.language, 8).toLowerCase();
   const language = requestedLanguage === 'ar' ? 'Arabic' : requestedLanguage === 'fr' ? 'French' : 'English';
-  if (!message) return res.status(400).json({ error: 'Message is required' });
 
-  const remaining = await consumeAiQuota(token, 'chat', 30);
+  const remaining = await consumeAiQuota(session.userId, 'ai-chat', 12, 60);
   const ai = getGeminiClient();
   if (!ai) return res.status(503).json({ error: 'AI service temporarily unavailable' });
 
@@ -197,8 +206,8 @@ function validDate(value: unknown): string | null {
 
 async function handlePlanTrip(req: any, res: any) {
   if (jsonBodySize(req) > 24_576) return res.status(413).json({ error: 'Request too large' });
-  const token = await verifiedToken(req, res);
-  if (!token) return;
+  const session = await verifiedSession(req, res);
+  if (!session) return;
 
   const body = req.body || {};
   const destinationId = text(body.destinationId ?? body.destination_id, 100);
@@ -228,7 +237,7 @@ async function handlePlanTrip(req: any, res: any) {
   if (error) throw error;
   if (!destination) return res.status(404).json({ error: 'Destination not found' });
 
-  const remaining = await consumeAiQuota(token, 'plan_trip', 10);
+  const remaining = await consumeAiQuota(session.userId, 'ai-plan-trip', 6, 600);
   const ai = getGeminiClient();
   if (!ai) return res.status(503).json({ error: 'AI planning temporarily unavailable' });
 
@@ -406,7 +415,11 @@ export default async function handler(req: any, res: any) {
       .replace(/[A-Za-z0-9_-]{32,}/g, '[token]')
       .slice(0, 500);
     if (status >= 500) console.error('API handler failed', { message: safeMessage });
-    if (status === 429) return res.status(429).json({ error: 'AI request limit reached. Try again later.' });
+    if (status === 429) {
+      const retryAfterSeconds = Math.max(1, Number(error?.retryAfterSeconds || 1));
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({ error: 'AI request limit reached. Try again later.', retryAfterSeconds });
+    }
     return res.status(status >= 400 && status < 600 ? status : 500).json({ error: status >= 500 ? 'Internal server error' : safeMessage });
   }
 }
