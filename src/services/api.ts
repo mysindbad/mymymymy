@@ -346,8 +346,23 @@ export async function fetchTrips(): Promise<Trip[]> {
 }
 
 export async function createTrip(payload: TripCreatePayload): Promise<Trip> {
-  const data = await apiRequest<{ trip: Trip }>('/api/trips', { method: 'POST', body: payload, requiresAuth: true });
-  return data.trip;
+  const data = await apiRequest<{ trip: Trip }>('/api/trips', {
+    method: 'POST',
+    body: payload,
+    requiresAuth: true,
+  });
+  if (!payload.aiItinerary) return data.trip;
+
+  try {
+    return await updateTrip(data.trip.id, { aiItinerary: payload.aiItinerary });
+  } catch (error) {
+    try {
+      await deleteTrip(data.trip.id);
+    } catch {
+      // Best-effort rollback: preserve the original persistence error for the caller.
+    }
+    throw error;
+  }
 }
 
 export async function updateTrip(id: string, patch: TripPatchPayload): Promise<Trip> {
