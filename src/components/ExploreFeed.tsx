@@ -69,18 +69,28 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   const loadExploreData = async () => {
     setIsLoading(true);
     setLoadError(null);
-    try {
-      const [loadedPlaces, loadedInsights] = await Promise.all([
-        fetchPlaces(userLocation ? { userLat: userLocation.latitude, userLng: userLocation.longitude } : undefined),
-        fetchAiMemoryInsights(),
-      ]);
-      setPlaces(loadedPlaces);
-      setInsights(loadedInsights);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Failed to load explore data');
-    } finally {
-      setIsLoading(false);
+    const [placesResult, insightsResult] = await Promise.allSettled([
+      fetchPlaces(userLocation ? { userLat: userLocation.latitude, userLng: userLocation.longitude } : undefined),
+      fetchAiMemoryInsights(),
+    ]);
+
+    if (placesResult.status === 'fulfilled') {
+      setPlaces(placesResult.value);
+    } else {
+      setPlaces([]);
+      setLoadError(placesResult.reason instanceof Error ? placesResult.reason.message : 'Failed to load places');
     }
+
+    if (insightsResult.status === 'fulfilled') {
+      setInsights(insightsResult.value);
+    } else {
+      setInsights(null);
+      setLoadError((current) => current || (
+        insightsResult.reason instanceof Error ? insightsResult.reason.message : 'Failed to load explore data'
+      ));
+    }
+
+    setIsLoading(false);
   };
 
   useEffect(() => {
