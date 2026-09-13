@@ -227,6 +227,9 @@ export default function App() {
               else setActiveTab(tab as ActiveTab);
             }}
             onSelectCategory={(cat) => {
+              setExploreQuery('');
+              setExploreCategory(cat);
+              setExploreView('map');
               setActiveTab('explore');
             }}
             onSelectDestination={handleDestinationSelect}
