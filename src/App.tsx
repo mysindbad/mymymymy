@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Place } from './types';
 import { fetchPlaces } from './services/api';
-import { supabase } from './lib/supabase';
+import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
 
 // Components
 import { HomeScreen } from './components/HomeScreen';
@@ -185,7 +185,27 @@ export default function App() {
       });
     };
 
-    void supabase.auth.getSession().then(({ data }) => applySession(data.session)).finally(() => {
+    const resolveAuthCallback = async () => {
+      const callbackUrl = new URL(window.location.href);
+      const isAuthCallback = callbackUrl.pathname === AUTH_CALLBACK_PATH;
+      const code = isAuthCallback ? callbackUrl.searchParams.get('code') : null;
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('Google OAuth callback failed:', error);
+        }
+      }
+
+      const { data } = await supabase.auth.getSession();
+      applySession(data.session);
+
+      if (isAuthCallback) {
+        window.history.replaceState({}, document.title, '/');
+      }
+    };
+
+    void resolveAuthCallback().finally(() => {
       setIsSessionResolved(true);
     });
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {

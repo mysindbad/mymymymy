@@ -23,7 +23,7 @@ import { BrandLogo } from './BrandLogo';
 import santoriniBg from '../assets/images/santorini_bg.jpg';
 import { SupportedLanguage } from '../data/translations';
 import { LanguageFlagSelector } from './LanguageFlagSelector';
-import { supabase } from '../lib/supabase';
+import { getAuthRedirectUrl, supabase } from '../lib/supabase';
 
 export type AuthScreenType =
   | 'welcome'
@@ -130,7 +130,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: getAuthRedirectUrl(),
         skipBrowserRedirect: true,
         queryParams: {
           prompt: 'select_account',
