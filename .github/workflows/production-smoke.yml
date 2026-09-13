@@ -16,20 +16,18 @@ jobs:
     env:
       BASE_URL: https://mymymymy-dusky.vercel.app
     steps:
-      - name: Wait for hardened Vercel entrypoint marker
+      - name: Wait for this exact commit to reach Production
         shell: bash
         run: |
           set -euo pipefail
           for attempt in $(seq 1 36); do
-            status=$(curl -sS -o /tmp/transit.json -w '%{http_code}' \
-              -H 'content-type: application/json' \
-              -d '{"destinationId":"00000000-0000-0000-0000-000000000000","startLatitude":35.7595,"startLongitude":-5.8340,"travelMode":"transit","language":"en"}' \
-              "$BASE_URL/api/ai/navigation-guidance" || true)
-            if [ "$status" = "501" ] && python - <<'PY'
-          import json
+            status=$(curl -sS -o /tmp/health.json -w '%{http_code}' "$BASE_URL/api/health" || true)
+            if [ "$status" = "200" ] && EXPECTED_SHA="$GITHUB_SHA" python - <<'PY'
+          import json, os
           try:
-              data=json.load(open('/tmp/transit.json'))
-              assert data.get('code') == 'TRANSIT_PROVIDER_UNAVAILABLE'
+              data=json.load(open('/tmp/health.json'))
+              assert data.get('status') == 'ok'
+              assert data.get('revision') == os.environ['EXPECTED_SHA']
           except Exception:
               raise SystemExit(1)
           PY
@@ -38,19 +36,21 @@ jobs:
             fi
             sleep 10
           done
-          echo 'Hardened Vercel API entrypoints did not become ready in time' >&2
+          echo "Production never reported expected revision $GITHUB_SHA" >&2
+          cat /tmp/health.json >&2 || true
           exit 1
 
-      - name: Homepage and health respond
+      - name: Homepage and health respond from expected revision
         shell: bash
         run: |
           test "$(curl -sS -o /tmp/home.html -w '%{http_code}' "$BASE_URL/")" = "200"
           grep -qi '<html' /tmp/home.html
           test "$(curl -sS -o /tmp/health.json -w '%{http_code}' "$BASE_URL/api/health")" = "200"
-          python - <<'PY'
-          import json
+          EXPECTED_SHA="$GITHUB_SHA" python - <<'PY'
+          import json, os
           data=json.load(open('/tmp/health.json'))
           assert data.get('status') == 'ok'
+          assert data.get('revision') == os.environ['EXPECTED_SHA']
           PY
 
       - name: Raw GPS details are never exposed

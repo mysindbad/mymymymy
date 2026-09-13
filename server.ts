@@ -318,7 +318,11 @@ app.use(express.json({ limit: '256kb' }));
 app.use('/api', authMiddleware);
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    time: new Date().toISOString(),
+    revision: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || null,
+  });
 });
 
 app.get('/api/places', async (req, res, next) => {
