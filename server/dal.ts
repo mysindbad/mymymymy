@@ -314,6 +314,15 @@ function validateExpenseCategory(value: unknown): TripExpenseCategory {
   return category as TripExpenseCategory;
 }
 
+function validateExpenseDate(value: unknown): string {
+  const date = requiredText(value, 'expenseDate');
+  const parsed = Date.parse(`${date}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed) || new Date(parsed).toISOString().slice(0, 10) !== date) {
+    throw new DataValidationError('expenseDate must be a valid date in YYYY-MM-DD format');
+  }
+  return date;
+}
+
 export function validateTripExpenseCreatePayload(input: unknown): TripExpenseCreatePayload {
   const value = (input || {}) as Record<string, unknown>;
   const currency = optionalText(value.currency) || 'MAD';
@@ -322,7 +331,7 @@ export function validateTripExpenseCreatePayload(input: unknown): TripExpenseCre
     amount: validateExpenseAmount(value.amount),
     currency,
     description: optionalText(value.description),
-    expenseDate: validateTripDate(value.expenseDate ?? value.expense_date ?? new Date().toISOString().slice(0, 10), 'expenseDate'),
+    expenseDate: validateExpenseDate(value.expenseDate ?? value.expense_date ?? new Date().toISOString().slice(0, 10)),
   };
 }
 
@@ -338,7 +347,7 @@ export function validateTripExpensePatchPayload(input: unknown): TripExpensePatc
     patch.description = value.description === null ? null : optionalText(value.description) || null;
   }
   if ('expenseDate' in value || 'expense_date' in value) {
-    patch.expenseDate = validateTripDate(value.expenseDate ?? value.expense_date, 'expenseDate');
+    patch.expenseDate = validateExpenseDate(value.expenseDate ?? value.expense_date);
   }
   if (Object.keys(patch).length === 0) throw new DataValidationError('At least one expense field is required');
   return patch;
@@ -698,7 +707,7 @@ export function createDal(accessToken?: string) {
           currency: payload.currency,
           participants_count: payload.participantsCount,
           preferences: payload.preferences,
-        }).select('*, destination:places(name)').single();
+        }).select('*, destination:places(name), trip_expenses(amount)').single();
         if (error) throwMappedSupabaseError(error);
         return mapTrip(data);
       },
@@ -724,7 +733,7 @@ export function createDal(accessToken?: string) {
         if (patch.status !== undefined) row.status = patch.status;
         if (patch.aiItinerary !== undefined) row.ai_itinerary = patch.aiItinerary;
         if (patch.preferences !== undefined) row.preferences = patch.preferences;
-        const { data, error } = await userClient!.from('trips').update(row).eq('id', id).eq('user_id', user.id).select('*, destination:places(name)').single();
+        const { data, error } = await userClient!.from('trips').update(row).eq('id', id).eq('user_id', user.id).select('*, destination:places(name), trip_expenses(amount)').single();
         if (error) throwMappedSupabaseError(error);
         return mapTrip(data);
       },
