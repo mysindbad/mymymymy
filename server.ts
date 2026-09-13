@@ -226,12 +226,16 @@ app.post('/api/user/location', requireAuth, async (req, res, next) => {
     if (accuracy !== undefined && accuracy < 0) throw new DataValidationError('accuracy must be a non-negative number');
     if (!supabaseAdmin) throw new Error('Supabase server configuration is missing');
 
-    const { error } = await supabaseAdmin.rpc('update_user_location', {
+    const { data, error } = await supabaseAdmin.rpc('update_user_location', {
+      p_user_id: req.user.id,
       p_lat: latitude,
       p_lng: longitude,
       p_accuracy: accuracy ?? null,
     });
     if (error) throwMappedSupabaseError(error);
+    if (data === null || data === 0) {
+      return res.status(500).json({ error: 'User location was not updated' });
+    }
     res.json({ success: true });
   } catch (error) {
     next(error);
