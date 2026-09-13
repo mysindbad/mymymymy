@@ -14,7 +14,7 @@ import {
   Radio
 } from 'lucide-react';
 import { Place } from '../types';
-import { AiMemoryInsights, fetchPlaces, fetchAiMemoryInsights } from '../services/api';
+import { fetchPlaces } from '../services/api';
 import { NorthernMoroccoBanner } from './NorthernMoroccoBanner';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
@@ -65,7 +65,6 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'hidden_gems' | 'accommodations' | 'tourist' | 'emergency'>('all');
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [nearestFirst, setNearestFirst] = useState(Boolean(userLocation));
-  const [insights, setInsights] = useState<AiMemoryInsights | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -86,28 +85,15 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
   const loadExploreData = async () => {
     setIsLoading(true);
     setLoadError(null);
-    const [placesResult, insightsResult] = await Promise.allSettled([
-      fetchPlaces(userLocation ? { userLat: userLocation.latitude, userLng: userLocation.longitude } : undefined),
-      fetchAiMemoryInsights(),
-    ]);
-
-    if (placesResult.status === 'fulfilled') {
-      setPlaces(placesResult.value);
-    } else {
+    try {
+      const nextPlaces = await fetchPlaces(userLocation ? { userLat: userLocation.latitude, userLng: userLocation.longitude } : undefined);
+      setPlaces(nextPlaces);
+    } catch (error) {
       setPlaces([]);
-      setLoadError(placesResult.reason instanceof Error ? placesResult.reason.message : 'Failed to load places');
+      setLoadError(error instanceof Error ? error.message : 'Failed to load places');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (insightsResult.status === 'fulfilled') {
-      setInsights(insightsResult.value);
-    } else {
-      setInsights(null);
-      setLoadError((current) => current || (
-        insightsResult.reason instanceof Error ? insightsResult.reason.message : 'Failed to load explore data'
-      ));
-    }
-
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -216,8 +202,8 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
             onClick={onOpenPassiveModal}
             className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 flex items-center gap-1.5 transition"
           >
-            <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-            <span>{isAr ? 'مشاركة الموقع' : 'Passive GPS'}</span>
+            <Radio className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{isAr ? 'مساهمة الموقع' : isFr ? 'Contribution GPS' : 'Location contribution'}</span>
           </button>
 
           <button
@@ -254,7 +240,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
             <Compass className="w-4 h-4 text-blue-600" />
-            <span>{isAr ? 'استكشف وجهات مختارة وموثقة' : 'Curated Community Discoveries'}</span>
+            <span>{isAr ? 'استكشف الأماكن المختارة' : isFr ? 'Découvertes sélectionnées' : 'Curated Discoveries'}</span>
           </h2>
           <span className="text-xs text-slate-400 font-medium shrink-0">
             {displayedPlaces.length} {isAr ? 'مكان متاح' : 'Places Listed'}

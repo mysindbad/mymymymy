@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, Mail, Plus, Radio, UserRound } from 'lucide-react';
+import { Mail, Plus, Radio, ShieldCheck } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import { UserAvatar } from './UserAvatar';
 
@@ -17,14 +17,12 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   onOpenAddModal,
   onOpenPassiveModal,
   isPassiveOptedIn,
-  userXp,
   language = 'en',
   currentUser,
   onOpenAuth,
 }) => {
   const isAr = language === 'ar';
   const isFr = language === 'fr';
-  const userLevel = Math.max(1, Math.floor(userXp / 200) + 1);
   const localize = (english: string, arabic: string, french: string) =>
     isAr ? arabic : isFr ? french : english;
   const isLoggedIn = Boolean(currentUser?.isLoggedIn);
@@ -65,23 +63,28 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
             onClick={onOpenAuth}
             className="mt-4 w-full py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition"
           >
-            {localize('Sign in to save your account progress', 'سجّل الدخول لحفظ تقدم حسابك', 'Connectez-vous pour conserver votre progression')}
+            {localize('Sign in to save trips and contributions', 'سجّل الدخول لحفظ الرحلات والمساهمات', 'Connectez-vous pour enregistrer vos voyages et contributions')}
           </button>
         )}
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-3xl bg-blue-50 border border-blue-100 p-4">
-          <Award className="w-5 h-5 text-blue-600 mb-3" />
-          <p className="text-[11px] font-bold text-blue-700">{localize('Experience', 'الخبرة', 'Expérience')}</p>
-          <p className="mt-1 text-2xl font-black text-slate-900">{userXp}</p>
-          <p className="text-[11px] text-slate-500">XP</p>
-        </div>
-        <div className="rounded-3xl bg-amber-50 border border-amber-100 p-4">
-          <UserRound className="w-5 h-5 text-amber-600 mb-3" />
-          <p className="text-[11px] font-bold text-amber-700">{localize('Level', 'المستوى', 'Niveau')}</p>
-          <p className="mt-1 text-2xl font-black text-slate-900">{userLevel}</p>
-          <p className="text-[11px] text-slate-500">{localize('Current level', 'المستوى الحالي', 'Niveau actuel')}</p>
+      <section className="rounded-3xl bg-slate-50 border border-slate-200 p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="font-black text-slate-900">
+              {localize('Community reputation', 'سمعة المجتمع', 'Réputation communautaire')}
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+              {localize(
+                'XP and levels are not shown yet. They will only be enabled when contribution scores are calculated and stored by the server.',
+                'لا نعرض نقاط XP أو المستويات حالياً. لن يتم تفعيلها إلا عندما تُحسب درجات المساهمات وتُحفظ من الخادم.',
+                'Les XP et niveaux ne sont pas encore affichés. Ils ne seront activés que lorsque les scores de contribution seront calculés et stockés côté serveur.'
+              )}
+            </p>
+          </div>
         </div>
       </section>
 
@@ -108,8 +111,8 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
           >
             <Radio className="w-4 h-4" />
             {isPassiveOptedIn
-              ? localize('GPS sharing is on', 'مشاركة GPS مفعّلة', 'Partage GPS activé')
-              : localize('Manage GPS sharing', 'إدارة مشاركة GPS', 'Gérer le partage GPS')}
+              ? localize('Location contribution preference is on', 'تفضيل مساهمة الموقع مفعّل', 'Préférence de contribution de localisation activée')
+              : localize('Manage location contribution', 'إدارة مساهمة الموقع', 'Gérer la contribution de localisation')}
           </button>
         </div>
       </section>

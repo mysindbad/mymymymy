@@ -53,10 +53,42 @@ forbid('src/components/AIChatModal.tsx', [
   'جرّب أقشور صباحاً',
 ]);
 
+forbid('src/App.tsx', [
+  'USER_XP_KEY',
+  "['akchour-bridge', 'riad-el-pueblo']",
+  'community_xp:',
+  'GPS Active',
+  'Explore & AI Memory',
+  'Live Interactive Map',
+]);
+
+forbid('src/components/ExploreFeed.tsx', [
+  'fetchAiMemoryInsights',
+  'AiMemoryInsights',
+  'Passive GPS',
+]);
+
+forbid('src/components/HomeScreen.tsx', [
+  "name: 'Istanbul'",
+  "name: 'Paris'",
+  "name: 'Bali'",
+  'Best deals',
+  'Chefchaouen & Akchour',
+]);
+
+requirePattern('src/components/HomeScreen.tsx', [
+  'const availableRegions = useMemo',
+  'const featuredPlaces = useMemo(() => places.slice(0, 5)',
+  'Available Places',
+]);
+
 requirePattern('src/components/NavigationFlow.tsx', [
   'useState<[number, number] | null>(null)',
   '!routeData || steps.length === 0',
   'Start Route Guidance',
+  "const isUnavailable = item.mode === 'transit'",
+  'disabled={isUnavailable}',
+  'Public-transit routing will be enabled here',
 ]);
 
 requirePattern('src/services/api.ts', [

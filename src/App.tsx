@@ -40,16 +40,6 @@ type ActiveTab = 'home' | 'explore' | 'trips' | 'community';
 type ExploreView = 'feed' | 'map';
 const PASSIVE_GPS_CONSENT_KEY = 'sindbad_passive_gps_consent';
 const LANGUAGE_KEY = 'sindbad_language';
-const USER_XP_KEY = 'sindbad_user_xp';
-
-function readStoredXp(): number {
-  try {
-    const stored = Number(localStorage.getItem(USER_XP_KEY));
-    return Number.isFinite(stored) && stored >= 0 ? Math.floor(stored) : 0;
-  } catch {
-    return 0;
-  }
-}
 
 type CurrentUser = {
   id: string;
@@ -109,13 +99,14 @@ export default function App() {
       return false;
     }
   });
-  const [userXp, setUserXp] = useState<number>(() => readStoredXp());
   const [savedPlaceIds, setSavedPlaceIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('sindbad_saved_ids');
-      return stored ? JSON.parse(stored) : ['akchour-bridge', 'riad-el-pueblo'];
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
     } catch {
-      return ['akchour-bridge', 'riad-el-pueblo'];
+      return [];
     }
   });
   const { location: userLocation, permission, requestPermission } = useGeolocation();
@@ -145,18 +136,6 @@ export default function App() {
       // Storage may be unavailable; keep the current session language.
     }
   }, [language]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(USER_XP_KEY, String(userXp));
-    } catch {
-      // Storage may be unavailable; keep the current session XP.
-    }
-
-    if (authStatus === 'authed' && currentUser.isLoggedIn) {
-      void supabase.auth.updateUser({ data: { community_xp: userXp } });
-    }
-  }, [userXp, authStatus, currentUser.isLoggedIn]);
 
   useEffect(() => {
     if (authStatus !== 'authed' || !currentUser.isLoggedIn || !currentUser.id) {
@@ -224,7 +203,6 @@ export default function App() {
   const handlePlaceAdded = (newPlace: Place) => {
     setPlaces((prev) => [newPlace, ...prev]);
     setSelectedPlace(newPlace);
-    setUserXp((prev) => prev + 100);
   };
 
   const handleDestinationSelect = (name: string) => {
@@ -235,8 +213,6 @@ export default function App() {
     setExploreView('feed');
     setActiveTab('explore');
   };
-
-  const savedPlacesList = places.filter((p) => savedPlaceIds.includes(p.id));
 
   const handleOpenAuth = (screen: AuthScreenType = 'welcome') => {
     setAuthInitialScreen(screen);
@@ -289,7 +265,7 @@ export default function App() {
           />
         )}
 
-        {/* 2. EXPLORE & LIVE MAP TAB */}
+        {/* 2. EXPLORE & MAP TAB */}
         {activeTab === 'explore' && (
           <div className="w-full h-full overflow-y-auto">
             <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between gap-2">
@@ -298,7 +274,7 @@ export default function App() {
                   ← {isAr ? 'الرئيسية' : 'Home'}
                 </button>
                 <h2 className="text-sm font-bold text-slate-900 truncate">
-                  {exploreView === 'feed' ? (isAr ? 'الاستكشاف وذاكرة المجتمع' : 'Explore & AI Memory') : (isAr ? 'الخريطة التفاعلية الحية' : 'Live Interactive Map')}
+                  {exploreView === 'feed' ? (isAr ? 'استكشاف الأماكن' : 'Explore Places') : (isAr ? 'الخريطة التفاعلية' : 'Interactive Map')}
                 </h2>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -306,8 +282,8 @@ export default function App() {
                   {exploreView === 'feed' ? (isAr ? 'الخريطة' : 'Map') : (isAr ? 'الاستكشاف' : 'Discoveries')}
                 </button>
                 <button onClick={() => setIsPassiveModalOpen(true)} className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200 flex items-center gap-1">
-                  <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-                  <span>{isPassiveOptedIn ? 'GPS Active' : 'GPS Off'}</span>
+                  <Radio className="w-3 h-3 text-emerald-600" />
+                  <span>{isPassiveOptedIn ? (isAr ? 'مساهمة الموقع: مفعّلة' : 'Location preference: On') : (isAr ? 'مساهمة الموقع: متوقفة' : 'Location preference: Off')}</span>
                 </button>
                 <button onClick={() => setIsAddPlaceOpen(true)} className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-xs flex items-center gap-1">
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
@@ -351,7 +327,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TRIPS & OFFLINE SAVED ITINERARIES */}
+        {/* 3. TRIPS */}
         {activeTab === 'trips' && (
           <div className="w-full h-full overflow-y-auto">
             <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
@@ -362,7 +338,7 @@ export default function App() {
                 ← {isAr ? 'الرئيسية' : 'Home'}
               </button>
               <h2 className="text-sm font-bold text-slate-900">
-                {isAr ? 'مخطط الرحلات والأماكن المحفوظة' : 'Trips & Saved Places'}
+                {isAr ? 'مخطط الرحلات' : 'Trips Planner'}
               </h2>
               <div className="w-16" />
             </div>
@@ -395,7 +371,7 @@ export default function App() {
               onOpenAddModal={() => setIsAddPlaceOpen(true)}
               onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
               isPassiveOptedIn={isPassiveOptedIn}
-              userXp={userXp}
+              userXp={0}
               language={language}
               currentUser={currentUser}
               onOpenAuth={() => handleOpenAuth('welcome')}
@@ -404,79 +380,52 @@ export default function App() {
         )}
       </main>
 
-      {/* 2. BOTTOM NAVIGATION BAR: Exactly matching the uploaded photo */}
+      {/* BOTTOM NAVIGATION BAR */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 px-4 py-2 shadow-[0_-8px_25px_rgba(0,0,0,0.06)]">
         <div className="max-w-md mx-auto flex items-end justify-between relative px-2">
-          {/* Tab 1: Home */}
           <button
             id="tab-home"
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${
-              activeTab === 'home'
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
+            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'home' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
           >
             <HomeIcon className={`w-5 h-5 ${activeTab === 'home' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'الرئيسية' : 'Home'}</span>
           </button>
 
-          {/* Tab 2: Explore */}
           <button
             id="tab-explore"
             onClick={() => setActiveTab('explore')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${
-              activeTab === 'explore'
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
+            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'explore' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
           >
             <Compass className={`w-5 h-5 ${activeTab === 'explore' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'استكشف' : 'Explore'}</span>
           </button>
 
-          {/* Tab 3 (Center): Professional AI Assistant */}
           <button
             id="tab-ai-assistant"
             onClick={() => setIsAIChatOpen(true)}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition active:scale-95 group ${
-              isAIChatOpen
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-500 hover:text-blue-600 font-medium'
-            }`}
+            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition active:scale-95 group ${isAIChatOpen ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-blue-600 font-medium'}`}
             title={isAr ? 'الذكاء الاصطناعي لسندباد' : 'AI Assistant'}
           >
             <div className="w-[22px] h-[22px] flex items-center justify-center transition-transform group-hover:scale-110">
               <AIIcon size={22} variant="badge" />
             </div>
-            <span className="text-[11px] leading-none tracking-wider font-extrabold text-blue-600">
-              AI
-            </span>
+            <span className="text-[11px] leading-none tracking-wider font-extrabold text-blue-600">AI</span>
           </button>
 
-          {/* Tab 4: Trips */}
           <button
             id="tab-trips"
             onClick={() => setActiveTab('trips')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${
-              activeTab === 'trips'
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
+            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'trips' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
           >
             <ShoppingBag className={`w-5 h-5 ${activeTab === 'trips' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'رحلاتي' : 'Trips'}</span>
           </button>
 
-          {/* Tab 5: Profile */}
           <button
             id="tab-profile"
             onClick={() => setActiveTab('community')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${
-              activeTab === 'community'
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-400 hover:text-slate-600 font-medium'
-            }`}
+            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'community' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
           >
             <User className={`w-5 h-5 ${activeTab === 'community' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'حسابي' : 'Profile'}</span>
@@ -484,9 +433,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* 3. MODALS & SPECIALIZED DIALOGS */}
-
-      {/* Side Menu Drawer */}
       <SideMenuDrawer
         isOpen={isSideMenuOpen}
         onClose={() => setIsSideMenuOpen(false)}
@@ -497,7 +443,7 @@ export default function App() {
         onOpenAddPlace={() => setIsAddPlaceOpen(true)}
         onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
         onOpenAIChat={() => setIsAIChatOpen(true)}
-        userXp={userXp}
+        userXp={0}
         language={language}
         onOpenAuth={handleOpenAuth}
         authStatus={authStatus}
@@ -516,18 +462,13 @@ export default function App() {
         onDismissIosInstallHint={dismissIosInstallHint}
       />
 
-      {/* Auth & Onboarding 6-Screen Flow Modal */}
       <AuthFlowModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         initialScreen={authInitialScreen}
         language={language}
         onToggleLanguage={setLanguage}
-        onAuthSuccess={(user) => {
-          if (typeof user.xp === 'number' && Number.isFinite(user.xp) && user.xp >= 0) {
-            setUserXp(Math.floor(user.xp));
-          }
-        }}
+        onAuthSuccess={() => {}}
       />
 
       {isOnboardingOpen && authStatus === 'authed' && currentUser.id && (
@@ -542,21 +483,18 @@ export default function App() {
         />
       )}
 
-      {/* Flights Discovery Modal */}
       <FlightsModal
         isOpen={isFlightsOpen}
         onClose={() => setIsFlightsOpen(false)}
         language={language}
       />
 
-      {/* Weather Forecast Modal */}
       <WeatherModal
         isOpen={isWeatherOpen}
         onClose={() => setIsWeatherOpen(false)}
         language={language}
       />
 
-      {/* Turn-by-Turn AI Navigation Flow */}
       {activeNavDestination && (
         <NavigationFlow
           destination={activeNavDestination}
@@ -571,7 +509,6 @@ export default function App() {
         />
       )}
 
-      {/* Place Details Modal with Formation History & Community Reviews */}
       <PlaceDetailModal
         place={selectedPlace}
         onClose={() => setSelectedPlace(null)}
@@ -589,7 +526,6 @@ export default function App() {
         currency={currency}
       />
 
-      {/* Scoped Sindbad AI Chat Modal */}
       <AIChatModal
         isOpen={isAIChatOpen}
         onClose={() => setIsAIChatOpen(false)}
@@ -601,7 +537,6 @@ export default function App() {
         language={language}
       />
 
-      {/* Add Place / Business Owner Listing Modal */}
       <AddPlaceModal
         isOpen={isAddPlaceOpen}
         onClose={() => setIsAddPlaceOpen(false)}
@@ -609,7 +544,6 @@ export default function App() {
         language={language}
       />
 
-      {/* Passive Location Sharing Modal */}
       <PassiveDataModal
         isOpen={isPassiveModalOpen}
         onClose={() => setIsPassiveModalOpen(false)}
