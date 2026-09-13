@@ -438,7 +438,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {/* 6. More */}
             <button
               id="service-more-btn"
-              onClick={onOpenAddPlace}
+              onClick={onOpenSideMenu}
               className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
             >
               <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-pink-500 via-rose-500 to-red-500 shadow-sm shadow-rose-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
