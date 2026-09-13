@@ -1,4 +1,4 @@
-import { normalizeSupabaseServerEnv } from './supabase-url';
+import { normalizeSupabaseServerEnv } from './supabase-url.js';
 
 // Normalize deployment environment values before loading api/index.ts.
 // api/index.ts can lazy-load server.ts/server/dal.ts, so doing this here
@@ -6,6 +6,6 @@ import { normalizeSupabaseServerEnv } from './supabase-url';
 normalizeSupabaseServerEnv();
 
 export default async function handler(req: any, res: any) {
-  const { default: indexHandler } = await import('./index');
+  const { default: indexHandler } = await import('./index.js');
   return indexHandler(req, res);
 }
