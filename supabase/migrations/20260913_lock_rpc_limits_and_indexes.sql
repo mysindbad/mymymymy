@@ -70,6 +70,23 @@ $$;
 revoke all on function public.record_place_checkin(uuid) from public, anon;
 grant execute on function public.record_place_checkin(uuid) to authenticated;
 
+-- Backward-compatible overload: the supplied cooldown is intentionally ignored.
+-- Existing deployed code can keep calling the old signature without being able
+-- to weaken the database-enforced 60-second rule.
+create or replace function public.record_place_checkin(
+  place_id_input uuid,
+  cooldown_seconds integer default 60
+)
+returns integer
+language sql
+security invoker
+set search_path = ''
+as $$
+  select public.record_place_checkin(place_id_input);
+$$;
+revoke all on function public.record_place_checkin(uuid, integer) from public, anon;
+grant execute on function public.record_place_checkin(uuid, integer) to authenticated;
+
 -- Endpoint limits are fixed server-side: chat=30/hour, plan_trip=10/hour.
 create or replace function public.consume_ai_quota(endpoint_input text)
 returns integer
@@ -119,9 +136,21 @@ $$;
 revoke all on function public.consume_ai_quota(text) from public, anon;
 grant execute on function public.consume_ai_quota(text) to authenticated;
 
--- Remove execution from the configurable overloads after application code has
--- moved to fixed-limit RPCs. The functions may remain temporarily for rollback.
-revoke all on function public.record_place_checkin(uuid, integer) from public, anon, authenticated;
-revoke all on function public.consume_ai_quota(text, integer, integer) from public, anon, authenticated;
+-- Backward-compatible overload: max_requests/window_seconds are intentionally
+-- ignored so clients cannot weaken the fixed database quota.
+create or replace function public.consume_ai_quota(
+  endpoint_input text,
+  max_requests integer default 30,
+  window_seconds integer default 3600
+)
+returns integer
+language sql
+security invoker
+set search_path = ''
+as $$
+  select public.consume_ai_quota(endpoint_input);
+$$;
+revoke all on function public.consume_ai_quota(text, integer, integer) from public, anon;
+grant execute on function public.consume_ai_quota(text, integer, integer) to authenticated;
 
 commit;
