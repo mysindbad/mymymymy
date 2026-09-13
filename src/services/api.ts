@@ -150,7 +150,7 @@ export async function submitPlaceReview(
 
 export async function submitPlaceCheckIn(placeId: string): Promise<boolean> {
   try {
-    await apiRequest(`/api/places/${encodeURIComponent(placeId)}/checkin`, { method: 'POST' });
+    await apiRequest(`/api/places/${encodeURIComponent(placeId)}/checkin`, { method: 'POST', requiresAuth: true });
     return true;
   } catch (error) {
     console.error('submitPlaceCheckIn error:', error);
