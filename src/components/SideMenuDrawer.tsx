@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import { AuthStatus, AuthUser } from '../lib/authSession';
+import { BrandLogo } from './BrandLogo';
 import { UserAvatar } from './UserAvatar';
 
 interface SideMenuDrawerProps {
@@ -67,9 +68,12 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
       <button type="button" aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="fixed inset-0 cursor-default bg-black/45 backdrop-blur-xs" onClick={onClose} />
       <aside className="relative z-10 flex h-full w-[292px] max-w-[86vw] flex-col bg-white shadow-2xl animate-in slide-in-from-left duration-300 rtl:slide-in-from-right">
         <div className="flex items-center justify-between bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 p-4 text-white">
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-black tracking-tight">My Sindbad</h2>
-            <p className="mt-0.5 truncate text-[11px] text-blue-100">{localize('Your travel guide', 'دليلك للسفر', 'Votre guide de voyage')}</p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandLogo size="icon" showSlogan={false} language={language} className="h-12 w-12 shrink-0" />
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-black tracking-tight">My Sindbad</h2>
+              <p className="mt-0.5 truncate text-[11px] text-blue-100">{localize('Your travel guide', 'دليلك للسفر', 'Votre guide de voyage')}</p>
+            </div>
           </div>
           <button type="button" onClick={onClose} aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition hover:bg-white/30">
             <X className="h-5 w-5" />
