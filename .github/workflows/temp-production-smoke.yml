@@ -1,0 +1,70 @@
+name: Temporary Production Smoke
+
+on:
+  push:
+    branches:
+      - audit/production-smoke-20260914
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production API contracts
+        env:
+          BASE_URL: https://mymymymy-dusky.vercel.app
+          PLACE_ID: 07436a06-5c12-4cdc-8ee5-4417dc0f38b7
+        run: |
+          set -euo pipefail
+
+          request() {
+            method="$1"
+            path="$2"
+            expected="$3"
+            body="${4:-}"
+            out="$(mktemp)"
+            if [ -n "$body" ]; then
+              code=$(curl -sS -X "$method" "$BASE_URL$path" -H 'Content-Type: application/json' --data "$body" -o "$out" -w '%{http_code}')
+            else
+              code=$(curl -sS -X "$method" "$BASE_URL$path" -o "$out" -w '%{http_code}')
+            fi
+            echo "$method $path -> $code"
+            cat "$out"
+            echo
+            if [ "$code" != "$expected" ]; then
+              echo "Expected $expected, got $code for $method $path" >&2
+              exit 1
+            fi
+            RESPONSE_FILE="$out"
+          }
+
+          request GET /api/health 200
+          jq -e '.status == "ok" and (.revision | type == "string")' "$RESPONSE_FILE" >/dev/null
+
+          request GET /api/places 200
+          jq -e '.total == 11 and (.places | length == 11) and (.places[0].id | test("^[0-9a-f-]{36}$"))' "$RESPONSE_FILE" >/dev/null
+
+          request GET /api/traces/summary 200
+          jq -e '.recent == [] and (.totalTraces | type == "number") and (has("coordinates") | not)' "$RESPONSE_FILE" >/dev/null
+
+          request GET /api/trips 401
+          jq -e '.code == "TOKEN_MISSING"' "$RESPONSE_FILE" >/dev/null
+
+          request POST /api/ai/chat 401 '{"message":"hello","destination":"","language":"en","history":[]}'
+          jq -e '.code == "TOKEN_MISSING"' "$RESPONSE_FILE" >/dev/null
+
+          request POST /api/ai/plan-trip 401 '{"destinationId":"'$PLACE_ID'","name":"smoke","startDate":"2026-09-15","endDate":"2026-09-16","budget":1000,"currency":"MAD","participants":1,"preferences":[]}'
+          jq -e '.code == "TOKEN_MISSING"' "$RESPONSE_FILE" >/dev/null
+
+          request POST /api/places/$PLACE_ID/checkin 401 '{}'
+          jq -e '.code == "TOKEN_MISSING"' "$RESPONSE_FILE" >/dev/null
+
+          request POST /api/user/location 401 '{"latitude":35.75,"longitude":-5.83,"accuracy":20}'
+          jq -e '.code == "TOKEN_MISSING"' "$RESPONSE_FILE" >/dev/null
+
+          request POST /api/ai/navigation-guidance 501 '{"destinationId":"'$PLACE_ID'","travelMode":"transit","language":"en","startLatitude":35.75,"startLongitude":-5.83}'
+          jq -e '.code == "TRANSIT_PROVIDER_UNAVAILABLE" and (.supportedModes == ["driving","walking","taxi"])' "$RESPONSE_FILE" >/dev/null
+
+          request GET '/api/weather?lat=35.75&lng=-5.83' 200
+          jq -e '(.temperatureC | type == "number") and (.weatherCode | type == "number") and (.windSpeedKmh | type == "number")' "$RESPONSE_FILE" >/dev/null
+
+          echo 'Production API smoke suite passed.'
