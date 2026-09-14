@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Compass, Globe2, MapPin, ShieldCheck } from 'lucide-react';
+import { Globe2, MapPin, ShieldCheck } from 'lucide-react';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import type { UserLocation, GeolocationPermission } from '../hooks/useGeolocation';
+import { BrandLogo } from './BrandLogo';
 
 interface OnboardingModalProps {
   userId: string;
@@ -66,11 +67,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
       <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-2xl">
         <div className="bg-gradient-to-br from-blue-600 via-cyan-500 to-teal-500 px-6 py-7 text-white">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/30 backdrop-blur">
-            <Compass className="h-8 w-8" />
+          <div className="mx-auto mb-3 flex justify-center">
+            <BrandLogo size="md" showSlogan={false} language={language} className="drop-shadow-xl" />
           </div>
-          <h2 className="text-2xl font-black tracking-tight">{isAr ? 'مرحباً بك في My Sindbad' : 'Welcome to My Sindbad'}</h2>
-          <p className="mt-2 text-sm font-medium text-white/90">
+          <h2 className="text-center text-2xl font-black tracking-tight">{isAr ? 'مرحباً بك في My Sindbad' : 'Welcome to My Sindbad'}</h2>
+          <p className="mt-2 text-center text-sm font-medium text-white/90">
             {isAr ? 'لنجهّز تجربتك بسرعة، ثم ابدأ اكتشاف الأماكن.' : 'Let us personalize your experience, then start exploring.'}
           </p>
         </div>
@@ -164,7 +165,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
           {step === 3 && (
             <section>
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">🧭</div>
+              <div className="mx-auto flex justify-center">
+                <BrandLogo size="icon" showSlogan={false} language={language} className="h-20 w-20" />
+              </div>
               <h3 className="mt-4 text-center text-xl font-black text-slate-900">{isAr ? 'أنت جاهز للاستكشاف' : 'You are ready to explore'}</h3>
               <p className="mx-auto mt-2 max-w-md text-center text-sm leading-relaxed text-slate-500">
                 {userLocation
