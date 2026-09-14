@@ -19,6 +19,7 @@ import { AddPlaceModal } from './AddPlaceModal';
 import { PassiveDataModal } from './PassiveDataModal';
 import { RatePlaceModal } from './RatePlaceModal';
 import type { UserLocation } from '../hooks/useGeolocation';
+import { formatVerifiedRating, unratedShortLabel } from '../lib/placeRating';
 
 interface MapViewProps {
   places: Place[];
@@ -259,6 +260,10 @@ export const MapView: React.FC<MapViewProps> = ({
     visiblePlaces.forEach((place) => {
       const isSelected = activeNearbyPlace?.id === place.id;
       const { bg, border, iconChar } = getMarkerBadgeStyle(place.category, isSelected);
+      const verifiedRating = formatVerifiedRating(place.rating, place.reviewCount);
+      const ratingBadge = verifiedRating
+        ? `<span class="text-amber-300 text-[10px] font-bold">★${verifiedRating}</span>`
+        : `<span class="text-slate-200 text-[9px] font-bold">${unratedShortLabel(language)}</span>`;
 
       const markerHtml = `
         <div class="flex flex-col items-center group cursor-pointer transition-transform duration-200 hover:scale-115 ${
@@ -269,7 +274,7 @@ export const MapView: React.FC<MapViewProps> = ({
       }">
             <span>${iconChar}</span>
             <span>${place.name.slice(0, 18)}</span>
-            <span class="text-amber-300 text-[10px] font-bold">★${place.rating.toFixed(1)}</span>
+            ${ratingBadge}
             ${place.isUnderDocumentedGem ? '<span class="text-[9px] bg-amber-400 text-slate-950 font-black px-1 rounded-xs">GEM</span>' : ''}
           </div>
           <div class="w-2.5 h-2.5 ${bg.split(' ')[0]} rotate-45 -mt-1 border-r border-b ${border}"></div>
@@ -508,11 +513,15 @@ export const MapView: React.FC<MapViewProps> = ({
               </p>
 
               <div className="flex items-center gap-2 text-xs text-slate-600 mt-1">
-                <div className="flex items-center text-amber-500 font-bold">
-                  <Star className="w-3.5 h-3.5 fill-current mr-0.5 rtl:mr-0 rtl:ml-0.5" />
-                  <span>{activeNearbyPlace.rating.toFixed(1)}</span>
-                  <span className="text-slate-400 font-normal ml-0.5">({activeNearbyPlace.reviewCount})</span>
-                </div>
+                {formatVerifiedRating(activeNearbyPlace.rating, activeNearbyPlace.reviewCount) ? (
+                  <div className="flex items-center text-amber-500 font-bold">
+                    <Star className="w-3.5 h-3.5 fill-current mr-0.5 rtl:mr-0 rtl:ml-0.5" />
+                    <span>{formatVerifiedRating(activeNearbyPlace.rating, activeNearbyPlace.reviewCount)}</span>
+                    <span className="text-slate-400 font-normal ml-0.5">({activeNearbyPlace.reviewCount})</span>
+                  </div>
+                ) : (
+                  <span className="font-semibold text-slate-500">{unratedShortLabel(language)}</span>
+                )}
                 <span>•</span>
                 <span className="font-semibold text-slate-700">{formatPriceLevel(activeNearbyPlace.priceLevel, currency)}</span>
                 {typeof activeNearbyPlace.distanceKm === 'number' && (

@@ -36,7 +36,7 @@ create table public.places (
   photos text[] not null default '{}',
   description text not null,
   formation_info text,
-  rating numeric(3,2) not null default 0 check (rating between 0 and 5),
+  rating numeric(3,2) check (rating is null or rating between 0 and 5),
   review_count integer not null default 0 check (review_count >= 0),
   ratings_breakdown jsonb,
   features jsonb,
@@ -53,6 +53,18 @@ create table public.places (
   rank_text text,
   created_by_user_id uuid references auth.users(id) on delete set null,
   seed_data boolean not null default false,
+  seed_check_ins_count integer not null default 0 check (seed_check_ins_count >= 0),
+  photo_provenance text not null default 'user_submitted',
+  rating_provenance text not null default 'unrated'
+    check (rating_provenance in ('unrated', 'community', 'seed_reference', 'external_reference', 'verified_owner')),
+  seed_rating numeric,
+  seed_review_count integer not null default 0 check (seed_review_count >= 0),
+  seed_owner_verified boolean not null default false,
+  seed_source text,
+  data_source text not null default 'community_submission' check (length(btrim(data_source)) > 0),
+  last_verified_at timestamptz,
+  trust_level text not null default 'unverified'
+    check (trust_level in ('unverified', 'community', 'external', 'official')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint places_coordinates_shape check (
@@ -62,6 +74,11 @@ create table public.places (
     and jsonb_typeof(coordinates->1) = 'number'
     and (coordinates->>0)::numeric between -90 and 90
     and (coordinates->>1)::numeric between -180 and 180
+  ),
+  constraint places_rating_truth_check check (
+    (review_count = 0 and rating is null and rating_provenance = 'unrated')
+    or
+    (review_count > 0 and rating is not null and rating_provenance <> 'unrated')
   )
 );
 
@@ -76,6 +93,7 @@ create table public.reviews (
   tags text[] not null default '{}',
   photos text[],
   author_user_id uuid references auth.users(id) on delete set null,
+  seed_data boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
@@ -146,14 +164,26 @@ create or replace function public.update_place_rating_aggregate()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
-declare target_place_id uuid;
+declare
+  target_place_id uuid;
+  live_rating numeric(3,2);
+  live_review_count integer;
 begin
-  target_place_id = coalesce(new.place_id, old.place_id);
+  target_place_id := coalesce(new.place_id, old.place_id);
+
+  select avg(r.rating)::numeric(3,2), count(*)::integer
+  into live_rating, live_review_count
+  from public.reviews r
+  where r.place_id = target_place_id
+    and r.seed_data = false;
+
   update public.places
-  set rating = coalesce((select avg(rating)::numeric(3,2) from public.reviews where place_id = target_place_id), 0),
-      review_count = (select count(*)::integer from public.reviews where place_id = target_place_id)
+  set rating = live_rating,
+      review_count = live_review_count,
+      rating_provenance = case when live_review_count > 0 then 'community' else 'unrated' end,
+      trust_level = case when live_review_count > 0 then 'community' else 'unverified' end
   where id = target_place_id;
   return coalesce(new, old);
 end;

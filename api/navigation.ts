@@ -150,7 +150,7 @@ export default async function handler(req: any, res: any) {
         area: destination.area,
         coordinates: destination.coordinates,
         address: destination.address,
-        rating: Number(destination.rating || 0),
+        rating: destination.rating === null || destination.rating === undefined ? null : Number(destination.rating),
       },
       travelMode,
       routeBasis: travelMode === 'taxi' ? 'road-network-estimate' : travelMode === 'walking' ? 'pedestrian-network' : 'road-network',

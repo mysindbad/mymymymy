@@ -10,7 +10,7 @@ export interface PlaceReview {
   id: string;
   authorName: string;
   authorRole: 'traveler' | 'local_resident' | 'guide' | 'owner';
-  rating: number;
+  rating: number | null;
   date: string;
   text: string;
   tags: string[];
@@ -68,6 +68,9 @@ export interface Place {
   seedCheckInsCount?: number;
   photoProvenance?: string | null;
   ratingProvenance?: string | null;
+  dataSource?: string;
+  lastVerifiedAt?: string | null;
+  trustLevel?: 'unverified' | 'community' | 'external' | 'official';
   seedRating?: number | null;
   seedReviewCount?: number;
   seedOwnerVerified?: boolean;

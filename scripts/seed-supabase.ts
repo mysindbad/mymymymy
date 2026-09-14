@@ -59,7 +59,7 @@ const placeRows = input.map((place: any) => {
     photos: place.photos,
     description: place.description,
     formation_info: place.formationInfo || null,
-    rating: 0,
+    rating: null,
     review_count: 0,
     ratings_breakdown: place.ratingsBreakdown || null,
     features: place.features || null,
@@ -68,6 +68,10 @@ const placeRows = input.map((place: any) => {
     contact_phone: place.contactPhone || null,
     is_under_documented_gem: Boolean(place.isUnderDocumentedGem),
     source: place.source || 'initial_seed',
+    rating_provenance: 'unrated',
+    data_source: 'curated_seed',
+    last_verified_at: null,
+    trust_level: 'unverified',
     owner_verified: Boolean(place.ownerVerified),
     business_owner_name: place.businessOwnerName || null,
     check_ins_count: Number.isInteger(place.checkInsCount) ? place.checkInsCount : 0,
@@ -82,22 +86,21 @@ const placeRows = input.map((place: any) => {
 const { error: placeError } = await supabase.from('places').insert(placeRows);
 if (placeError) throw placeError;
 
-const reviewRows = input.flatMap((place: any) => (place.reviews || []).map((review: any) => ({
-  id: crypto.randomUUID(),
+const archivedReviewRows = input.flatMap((place: any) => (place.reviews || []).map((review: any) => ({
+  original_id: crypto.randomUUID(),
   place_id: placeIds.get(place.id || place.name),
   author_name: requiredString(review.authorName, 'review authorName'),
   author_role: review.authorRole,
   rating: review.rating,
-  date: review.date || new Date().toISOString(),
-  text: requiredString(review.text, 'review text'),
+  review_date: review.date || null,
+  review_text: requiredString(review.text, 'review text'),
   tags: review.tags || [],
   photos: review.photos || [],
-  author_user_id: null,
 })));
 
-if (reviewRows.length) {
-  const { error: reviewError } = await supabase.from('reviews').insert(reviewRows);
+if (archivedReviewRows.length) {
+  const { error: reviewError } = await supabase.from('review_seed_archive').insert(archivedReviewRows);
   if (reviewError) throw reviewError;
 }
 
-console.log(`Seeded ${placeRows.length} places and ${reviewRows.length} reviews.`);
+console.log(`Seeded ${placeRows.length} places and archived ${archivedReviewRows.length} reference reviews.`);

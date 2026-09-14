@@ -27,7 +27,7 @@ type SeedPlace = {
   photos?: string[];
   description: string;
   formationInfo?: string;
-  rating?: number;
+  rating?: number | null;
   reviewCount?: number;
   ratingsBreakdown?: Record<string, unknown>;
   features?: Record<string, unknown>;
@@ -78,7 +78,7 @@ function seedPlaceMatches(place: SeedPlace, filters: {
   if (filters.category && filters.category !== 'All' && place.category !== filters.category) return false;
   if (filters.region && filters.region !== 'All' && place.region.toLowerCase() !== filters.region.toLowerCase()) return false;
   if (filters.hiddenGemsOnly && !place.isUnderDocumentedGem) return false;
-  if (filters.minRating !== undefined && (place.rating || 0) < filters.minRating) return false;
+  if (filters.minRating !== undefined && (place.rating == null || place.rating < filters.minRating)) return false;
   if (filters.query?.trim()) {
     const term = filters.query.trim().toLowerCase();
     const searchable = [
@@ -98,10 +98,16 @@ function mapSeedPlace(place: SeedPlace): any {
   return {
     ...place,
     photos: place.photos || [],
-    rating: Number(place.rating || 0),
-    reviewCount: place.reviewCount || 0,
+    rating: null,
+    reviewCount: 0,
     checkInsCount: place.checkInsCount || 0,
-    reviews: place.reviews || [],
+    reviews: [],
+    ratingProvenance: 'unrated',
+    dataSource: 'curated_seed',
+    lastVerifiedAt: null,
+    trustLevel: 'unverified',
+    seedRating: place.rating == null ? null : Number(place.rating),
+    seedReviewCount: place.reviewCount || 0,
     distanceKm: null,
   };
 }
@@ -196,7 +202,7 @@ export interface PlacePayload {
   photos?: string[];
   description: string;
   formationInfo?: string;
-  rating?: number;
+  rating?: number | null;
   reviewCount?: number;
   ratingsBreakdown?: Record<string, unknown>;
   features?: Record<string, unknown>;
@@ -516,7 +522,7 @@ function mapPlace(row: any): any {
     photos: row.photos || [],
     description: row.description,
     formationInfo: row.formation_info,
-    rating: Number(row.rating || 0),
+    rating: row.rating === null || row.rating === undefined ? null : Number(row.rating),
     reviewCount: row.review_count || 0,
     ratingsBreakdown: row.ratings_breakdown,
     features: row.features,
@@ -532,6 +538,9 @@ function mapPlace(row: any): any {
     seedCheckInsCount: row.seed_check_ins_count || 0,
     photoProvenance: row.photo_provenance || null,
     ratingProvenance: row.rating_provenance || null,
+    dataSource: row.data_source || 'community_submission',
+    lastVerifiedAt: row.last_verified_at || null,
+    trustLevel: row.trust_level || 'unverified',
     seedRating: row.seed_rating === null || row.seed_rating === undefined ? null : Number(row.seed_rating),
     seedReviewCount: row.seed_review_count || 0,
     seedOwnerVerified: Boolean(row.seed_owner_verified),
@@ -658,7 +667,7 @@ export function createDal(accessToken?: string) {
           photos: payload.photos,
           description: payload.description,
           formation_info: payload.formationInfo,
-          rating: 0,
+          rating: null,
           review_count: 0,
           ratings_breakdown: payload.ratingsBreakdown,
           features: payload.features,
@@ -667,6 +676,10 @@ export function createDal(accessToken?: string) {
           contact_phone: payload.contactPhone,
           is_under_documented_gem: false,
           source: 'community_traveler',
+          rating_provenance: 'unrated',
+          data_source: 'community_submission',
+          last_verified_at: null,
+          trust_level: 'unverified',
           owner_verified: false,
           business_owner_name: payload.businessOwnerName,
           check_ins_count: 0,

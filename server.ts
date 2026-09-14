@@ -782,13 +782,16 @@ app.post('/api/ai/memory/insights', async (_req, res, next) => {
       if (result.error) throwMappedSupabaseError(result.error);
     }
     const hiddenGems = (placesResult.data || [])
-      .filter((place: any) => !place.seed_data && (place.is_under_documented_gem || Number(place.rating || 0) >= 4.7))
+      .filter((place: any) => !place.seed_data && (
+        place.is_under_documented_gem
+        || (place.rating !== null && place.rating !== undefined && Number(place.rating) >= 4.7)
+      ))
       .map((place: any) => ({
         id: place.id,
         name: place.name,
         area: place.area,
         category: place.category,
-        rating: Number(place.rating || 0),
+        rating: place.rating === null || place.rating === undefined ? null : Number(place.rating),
         reviewCount: place.review_count || 0,
         aiConfidenceScore: place.ai_confidence_score === null ? 0 : Number(place.ai_confidence_score),
         verifiedCheckIns: place.check_ins_count || 0,

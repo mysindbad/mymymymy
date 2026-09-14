@@ -171,7 +171,7 @@ async function handleAiChat(req: any, res: any) {
     category: text(row.category, 40),
     region: text(row.region, 80),
     area: text(row.area, 100),
-    rating: Number(row.rating || 0),
+    rating: row.rating === null || row.rating === undefined ? null : Number(row.rating),
   }));
 
   const prompt = [
@@ -250,7 +250,7 @@ async function handlePlanTrip(req: any, res: any) {
     region: text(destination.region, 80),
     area: text(destination.area, 100),
     address: text(destination.address, 160),
-    rating: Number(destination.rating || 0),
+    rating: destination.rating === null || destination.rating === undefined ? null : Number(destination.rating),
   };
 
   const prompt = [
@@ -341,13 +341,15 @@ async function handleMemoryInsights(_req: any, res: any) {
 
   const organicPlaces = organicPlacesResult.data || [];
   const learnedHiddenGems = organicPlaces
-    .filter((place: any) => Boolean(place.is_under_documented_gem) || Number(place.rating || 0) >= 4.7)
+    .filter((place: any) => Boolean(place.is_under_documented_gem) || (
+      place.rating !== null && place.rating !== undefined && Number(place.rating) >= 4.7
+    ))
     .map((place: any) => ({
       id: place.id,
       name: place.name,
       area: place.area,
       category: place.category,
-      rating: Number(place.rating || 0),
+      rating: place.rating === null || place.rating === undefined ? null : Number(place.rating),
       reviewCount: Number(place.review_count || 0),
       aiConfidenceScore: Number(place.ai_confidence_score || 0),
       recentCheckIns: Number(place.check_ins_count || 0),
