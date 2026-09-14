@@ -4,8 +4,6 @@ import {
   Compass,
   ShoppingBag,
   User,
-  Sparkles,
-  MapPin,
   Radio,
   Plus
 } from 'lucide-react';
@@ -14,7 +12,6 @@ import { fetchPlaces } from './services/api';
 import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
 import { signOut, useAuthSession } from './lib/authSession';
 
-// Components
 import { HomeScreen } from './components/HomeScreen';
 import { MapView } from './components/MapView';
 import { ExploreFeed } from './components/ExploreFeed';
@@ -29,7 +26,6 @@ import { SideMenuDrawer } from './components/SideMenuDrawer';
 import { FlightsModal } from './components/FlightsModal';
 import { WeatherModal } from './components/WeatherModal';
 import { SupportedLanguage, TRANSLATIONS } from './data/translations';
-import mySindbadTransparent from './assets/images/my_sindbad_logo_transparent.png';
 import { AuthFlowModal, AuthScreenType } from './components/AuthFlowModal';
 import { AIIcon } from './components/AIIcon';
 import { OnboardingModal, hasCompletedOnboarding } from './components/OnboardingModal';
@@ -50,7 +46,6 @@ type CurrentUser = {
 };
 
 export default function App() {
-  // Navigation & View State - Default to 'home' to show the exact home page requested
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [places, setPlaces] = useState<Place[]>([]);
   const [placesLoading, setPlacesLoading] = useState(true);
@@ -61,7 +56,6 @@ export default function App() {
   const [exploreQuery, setExploreQuery] = useState('');
   const [exploreCategory, setExploreCategory] = useState('All');
 
-  // Modals
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
   const [isPassiveModalOpen, setIsPassiveModalOpen] = useState(false);
@@ -73,7 +67,6 @@ export default function App() {
   const [authInitialScreen, setAuthInitialScreen] = useState<AuthScreenType>('welcome');
   const { status: authStatus, user: authUser } = useAuthSession();
 
-  // User Settings & Profile
   const currentUser: CurrentUser = authUser
     ? {
       id: authUser.id,
@@ -83,6 +76,7 @@ export default function App() {
       isLoggedIn: true,
     }
     : { id: '', name: '', email: '', avatarUrl: '', isLoggedIn: false };
+
   const [language, setLanguage] = useState<SupportedLanguage>(() => {
     try {
       const stored = localStorage.getItem(LANGUAGE_KEY);
@@ -91,7 +85,7 @@ export default function App() {
       return 'en';
     }
   });
-  const [currency, setCurrency] = useState<string>('MAD');
+  const [currency] = useState<string>('MAD');
   const [isPassiveOptedIn, setIsPassiveOptedIn] = useState<boolean>(() => {
     try {
       return localStorage.getItem(PASSIVE_GPS_CONSENT_KEY) === 'true';
@@ -145,7 +139,6 @@ export default function App() {
     setIsOnboardingOpen(!hasCompletedOnboarding(currentUser.id));
   }, [authStatus, currentUser.id, currentUser.isLoggedIn]);
 
-  // Apply RTL direction when Arabic is selected
   useEffect(() => {
     document.documentElement.dir = isAr ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
@@ -171,17 +164,25 @@ export default function App() {
     const resolveAuthCallback = async () => {
       const callbackUrl = new URL(window.location.href);
       const isAuthCallback = callbackUrl.pathname === AUTH_CALLBACK_PATH;
-      const code = isAuthCallback ? callbackUrl.searchParams.get('code') : null;
+      if (!isAuthCallback) return;
+
+      const code = callbackUrl.searchParams.get('code');
+      const callbackMode = callbackUrl.searchParams.get('mode');
+      let exchangeSucceeded = !code;
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
+        exchangeSucceeded = !error;
         if (error) {
-          console.error('Google OAuth callback failed:', error);
+          console.error('Supabase auth callback failed:', error);
         }
       }
 
-      if (isAuthCallback) {
-        window.history.replaceState({}, document.title, '/');
+      window.history.replaceState({}, document.title, '/');
+
+      if (callbackMode === 'recovery' && exchangeSucceeded) {
+        setAuthInitialScreen('reset-password');
+        setIsAuthOpen(true);
       }
     };
 
@@ -194,7 +195,7 @@ export default function App() {
       try {
         localStorage.setItem('sindbad_saved_ids', JSON.stringify(next));
       } catch {
-        // ignore
+        // Storage may be unavailable; keep the saved state for this session.
       }
       return next;
     });
@@ -234,9 +235,8 @@ export default function App() {
           </button>
         </div>
       )}
-      {/* Active Tab Router */}
+
       <main className="flex-1 relative overflow-hidden">
-        {/* 1. HOME SCREEN: Exactly matches the uploaded photo */}
         {activeTab === 'home' && (
           <HomeScreen
             onOpenAIChat={() => setIsAIChatOpen(true)}
@@ -265,7 +265,6 @@ export default function App() {
           />
         )}
 
-        {/* 2. EXPLORE & MAP TAB */}
         {activeTab === 'explore' && (
           <div className="w-full h-full overflow-y-auto">
             <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between gap-2">
@@ -327,7 +326,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. TRIPS */}
         {activeTab === 'trips' && (
           <div className="w-full h-full overflow-y-auto">
             <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
@@ -342,7 +340,6 @@ export default function App() {
               </h2>
               <div className="w-16" />
             </div>
-
             <TripsPlanner
               language={language}
               authStatus={authStatus}
@@ -351,7 +348,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. PROFILE & COMMUNITY HUB */}
         {activeTab === 'community' && (
           <div className="w-full h-full overflow-y-auto">
             <div className="bg-white px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
@@ -366,7 +362,6 @@ export default function App() {
               </h2>
               <div className="w-16" />
             </div>
-
             <CommunityHub
               onOpenAddModal={() => setIsAddPlaceOpen(true)}
               onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
@@ -380,53 +375,27 @@ export default function App() {
         )}
       </main>
 
-      {/* BOTTOM NAVIGATION BAR */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200/90 px-4 py-2 shadow-[0_-8px_25px_rgba(0,0,0,0.06)]">
         <div className="max-w-md mx-auto flex items-end justify-between relative px-2">
-          <button
-            id="tab-home"
-            onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'home' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
-          >
+          <button id="tab-home" onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'home' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}>
             <HomeIcon className={`w-5 h-5 ${activeTab === 'home' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'الرئيسية' : 'Home'}</span>
           </button>
-
-          <button
-            id="tab-explore"
-            onClick={() => setActiveTab('explore')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'explore' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
-          >
+          <button id="tab-explore" onClick={() => setActiveTab('explore')} className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'explore' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}>
             <Compass className={`w-5 h-5 ${activeTab === 'explore' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'استكشف' : 'Explore'}</span>
           </button>
-
-          <button
-            id="tab-ai-assistant"
-            onClick={() => setIsAIChatOpen(true)}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition active:scale-95 group ${isAIChatOpen ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-blue-600 font-medium'}`}
-            title={isAr ? 'الذكاء الاصطناعي لسندباد' : 'AI Assistant'}
-          >
+          <button id="tab-ai-assistant" onClick={() => setIsAIChatOpen(true)} className={`flex flex-col items-center gap-1 py-0.5 px-3 transition active:scale-95 group ${isAIChatOpen ? 'text-blue-600 font-bold' : 'text-slate-500 hover:text-blue-600 font-medium'}`} title={isAr ? 'الذكاء الاصطناعي لسندباد' : 'AI Assistant'}>
             <div className="w-[22px] h-[22px] flex items-center justify-center transition-transform group-hover:scale-110">
               <AIIcon size={22} variant="badge" />
             </div>
             <span className="text-[11px] leading-none tracking-wider font-extrabold text-blue-600">AI</span>
           </button>
-
-          <button
-            id="tab-trips"
-            onClick={() => setActiveTab('trips')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'trips' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
-          >
+          <button id="tab-trips" onClick={() => setActiveTab('trips')} className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'trips' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}>
             <ShoppingBag className={`w-5 h-5 ${activeTab === 'trips' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'رحلاتي' : 'Trips'}</span>
           </button>
-
-          <button
-            id="tab-profile"
-            onClick={() => setActiveTab('community')}
-            className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'community' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
-          >
+          <button id="tab-profile" onClick={() => setActiveTab('community')} className={`flex flex-col items-center gap-1 py-0.5 px-3 transition ${activeTab === 'community' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}>
             <User className={`w-5 h-5 ${activeTab === 'community' ? 'stroke-[2.5]' : ''}`} />
             <span className="text-[11px] leading-none">{isAr ? 'حسابي' : 'Profile'}</span>
           </button>
@@ -483,17 +452,8 @@ export default function App() {
         />
       )}
 
-      <FlightsModal
-        isOpen={isFlightsOpen}
-        onClose={() => setIsFlightsOpen(false)}
-        language={language}
-      />
-
-      <WeatherModal
-        isOpen={isWeatherOpen}
-        onClose={() => setIsWeatherOpen(false)}
-        language={language}
-      />
+      <FlightsModal isOpen={isFlightsOpen} onClose={() => setIsFlightsOpen(false)} language={language} />
+      <WeatherModal isOpen={isWeatherOpen} onClose={() => setIsWeatherOpen(false)} language={language} />
 
       {activeNavDestination && (
         <NavigationFlow
