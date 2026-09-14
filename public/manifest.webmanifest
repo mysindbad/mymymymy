@@ -21,12 +21,6 @@
       "src": "/icons/my-sindbad-app-icon-512.jpg",
       "sizes": "512x512",
       "type": "image/jpeg",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/my-sindbad-app-icon.jpg",
-      "sizes": "1024x1024",
-      "type": "image/jpeg",
       "purpose": "any"
     }
   ]
