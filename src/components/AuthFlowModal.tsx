@@ -23,7 +23,7 @@ import { BrandLogo } from './BrandLogo';
 import santoriniBg from '../assets/images/santorini_bg.jpg';
 import { SupportedLanguage } from '../data/translations';
 import { LanguageFlagSelector } from './LanguageFlagSelector';
-import { getAuthRedirectUrl, supabase } from '../lib/supabase';
+import { getAuthRedirectUrl, getPasswordRecoveryRedirectUrl, supabase } from '../lib/supabase';
 
 export type AuthScreenType =
   | 'welcome'
@@ -58,9 +58,8 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [country, setCountry] = useState('Saudi Arabia');
-  const [selectedLang, setSelectedLang] = useState('العربية');
-  const [agreedToTerms, setAgreedToTerms] = useState(true);
+  const [country, setCountry] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Visibility toggles
   const [showPassword, setShowPassword] = useState(false);
@@ -169,8 +168,12 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !fullName) {
-      setStatusMessage(localize('Please enter your full name, email, and password.', 'يرجى إدخال الاسم الكامل والبريد الإلكتروني وكلمة المرور.', 'Veuillez saisir votre nom complet, votre e-mail et votre mot de passe.'));
+    if (!email || !password || !fullName || !country) {
+      setStatusMessage(localize('Please enter your name, email, password, and country.', 'يرجى إدخال الاسم والبريد الإلكتروني وكلمة المرور واختيار البلد.', 'Veuillez saisir votre nom, e-mail, mot de passe et pays.'));
+      return;
+    }
+    if (!agreedToTerms) {
+      setStatusMessage(localize('Please review and accept the Terms of Service and Privacy Policy to create an account.', 'يرجى مراجعة شروط الخدمة وسياسة الخصوصية والموافقة عليهما لإنشاء الحساب.', 'Veuillez consulter et accepter les Conditions d’utilisation et la Politique de confidentialité pour créer un compte.'));
       return;
     }
     if (password.length < 6) {
@@ -186,7 +189,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, country, preferred_language: selectedLang } },
+      options: { data: { full_name: fullName, country, preferred_language: language } },
     });
     setIsLoading(false);
     if (error) {
@@ -208,7 +211,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     }
     setIsLoading(true);
     setStatusMessage(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: getPasswordRecoveryRedirectUrl() });
     setIsLoading(false);
     setStatusMessage(error ? localizeAuthError(error.message) : localize('Reset link sent. Check your email inbox.', 'تم إرسال رابط إعادة التعيين إلى بريدك.', 'Lien de réinitialisation envoyé. Consultez votre boîte e-mail.'));
   };
@@ -586,13 +589,13 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <div className="leading-tight text-start">
                   <span className="text-[11px] font-bold text-blue-950 block">
-                    {localize("Your data is safe with us", "بياناتك وخصوصيتك في أمان تام", "Vos données sont en sécurité")}
+                    {localize("Account security", "أمان الحساب", "Sécurité du compte")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
                      {localize(
-                       'We never share your personal information with anyone else.',
-                       'نحن نلتزم بأعلى معايير الأمان والتشفير لبياناتك الشخصية.',
-                       'Nous ne partageons jamais vos informations personnelles.'
+                       'Sign-in is handled through the configured authentication provider.',
+                       'تتم معالجة تسجيل الدخول عبر مزود المصادقة المهيأ للتطبيق.',
+                       'La connexion est gérée par le fournisseur d’authentification configuré.'
                      )}
                   </span>
                 </div>
@@ -739,7 +742,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
               {/* Safe Note */}
               <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
                 <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                <span>{localize("Your data is safe with us", "بياناتك في أمان تام ومعاملاتك مشفرة", "Vos données sont en sécurité")}</span>
+                <span>{localize("Account security", "أمان الحساب", "Sécurité du compte")}</span>
               </div>
             </div>
           )}
@@ -836,8 +839,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                   <select
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
+                    required
                     className="w-full ps-9 pe-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 transition appearance-none cursor-pointer"
                   >
+                    <option value="" disabled>{localize("Select country", "اختر البلد", "Choisir le pays")}</option>
                     <option value="Saudi Arabia">🇸🇦 {localize("Saudi Arabia", "المملكة العربية السعودية", "Arabie saoudite")}</option>
                     <option value="Morocco">🇲🇦 {localize("Morocco", "المملكة المغربية", "Maroc")}</option>
                     <option value="UAE">🇦🇪 {localize("United Arab Emirates", "الإمارات العربية المتحدة", "Émirats arabes unis")}</option>
@@ -872,7 +877,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 {/* Create Account Button */}
                 <button
                   type="submit"
-                  disabled={!agreedToTerms}
+                  disabled={!agreedToTerms || isLoading}
                   className="w-full py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs tracking-wide shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition disabled:opacity-50 active:scale-95 mt-1"
                 >
                   <span>{localize("Create Account", "إنشاء الحساب", "Créer le compte")}</span>
@@ -961,13 +966,13 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <div className="leading-tight text-start">
                   <span className="text-[11px] font-bold text-blue-950 block">
-                    {localize("Your data is safe with us", "حماية وأمان كامل لمعلوماتك", "Vos données sont en sécurité")}
+                    {localize("Account security", "أمان الحساب", "Sécurité du compte")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
                     {localize(
-                      "We'll never share your email with anyone else. This link is only used to reset your password.",
-                      'لن يتم مشاركة بريدك الإلكتروني مع أي طرف آخر. الرابط مخصص لك فقط.',
-                      'Nous ne partagerons jamais votre e-mail. Ce lien sert uniquement à réinitialiser votre mot de passe.'
+                      "The reset link is sent to the email address you entered and is used to continue password recovery.",
+                      'يُرسل رابط الاستعادة إلى البريد الذي أدخلته ويُستخدم لمتابعة استعادة كلمة المرور.',
+                      'Le lien est envoyé à l’adresse saisie et sert à poursuivre la récupération du mot de passe.'
                     )}
                   </span>
                 </div>
@@ -1136,13 +1141,13 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <div className="leading-tight text-start">
                   <span className="text-[11px] font-bold text-blue-950 block">
-                    {localize("Your data is safe with us", "بياناتك مشفرة ومحمية", "Vos données sont en sécurité")}
+                    {localize("Account security", "أمان الحساب", "Sécurité du compte")}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-0.5">
                     {localize(
-                      'Your password is encrypted and never shared with anyone else.',
-                      'كلمة مرورك مشفرة ولا يتم مشاركتها أبداً مع أي جهة خارجية.',
-                      'Votre mot de passe est chiffré et jamais partagé avec qui que ce soit.'
+                      'Your password is handled by the authentication provider and is not displayed back to you.',
+                      'تتم معالجة كلمة المرور عبر مزود المصادقة ولا يعرضها التطبيق لك بعد حفظها.',
+                      'Votre mot de passe est géré par le fournisseur d’authentification et n’est pas réaffiché par l’application.'
                     )}
                   </span>
                 </div>
