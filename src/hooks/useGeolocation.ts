@@ -21,18 +21,24 @@ export function useGeolocation() {
     if (typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions?.query) return;
 
     let cancelled = false;
+    let permissionStatus: PermissionStatus | null = null;
+    let handleChange: (() => void) | null = null;
+
     void navigator.permissions.query({ name: 'geolocation' }).then((status) => {
       if (cancelled) return;
+      permissionStatus = status;
       setPermission(status.state);
-      const handleChange = () => setPermission(status.state);
+      handleChange = () => setPermission(status.state);
       status.addEventListener('change', handleChange);
-      return () => status.removeEventListener('change', handleChange);
     }).catch(() => {
       // Some browsers do not expose permission state; keep the prompt state.
     });
 
     return () => {
       cancelled = true;
+      if (permissionStatus && handleChange) {
+        permissionStatus.removeEventListener('change', handleChange);
+      }
     };
   }, []);
 

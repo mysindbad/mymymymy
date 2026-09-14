@@ -112,6 +112,25 @@ requirePattern('src/components/NavigationFlow.tsx', [
   'Public-transit routing will be enabled here',
 ]);
 
+requirePattern('src/lib/supabase.ts', [
+  'function normalizeSupabaseUrl',
+  'return parsed.origin',
+  'getPasswordRecoveryRedirectUrl',
+  "redirect.searchParams.set('mode', 'recovery')",
+  "flowType: 'pkce'",
+]);
+
+requirePattern('src/App.tsx', [
+  "const callbackMode = callbackUrl.searchParams.get('mode')",
+  "callbackMode === 'recovery'",
+  "setAuthInitialScreen('reset-password')",
+  'exchangeCodeForSession(code)',
+]);
+
+requirePattern('src/hooks/useGeolocation.ts', [
+  "permissionStatus.removeEventListener('change', handleChange)",
+]);
+
 requirePattern('src/services/api.ts', [
   "body: { ...payload, name: 'AI itinerary request' }",
   "return await updateTrip(data.trip.id, { aiItinerary: payload.aiItinerary });",
