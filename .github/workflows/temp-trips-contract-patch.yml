@@ -1,0 +1,80 @@
+name: Temporary Trips Contract Patch
+
+on:
+  push:
+    branches:
+      - fix/trips-date-contract-20260914
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/trips-date-contract-20260914
+      - name: Apply exact trips contract replacements
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one target, found {count}')
+              return text.replace(old, new, 1)
+
+          trips_path = Path('src/components/TripsPlanner.tsx')
+          trips = trips_path.read_text()
+
+          trips = replace_once(
+              trips,
+              "const expenseCategories = Object.keys(expenseCategoryMeta) as TripExpenseCategory[];\n\nfunction dateFromToday(offset: number) {\n  const date = new Date();\n  date.setDate(date.getDate() + offset);\n  return date.toISOString().slice(0, 10);\n}",
+              "const expenseCategories = Object.keys(expenseCategoryMeta) as TripExpenseCategory[];\nconst MAX_AI_TRIP_DAYS = 7;\n\nfunction dateInputValue(date: Date) {\n  const year = date.getFullYear();\n  const month = String(date.getMonth() + 1).padStart(2, '0');\n  const day = String(date.getDate()).padStart(2, '0');\n  return `${year}-${month}-${day}`;\n}\n\nfunction dateFromToday(offset: number) {\n  const date = new Date();\n  date.setDate(date.getDate() + offset);\n  return dateInputValue(date);\n}\n\nfunction addDaysToDateInput(value: string, offset: number) {\n  const timestamp = Date.parse(`${value}T00:00:00Z`);\n  if (Number.isNaN(timestamp)) return '';\n  const date = new Date(timestamp);\n  date.setUTCDate(date.getUTCDate() + offset);\n  return date.toISOString().slice(0, 10);\n}",
+              'date helpers',
+          )
+
+          trips = replace_once(
+              trips,
+              "  const selectedPlace = places.find((place) => place.id === form.destinationId);",
+              "  const today = dateFromToday(0);\n  const latestPlanEndDate = addDaysToDateInput(form.startDate, MAX_AI_TRIP_DAYS - 1);\n  const selectedPlace = places.find((place) => place.id === form.destinationId);",
+              'computed date limits',
+          )
+
+          trips = replace_once(
+              trips,
+              "    if (step === 2 && (!form.startDate || !form.endDate || form.endDate < form.startDate)) return setPlanError(isAr ? 'تحقق من تواريخ الرحلة.' : 'Check the trip dates.');",
+              "    if (step === 2 && (!form.startDate || !form.endDate || form.endDate < form.startDate)) return setPlanError(isAr ? 'تحقق من تواريخ الرحلة.' : 'Check the trip dates.');\n    if (step === 2 && form.startDate < today) return setPlanError(isAr ? 'لا يمكن أن يبدأ التخطيط في تاريخ مضى.' : 'The trip plan cannot start in the past.');\n    if (step === 2 && latestPlanEndDate && form.endDate > latestPlanEndDate) return setPlanError(isAr ? 'يدعم مخطط الذكاء الاصطناعي مدة تصل إلى 7 أيام.' : 'AI trip plans support up to 7 days.');",
+              'step date validation',
+          )
+
+          replacements = [
+              ("subtitle: 'أنشئ خطة واقعية لرحلتك في المغرب'", "subtitle: 'أنشئ خطة واقعية لوجهتك المختارة'", 'Arabic global subtitle'),
+              ("noPlaceMatch: 'لا توجد وجهة مطابقة — الأماكن المتاحة حالياً في شمال المغرب'", "noPlaceMatch: 'لا توجد وجهة مطابقة في الأماكن المتاحة حالياً'", 'Arabic no-match copy'),
+              ("subtitle: 'Build a realistic Morocco trip plan'", "subtitle: 'Build a realistic plan for your selected destination'", 'English global subtitle'),
+              ("noPlaceMatch: 'No matching destination — places currently available in Northern Morocco'", "noPlaceMatch: 'No matching destination in the currently available places'", 'English no-match copy'),
+              ('type="date" value={form.startDate} onChange={(event) => updateForm({ startDate: event.target.value })}', 'type="date" value={form.startDate} min={today} onChange={(event) => updateForm({ startDate: event.target.value })}', 'start date min'),
+              ('type="date" value={form.endDate} min={form.startDate} onChange={(event) => updateForm({ endDate: event.target.value })}', 'type="date" value={form.endDate} min={form.startDate} max={latestPlanEndDate} onChange={(event) => updateForm({ endDate: event.target.value })}', 'end date max'),
+          ]
+          for old, new, label in replacements:
+              trips = replace_once(trips, old, new, label)
+          trips_path.write_text(trips)
+
+          server_path = Path('server.ts')
+          server = server_path.read_text()
+          old_day_count = "    const dayCount = Math.min(7, Math.floor((Date.parse(`${payload.endDate}T00:00:00Z`) - Date.parse(`${payload.startDate}T00:00:00Z`)) / 86400000) + 1);"
+          new_day_count = "    const dayCount = Math.floor((Date.parse(`${payload.endDate}T00:00:00Z`) - Date.parse(`${payload.startDate}T00:00:00Z`)) / 86400000) + 1;\n    if (dayCount > 7) throw new DataValidationError('AI trip plans support up to 7 days');"
+          server = replace_once(server, old_day_count, new_day_count, 'AI day count')
+          server_path.write_text(server)
+          PY
+      - name: Commit exact trips patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/components/TripsPlanner.tsx server.ts
+          git diff --cached --check
+          git commit -m "fix: align AI trip date limits"
+          git push origin HEAD:fix/trips-date-contract-20260914
