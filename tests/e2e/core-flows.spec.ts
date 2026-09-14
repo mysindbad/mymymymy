@@ -385,18 +385,31 @@ test('navigation calculates a route from the browser location and starts guidanc
 
   const card = page.locator('div.group').filter({ hasText: 'Kasbah Museum' }).first();
   const startNavigation = card.getByRole('button', { name: 'Start Navigation' });
-  await startNavigation.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
   await expect(startNavigation).toBeVisible();
-  const navButtonBox = await startNavigation.boundingBox();
-  if (!navButtonBox) throw new Error('Start Navigation button has no bounding box');
-  const targetX = navButtonBox.x + navButtonBox.width / 2;
-  const targetY = navButtonBox.y + navButtonBox.height / 2;
-  const hitTargetIsButton = await page.evaluate(({ x, y }) => {
-    const hit = document.elementFromPoint(x, y);
-    return Boolean(hit?.closest('button')?.textContent?.includes('Start Navigation'));
-  }, { x: targetX, y: targetY });
-  expect(hitTargetIsButton).toBe(true);
-  await page.mouse.click(targetX, targetY);
+
+  let clickablePoint: { x: number; y: number } | null = null;
+  const viewport = page.viewportSize();
+  for (let attempt = 0; attempt < 5 && !clickablePoint; attempt += 1) {
+    const box = await startNavigation.boundingBox();
+    if (!box) throw new Error('Start Navigation button has no bounding box');
+    clickablePoint = await page.evaluate(({ left, top, width, height }) => {
+      const x = left + width / 2;
+      for (let y = top + 2; y <= top + height - 2; y += 3) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit?.closest('button')?.textContent?.includes('Start Navigation')) return { x, y };
+      }
+      return null;
+    }, { left: box.x, top: box.y, width: box.width, height: box.height });
+
+    if (!clickablePoint) {
+      if (viewport) await page.mouse.move(viewport.width / 2, viewport.height / 2);
+      await page.mouse.wheel(0, 180);
+    }
+  }
+
+  expect(clickablePoint).not.toBeNull();
+  if (!clickablePoint) throw new Error('Start Navigation button remained occluded after scrolling');
+  await page.mouse.click(clickablePoint.x, clickablePoint.y);
   await expect(page.getByText('AI-Guided Route')).toBeVisible();
   await expect(page.getByText('12 min', { exact: true })).toBeVisible();
   await page.locator('#start-turn-by-turn-btn').click();
