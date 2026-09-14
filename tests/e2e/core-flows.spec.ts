@@ -411,7 +411,7 @@ test('navigation calculates a route from the browser location and starts guidanc
   if (!clickablePoint) throw new Error('Start Navigation button remained occluded after scrolling');
   await page.mouse.click(clickablePoint.x, clickablePoint.y);
   await expect(page.getByText('AI-Guided Route')).toBeVisible();
-  await expect(page.getByText('12 min', { exact: true })).toBeVisible();
+  await expect(page.getByText('12 min', { exact: true }).last()).toBeVisible();
   await page.locator('#start-turn-by-turn-btn').click();
   await expect(page.getByText('Continue straight', { exact: true })).toBeVisible();
 });
