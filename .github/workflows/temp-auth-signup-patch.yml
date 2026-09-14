@@ -1,0 +1,70 @@
+name: Temporary Auth Signup Patch
+
+on:
+  push:
+    branches:
+      - fix/signup-consent-recovery-20260914
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/signup-consent-recovery-20260914
+      - name: Apply exact signup/auth replacements
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/components/AuthFlowModal.tsx')
+          text = path.read_text()
+
+          replacements = [
+              ("import { getAuthRedirectUrl, supabase } from '../lib/supabase';", "import { getAuthRedirectUrl, getPasswordRecoveryRedirectUrl, supabase } from '../lib/supabase';"),
+              ("const [country, setCountry] = useState('Saudi Arabia');", "const [country, setCountry] = useState('');"),
+              ("  const [selectedLang, setSelectedLang] = useState('العربية');\n", ""),
+              ("const [agreedToTerms, setAgreedToTerms] = useState(true);", "const [agreedToTerms, setAgreedToTerms] = useState(false);"),
+              ("if (!email || !password || !fullName) {\n      setStatusMessage(localize('Please enter your full name, email, and password.', 'يرجى إدخال الاسم الكامل والبريد الإلكتروني وكلمة المرور.', 'Veuillez saisir votre nom complet, votre e-mail et votre mot de passe.'));\n      return;\n    }", "if (!email || !password || !fullName || !country) {\n      setStatusMessage(localize('Please enter your name, email, password, and country.', 'يرجى إدخال الاسم والبريد الإلكتروني وكلمة المرور واختيار البلد.', 'Veuillez saisir votre nom, e-mail, mot de passe et pays.'));\n      return;\n    }\n    if (!agreedToTerms) {\n      setStatusMessage(localize('Please review and accept the Terms of Service and Privacy Policy to create an account.', 'يرجى مراجعة شروط الخدمة وسياسة الخصوصية والموافقة عليهما لإنشاء الحساب.', 'Veuillez consulter et accepter les Conditions d’utilisation et la Politique de confidentialité pour créer un compte.'));\n      return;\n    }"),
+              ("options: { data: { full_name: fullName, country, preferred_language: selectedLang } },", "options: { data: { full_name: fullName, country, preferred_language: language } },"),
+              ("resetPasswordForEmail(email, { redirectTo: window.location.origin })", "resetPasswordForEmail(email, { redirectTo: getPasswordRecoveryRedirectUrl() })"),
+              ("<option value=\"Saudi Arabia\">🇸🇦", "<option value=\"\" disabled>{localize(\"Select country\", \"اختر البلد\", \"Choisir le pays\")}</option>\n                    <option value=\"Saudi Arabia\">🇸🇦"),
+              ("value={country}\n                    onChange={(e) => setCountry(e.target.value)}", "value={country}\n                    onChange={(e) => setCountry(e.target.value)}\n                    required"),
+              ("disabled={!agreedToTerms}\n                  className=\"w-full py-2.5", "disabled={!agreedToTerms || isLoading}\n                  className=\"w-full py-2.5"),
+              ("Your data is safe with us", "Account security"),
+              ("Vos données sont en sécurité", "Sécurité du compte"),
+              ("بياناتك وخصوصيتك في أمان تام", "أمان الحساب"),
+              ("بياناتك في أمان تام ومعاملاتك مشفرة", "أمان الحساب"),
+              ("حماية وأمان كامل لمعلوماتك", "أمان الحساب"),
+              ("بياناتك مشفرة ومحمية", "أمان الحساب"),
+              ("We never share your personal information with anyone else.", "Sign-in is handled through the configured authentication provider."),
+              ("نحن نلتزم بأعلى معايير الأمان والتشفير لبياناتك الشخصية.", "تتم معالجة تسجيل الدخول عبر مزود المصادقة المهيأ للتطبيق."),
+              ("Nous ne partageons jamais vos informations personnelles.", "La connexion est gérée par le fournisseur d’authentification configuré."),
+              ("We'll never share your email with anyone else. This link is only used to reset your password.", "The reset link is sent to the email address you entered and is used to continue password recovery."),
+              ("لن يتم مشاركة بريدك الإلكتروني مع أي طرف آخر. الرابط مخصص لك فقط.", "يُرسل رابط الاستعادة إلى البريد الذي أدخلته ويُستخدم لمتابعة استعادة كلمة المرور."),
+              ("Nous ne partagerons jamais votre e-mail. Ce lien sert uniquement à réinitialiser votre mot de passe.", "Le lien est envoyé à l’adresse saisie et sert à poursuivre la récupération du mot de passe."),
+              ("Your password is encrypted and never shared with anyone else.", "Your password is handled by the authentication provider and is not displayed back to you."),
+              ("كلمة مرورك مشفرة ولا يتم مشاركتها أبداً مع أي جهة خارجية.", "تتم معالجة كلمة المرور عبر مزود المصادقة ولا يعرضها التطبيق لك بعد حفظها."),
+              ("Votre mot de passe est chiffré et jamais partagé avec qui que ce soit.", "Votre mot de passe est géré par le fournisseur d’authentification et n’est pas réaffiché par l’application."),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count < 1:
+                  raise SystemExit(f'Expected replacement target not found: {old[:80]!r}')
+              text = text.replace(old, new)
+
+          path.write_text(text)
+          PY
+      - name: Commit exact patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/components/AuthFlowModal.tsx
+          git diff --cached --check
+          git commit -m "fix: require explicit signup consent"
+          git push origin HEAD:fix/signup-consent-recovery-20260914
