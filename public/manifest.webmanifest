@@ -1,6 +1,7 @@
 {
+  "id": "/",
   "name": "My Sindbad",
-  "short_name": "Sindbad",
+  "short_name": "My Sindbad",
   "description": "مساعد سفر ذكي لاكتشاف الأماكن والتخطيط والملاحة في المغرب.",
   "lang": "ar",
   "dir": "rtl",
