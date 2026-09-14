@@ -71,6 +71,17 @@ forbid('src/components/AuthFlowModal.tsx', [
   'بياناتك في أمان تام',
 ]);
 
+forbid('src/components/TripsPlanner.tsx', [
+  'Build a realistic Morocco trip plan',
+  'places currently available in Northern Morocco',
+  'أنشئ خطة واقعية لرحلتك في المغرب',
+  'الأماكن المتاحة حالياً في شمال المغرب',
+]);
+
+forbid('server.ts', [
+  'const dayCount = Math.min(7,',
+]);
+
 forbid('src/components/ExploreFeed.tsx', [
   'fetchAiMemoryInsights',
   'AiMemoryInsights',
@@ -147,6 +158,21 @@ requirePattern('src/components/AuthFlowModal.tsx', [
   'preferred_language: language',
   'getPasswordRecoveryRedirectUrl()',
   'disabled={!agreedToTerms || isLoading}',
+]);
+
+requirePattern('src/components/TripsPlanner.tsx', [
+  'const MAX_AI_TRIP_DAYS = 7',
+  'return dateInputValue(date)',
+  'const latestPlanEndDate = addDaysToDateInput(form.startDate, MAX_AI_TRIP_DAYS - 1)',
+  'form.startDate < today',
+  'AI trip plans support up to 7 days.',
+  'min={today}',
+  'max={latestPlanEndDate}',
+  'Build a realistic plan for your selected destination',
+]);
+
+requirePattern('server.ts', [
+  "if (dayCount > 7) throw new DataValidationError('AI trip plans support up to 7 days')",
 ]);
 
 requirePattern('src/services/api.ts', [

@@ -74,10 +74,26 @@ const expenseCategoryMeta: Record<TripExpenseCategory, { ar: string; en: string;
 };
 
 const expenseCategories = Object.keys(expenseCategoryMeta) as TripExpenseCategory[];
+const MAX_AI_TRIP_DAYS = 7;
+
+function dateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function dateFromToday(offset: number) {
   const date = new Date();
   date.setDate(date.getDate() + offset);
+  return dateInputValue(date);
+}
+
+function addDaysToDateInput(value: string, offset: number) {
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  if (Number.isNaN(timestamp)) return '';
+  const date = new Date(timestamp);
+  date.setUTCDate(date.getUTCDate() + offset);
   return date.toISOString().slice(0, 10);
 }
 
@@ -135,6 +151,8 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     preferences: [] as string[],
   });
 
+  const today = dateFromToday(0);
+  const latestPlanEndDate = addDaysToDateInput(form.startDate, MAX_AI_TRIP_DAYS - 1);
   const selectedPlace = places.find((place) => place.id === form.destinationId);
   const visiblePlaces = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -196,6 +214,8 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   const nextStep = () => {
     if (step === 1 && !form.destinationId) return setPlanError(isAr ? 'اختر وجهة أولاً.' : 'Choose a destination first.');
     if (step === 2 && (!form.startDate || !form.endDate || form.endDate < form.startDate)) return setPlanError(isAr ? 'تحقق من تواريخ الرحلة.' : 'Check the trip dates.');
+    if (step === 2 && form.startDate < today) return setPlanError(isAr ? 'لا يمكن أن يبدأ التخطيط في تاريخ مضى.' : 'The trip plan cannot start in the past.');
+    if (step === 2 && latestPlanEndDate && form.endDate > latestPlanEndDate) return setPlanError(isAr ? 'يدعم مخطط الذكاء الاصطناعي مدة تصل إلى 7 أيام.' : 'AI trip plans support up to 7 days.');
     if (step === 3 && (!Number.isFinite(Number(form.budget)) || Number(form.budget) <= 0)) return setPlanError(isAr ? 'أدخل ميزانية صحيحة.' : 'Enter a valid budget.');
     setPlanError('');
     setStep((current) => Math.min(5, current + 1));
@@ -368,7 +388,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   const labels = isAr
     ? {
       title: 'مخطط الرحلات الذكي',
-      subtitle: 'أنشئ خطة واقعية لرحلتك في المغرب',
+      subtitle: 'أنشئ خطة واقعية لوجهتك المختارة',
       create: 'إنشاء رحلة',
       empty: 'لا توجد رحلات بعد — أنشئ أول رحلة',
       next: 'التالي',
@@ -410,11 +430,11 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       hideBudget: 'إخفاء الميزانية',
       loginAgain: 'تسجيل الدخول مجدداً',
       placesError: 'تعذر تحميل الوجهات.',
-      noPlaceMatch: 'لا توجد وجهة مطابقة — الأماكن المتاحة حالياً في شمال المغرب',
+      noPlaceMatch: 'لا توجد وجهة مطابقة في الأماكن المتاحة حالياً',
     }
     : {
       title: 'AI Trip Planner',
-      subtitle: 'Build a realistic Morocco trip plan',
+      subtitle: 'Build a realistic plan for your selected destination',
       create: 'Create a trip',
       empty: 'No trips yet — create your first trip',
       next: 'Next',
@@ -456,7 +476,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       hideBudget: 'Hide budget',
       loginAgain: 'Sign in again',
       placesError: 'Unable to load destinations.',
-      noPlaceMatch: 'No matching destination — places currently available in Northern Morocco',
+      noPlaceMatch: 'No matching destination in the currently available places',
     };
   const statusLabel = (status: Trip['status']) => labels[status];
 
@@ -503,7 +523,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
           <div className="flex gap-1">{[1, 2, 3, 4, 5].map((item) => <span key={item} className={'h-2 w-8 rounded-full ' + (item <= step ? 'bg-indigo-600' : 'bg-slate-200')} />)}</div>
         </div>
         {step === 1 && <div className="space-y-4"><label className="block text-sm font-bold text-slate-700">{labels.destination}</label><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={labels.search} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500" />{placesLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> {labels.loading}</div> : placesError ? <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"><span>{labels.placesError}</span><button onClick={() => void loadData()} className="flex items-center gap-1 font-bold"><RefreshCw className="h-4 w-4" /> {labels.retry}</button></div> : placesLoaded && visiblePlaces.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm font-semibold text-slate-600">{labels.noPlaceMatch}</div> : <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{visiblePlaces.map((place) => <button key={place.id} onClick={() => updateForm({ destinationId: place.id })} className={'flex items-center gap-3 rounded-2xl border p-3 text-start transition ' + (form.destinationId === place.id ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-300')}><MapPin className="h-5 w-5 shrink-0 text-indigo-600" /><span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{isAr && place.arabicName ? place.arabicName : place.name}</strong><small className="block truncate text-slate-500">{place.area} · {place.region}</small></span>{form.destinationId === place.id && <Check className="ms-auto h-4 w-4 text-indigo-600" />}</button>)}</div>}</div>}
-        {step === 2 && <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">{labels.start}<input type="date" value={form.startDate} onChange={(event) => updateForm({ startDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500" /></label><label className="text-sm font-bold text-slate-700">{labels.end}<input type="date" value={form.endDate} min={form.startDate} onChange={(event) => updateForm({ endDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500" /></label></div>}
+        {step === 2 && <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">{labels.start}<input type="date" value={form.startDate} min={today} onChange={(event) => updateForm({ startDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500" /></label><label className="text-sm font-bold text-slate-700">{labels.end}<input type="date" value={form.endDate} min={form.startDate} max={latestPlanEndDate} onChange={(event) => updateForm({ endDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500" /></label></div>}
         {step === 3 && <div className="grid gap-4 sm:grid-cols-[1fr_160px]"><label className="text-sm font-bold text-slate-700">{labels.budget}<div className="relative mt-2"><Wallet className="absolute start-4 top-3.5 h-4 w-4 text-slate-400" /><input type="number" min="1" value={form.budget} onChange={(event) => updateForm({ budget: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-10 py-3 font-normal outline-none focus:border-indigo-500" /></div></label><label className="text-sm font-bold text-slate-700">{labels.currency}<select value={form.currency} onChange={(event) => updateForm({ currency: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal outline-none focus:border-indigo-500"><option>MAD</option><option>EUR</option><option>USD</option></select></label></div>}
         {step === 4 && <div className="max-w-sm"><label className="text-sm font-bold text-slate-700">{labels.participants}<div className="mt-3 flex items-center gap-4 rounded-2xl border border-slate-200 p-4"><Users className="h-5 w-5 text-indigo-600" /><input type="number" min="1" max="50" value={form.participants} onChange={(event) => updateForm({ participants: Math.max(1, Number(event.target.value)) })} className="w-full text-xl font-black outline-none" /><span className="text-sm text-slate-500">{labels.people}</span></div></label></div>}
         {step === 5 && <div><p className="mb-3 text-sm font-bold text-slate-700">{labels.preferences}</p><div className="grid gap-2 sm:grid-cols-2">{preferences.map((preference) => <label key={preference.value} className={'flex cursor-pointer items-center gap-3 rounded-2xl border p-3 ' + (form.preferences.includes(preference.value) ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200')}><input type="checkbox" checked={form.preferences.includes(preference.value)} onChange={() => togglePreference(preference.value)} className="h-4 w-4 accent-indigo-600" /><span className="text-sm font-bold text-slate-700">{isAr ? preference.ar : preference.en}</span></label>)}</div></div>}

@@ -558,7 +558,8 @@ app.post('/api/ai/plan-trip', requireAuth, async (req, res, next) => {
     }
     const destination = await createDal().places.getById(payload.destinationId || '');
     if (!destination) return res.status(404).json({ error: 'Destination not found' });
-    const dayCount = Math.min(7, Math.floor((Date.parse(`${payload.endDate}T00:00:00Z`) - Date.parse(`${payload.startDate}T00:00:00Z`)) / 86400000) + 1);
+    const dayCount = Math.floor((Date.parse(`${payload.endDate}T00:00:00Z`) - Date.parse(`${payload.startDate}T00:00:00Z`)) / 86400000) + 1;
+    if (dayCount > 7) throw new DataValidationError('AI trip plans support up to 7 days');
     const preferences = payload.preferences.length ? payload.preferences.join(', ') : 'none specified';
     const placeContext = modelDataBlock('retrieved_place_data', {
       id: destination.id,
