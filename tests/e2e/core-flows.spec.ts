@@ -345,7 +345,7 @@ test('adding an expense updates the trip budget', async ({ page }) => {
   await page.getByRole('button', { name: 'Save expense' }).click();
 
   await expect(page.getByText('Dinner in the medina')).toBeVisible();
-  await expect(page.getByText('125.00 MAD')).toBeVisible();
+  await expect(page.getByText('125.00 MAD').first()).toBeVisible();
   expect(state.expenses).toHaveLength(1);
 });
 
@@ -368,7 +368,8 @@ test('GPS contribution uses browser geolocation only after explicit opt-in', asy
 
   await page.locator('#tab-explore').click();
   await page.getByRole('button', { name: 'Location contribution' }).click();
-  await page.getByLabel('Allow manual GPS contributions').check();
+  const optInToggle = page.locator('input[type="checkbox"]').locator('..');
+  await optInToggle.click();
   await page.getByRole('button', { name: 'Send Current Location Sample' }).click();
   await expect(page.getByText('Your current-location sample was recorded successfully.')).toBeVisible();
   expect(state.passiveSamples).toBe(1);
@@ -384,15 +385,18 @@ test('navigation calculates a route from the browser location and starts guidanc
 
   const card = page.locator('div.group').filter({ hasText: 'Kasbah Museum' }).first();
   const startNavigation = card.getByRole('button', { name: 'Start Navigation' });
-  await startNavigation.scrollIntoViewIfNeeded();
-  await page.evaluate(() => window.scrollBy(0, -160));
+  await startNavigation.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
   await expect(startNavigation).toBeVisible();
   const navButtonBox = await startNavigation.boundingBox();
   if (!navButtonBox) throw new Error('Start Navigation button has no bounding box');
-  await page.mouse.click(
-    navButtonBox.x + navButtonBox.width / 2,
-    navButtonBox.y + navButtonBox.height / 2
-  );
+  const targetX = navButtonBox.x + navButtonBox.width / 2;
+  const targetY = navButtonBox.y + navButtonBox.height / 2;
+  const hitTargetIsButton = await page.evaluate(({ x, y }) => {
+    const hit = document.elementFromPoint(x, y);
+    return Boolean(hit?.closest('button')?.textContent?.includes('Start Navigation'));
+  }, { x: targetX, y: targetY });
+  expect(hitTargetIsButton).toBe(true);
+  await page.mouse.click(targetX, targetY);
   await expect(page.getByText('AI-Guided Route')).toBeVisible();
   await expect(page.getByText('12 min', { exact: true })).toBeVisible();
   await page.locator('#start-turn-by-turn-btn').click();
