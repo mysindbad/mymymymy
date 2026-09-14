@@ -1,0 +1,40 @@
+name: Bootstrap Playwright Lockfile
+
+on:
+  push:
+    branches:
+      - audit/phase1-devops-testing-20260914
+    paths:
+      - .github/workflows/bootstrap-playwright.yml
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/phase1-devops-testing-20260914
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install Playwright test package and refresh lockfile
+        run: npm install --save-dev @playwright/test --no-audit --no-fund
+      - name: Commit generated package metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No package changes generated"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: add Playwright test dependency"
+          git push origin HEAD:audit/phase1-devops-testing-20260914
