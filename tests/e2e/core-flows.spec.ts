@@ -280,7 +280,7 @@ async function signIn(page: Page) {
     localStorage.setItem(`sindbad_onboarding_complete:${userId}`, 'true');
   }, USER_ID);
 
-  await page.getByText('Traveler!', { exact: true }).click();
+  await page.getByRole('button').filter({ hasText: 'Traveler!' }).first().click();
   await page.getByRole('button', { name: 'I already have an account' }).click();
   await page.getByPlaceholder('Email address').fill('e2e@example.com');
   await page.getByPlaceholder('Password').fill('correct-horse-battery-staple');
@@ -383,7 +383,9 @@ test('navigation calculates a route from the browser location and starts guidanc
   await expect(page.getByText('Kasbah Museum', { exact: true })).toBeVisible();
 
   const card = page.locator('div.group').filter({ hasText: 'Kasbah Museum' }).first();
-  await card.getByRole('button', { name: 'Start Navigation' }).click();
+  const startNavigation = card.getByRole('button', { name: 'Start Navigation' });
+  await startNavigation.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+  await startNavigation.click();
   await expect(page.getByText('AI-Guided Route')).toBeVisible();
   await expect(page.getByText('12 min', { exact: true })).toBeVisible();
   await page.locator('#start-turn-by-turn-btn').click();
