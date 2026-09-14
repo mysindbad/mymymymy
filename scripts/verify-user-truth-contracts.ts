@@ -62,6 +62,15 @@ forbid('src/App.tsx', [
   'Live Interactive Map',
 ]);
 
+forbid('src/components/AuthFlowModal.tsx', [
+  'useState(true)',
+  "useState('Saudi Arabia')",
+  "useState('العربية')",
+  'redirectTo: window.location.origin',
+  'Your data is safe with us',
+  'بياناتك في أمان تام',
+]);
+
 forbid('src/components/ExploreFeed.tsx', [
   'fetchAiMemoryInsights',
   'AiMemoryInsights',
@@ -129,6 +138,15 @@ requirePattern('src/App.tsx', [
 
 requirePattern('src/hooks/useGeolocation.ts', [
   "permissionStatus.removeEventListener('change', handleChange)",
+]);
+
+requirePattern('src/components/AuthFlowModal.tsx', [
+  'const [country, setCountry] = useState(\'\')',
+  'const [agreedToTerms, setAgreedToTerms] = useState(false)',
+  'if (!agreedToTerms)',
+  'preferred_language: language',
+  'getPasswordRecoveryRedirectUrl()',
+  'disabled={!agreedToTerms || isLoading}',
 ]);
 
 requirePattern('src/services/api.ts', [
