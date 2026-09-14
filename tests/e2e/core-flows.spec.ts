@@ -286,7 +286,7 @@ async function signIn(page: Page) {
   await page.getByPlaceholder('Password').fill('correct-horse-battery-staple');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await expect(page.getByText('Welcome Back')).toBeHidden();
-  await expect(page.getByText('E2E Traveler', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button').filter({ hasText: 'E2E Traveler' }).first()).toBeVisible();
 }
 
 async function goToTrips(page: Page) {
@@ -384,8 +384,15 @@ test('navigation calculates a route from the browser location and starts guidanc
 
   const card = page.locator('div.group').filter({ hasText: 'Kasbah Museum' }).first();
   const startNavigation = card.getByRole('button', { name: 'Start Navigation' });
-  await startNavigation.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
-  await startNavigation.click();
+  await startNavigation.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollBy(0, -160));
+  await expect(startNavigation).toBeVisible();
+  const navButtonBox = await startNavigation.boundingBox();
+  if (!navButtonBox) throw new Error('Start Navigation button has no bounding box');
+  await page.mouse.click(
+    navButtonBox.x + navButtonBox.width / 2,
+    navButtonBox.y + navButtonBox.height / 2
+  );
   await expect(page.getByText('AI-Guided Route')).toBeVisible();
   await expect(page.getByText('12 min', { exact: true })).toBeVisible();
   await page.locator('#start-turn-by-turn-btn').click();
