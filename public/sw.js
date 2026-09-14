@@ -1,4 +1,4 @@
-const CACHE_NAME = 'my-sindbad-shell-v1';
+const CACHE_NAME = 'my-sindbad-shell-v2';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
