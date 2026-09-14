@@ -13,8 +13,9 @@
     "build:web": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "build:server": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
-    "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('server.js',{force:true});\"",
-    "lint": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit"
+    "clean": "node -e \"const fs=require('node:fs'); for (const path of ['dist','playwright-report','test-results']) fs.rmSync(path,{recursive:true,force:true}); fs.rmSync('server.js',{force:true});\"",
+    "lint": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
