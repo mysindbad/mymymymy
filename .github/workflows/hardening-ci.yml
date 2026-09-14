@@ -24,6 +24,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
+      - name: Run unit tests
+        run: npm run test:unit
       - name: Verify truthful DAL fallback behavior
         run: node --import tsx scripts/verify-truthful-dal.ts
       - name: Verify user-facing truth contracts
