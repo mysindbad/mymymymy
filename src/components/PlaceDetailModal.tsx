@@ -17,6 +17,7 @@ import { submitPlaceCheckIn } from '../services/api';
 import { RatePlaceModal } from './RatePlaceModal';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
+import { formatVerifiedRating, liveReviewsLabel, unratedLabel } from '../lib/placeRating';
 
 interface PlaceDetailModalProps {
   place: Place | null;
@@ -183,13 +184,21 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
 
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-center">
             <div>
-              <div className="flex items-center justify-center text-amber-500 font-black text-base">
-                <Star className="w-4 h-4 fill-current mr-0.5" />
-                <span>{place.rating.toFixed(1)}</span>
-              </div>
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                {place.reviewCount} {isAr ? 'تقييم حي' : isFr ? 'avis actifs' : 'Live reviews'}
-              </span>
+              {formatVerifiedRating(place.rating, place.reviewCount) ? (
+                <>
+                  <div className="flex items-center justify-center text-amber-500 font-black text-base">
+                    <Star className="w-4 h-4 fill-current mr-0.5" />
+                    <span>{formatVerifiedRating(place.rating, place.reviewCount)}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                    {liveReviewsLabel(place.reviewCount, language)}
+                  </span>
+                </>
+              ) : (
+                <span className="block max-w-28 text-[10px] font-bold text-slate-500">
+                  {unratedLabel(language)}
+                </span>
+              )}
             </div>
 
             <div className="w-px h-8 bg-slate-200" />

@@ -40,8 +40,8 @@ const places = [
     address: 'Medina, Tangier, Morocco',
     photos: [PIXEL],
     description: 'Local cafe in the old medina.',
-    rating: 4.3,
-    reviewCount: 45,
+    rating: null,
+    reviewCount: 0,
     reviews: [],
     priceLevel: '$$',
     source: 'community_traveler',
@@ -354,6 +354,7 @@ test('search filters places using the explore UI', async ({ page }) => {
   await openApp(page);
   await page.locator('#tab-explore').click();
   await expect(page.getByText('Kasbah Museum', { exact: true })).toBeVisible();
+  await expect(page.getByText('Unrated', { exact: true })).toBeVisible();
   await page.getByRole('searchbox', { name: 'Search places' }).fill('Kasbah');
   await expect(page.getByText('Kasbah Museum', { exact: true })).toBeVisible();
   await expect(page.getByText('Medina Cafe', { exact: true })).toBeHidden();

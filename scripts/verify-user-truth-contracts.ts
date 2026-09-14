@@ -105,7 +105,9 @@ requirePattern('src/components/HomeScreen.tsx', [
 requirePattern('src/types.ts', [
   'seedData?: boolean',
   'photoProvenance?: string | null',
+  'rating: number | null',
   'ratingProvenance?: string | null',
+  "trustLevel?: 'unverified' | 'community' | 'external' | 'official'",
   'seedRating?: number | null',
   'seedReviewCount?: number',
 ]);
@@ -186,11 +188,30 @@ requirePattern('server/dal.ts', [
   'throw new DalServiceUnavailableError()',
   "source: 'community_traveler'",
   'owner_verified: false',
-  'rating: 0',
+  'rating: null',
   'check_ins_count: 0',
   'seedData: Boolean(row.seed_data)',
   'photoProvenance: row.photo_provenance || null',
   'ratingProvenance: row.rating_provenance || null',
+  "trustLevel: row.trust_level || 'unverified'",
+]);
+
+forbid('server/dal.ts', [
+  'Number(row.rating || 0)',
+  'rating: 0',
+]);
+
+forbid('src/components/PlaceDetailModal.tsx', ['place.rating.toFixed(1)']);
+forbid('src/components/ExploreFeed.tsx', ['place.rating.toFixed(1)']);
+forbid('src/components/MapView.tsx', [
+  'place.rating.toFixed(1)',
+  'activeNearbyPlace.rating.toFixed(1)',
+]);
+
+requirePattern('src/lib/placeRating.ts', [
+  'hasVerifiedRating',
+  'No verified rating',
+  'لا يوجد تقييم موثوق بعد',
 ]);
 
 console.log('User-truth contracts verified.');

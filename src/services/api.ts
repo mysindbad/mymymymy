@@ -35,7 +35,7 @@ export interface AiMemoryInsights {
     name: string;
     area: string;
     category: string;
-    rating: number;
+    rating: number | null;
     reviewCount: number;
     aiConfidenceScore: number;
     recentCheckIns: number;

@@ -18,6 +18,7 @@ import { fetchPlaces } from '../services/api';
 import { NorthernMoroccoBanner } from './NorthernMoroccoBanner';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
+import { formatVerifiedRating, unratedShortLabel } from '../lib/placeRating';
 import type { UserLocation } from '../hooks/useGeolocation';
 
 type SpeechRecognitionLike = {
@@ -380,11 +381,17 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                 <div className="absolute bottom-3 left-3 right-3 text-white">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium text-slate-200">{place.area}</span>
-                    <div className="flex items-center gap-1 text-amber-300 text-xs font-black">
-                      <Star className="w-3.5 h-3.5 fill-current" />
-                      <span>{place.rating.toFixed(1)}</span>
-                      <span className="text-white/80 text-[10px] font-normal">({place.reviewCount})</span>
-                    </div>
+                    {formatVerifiedRating(place.rating, place.reviewCount) ? (
+                      <div className="flex items-center gap-1 text-amber-300 text-xs font-black">
+                        <Star className="w-3.5 h-3.5 fill-current" />
+                        <span>{formatVerifiedRating(place.rating, place.reviewCount)}</span>
+                        <span className="text-white/80 text-[10px] font-normal">({place.reviewCount})</span>
+                      </div>
+                    ) : (
+                      <span className="rounded-full bg-black/45 px-2 py-1 text-[10px] font-bold text-white/90 backdrop-blur-sm">
+                        {unratedShortLabel(language)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
