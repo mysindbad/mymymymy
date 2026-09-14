@@ -1,11 +1,10 @@
-const CACHE_NAME = 'my-sindbad-shell-v2';
+const CACHE_NAME = 'my-sindbad-shell-v3';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
   '/icons/my-sindbad-app-icon-192.jpg',
   '/icons/my-sindbad-app-icon-512.jpg',
-  '/icons/my-sindbad-app-icon.jpg',
 ];
 
 self.addEventListener('install', (event) => {
