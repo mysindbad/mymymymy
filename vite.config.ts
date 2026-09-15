@@ -13,5 +13,7 @@ export default defineConfig(() => ({
   server: {
     hmr: process.env.DISABLE_HMR !== 'true',
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    // Allow sandboxed preview hosts (e.g. Arena's e2b.app proxy) to reach the dev server.
+    allowedHosts: true as const,
   },
 }));

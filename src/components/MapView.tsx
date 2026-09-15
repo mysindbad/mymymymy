@@ -164,8 +164,6 @@ export const MapView: React.FC<MapViewProps> = ({
       mapInstanceRef.current.flyTo([35.175, -5.26], 12);
     } else if (selectedRegion === 'Marrakech') {
       mapInstanceRef.current.flyTo([31.625, -7.99], 13);
-    } else if (selectedRegion === 'Santorini') {
-      mapInstanceRef.current.flyTo([36.435, 25.41], 12);
     }
   }, [selectedRegion]);
 
@@ -319,8 +317,8 @@ export const MapView: React.FC<MapViewProps> = ({
       }
       setRealTraces(summary.recent.map((trace) => ({ coordinates: trace.coordinates })));
       setShowCrowdHeatmap(true);
-    } catch (error) {
-      setTracesError(error instanceof Error ? error.message : 'Failed to load trace summary');
+    } catch {
+      setTracesError(isAr ? 'تعذر تحميل ملخص المسارات' : 'Failed to load trace summary');
     } finally {
       setTracesLoading(false);
     }
@@ -354,8 +352,7 @@ export const MapView: React.FC<MapViewProps> = ({
           >
             <option value="Northern Morocco">🇲🇦 Northern Morocco</option>
             <option value="Marrakech">🇲🇦 Marrakech</option>
-            <option value="Santorini">🇬🇷 Santorini</option>
-            <option value="All">🌍 All Regions</option>
+            <option value="All">🇲🇦 {isAr ? 'كل المناطق' : 'All Regions'}</option>
           </select>
 
           <button

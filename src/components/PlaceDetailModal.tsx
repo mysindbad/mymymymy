@@ -79,6 +79,22 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   const activePhoto = place.photos[activePhotoIdx] || place.photos[0] || '';
   const visualPlace = activePhoto ? { ...place, photos: [activePhoto] } : { ...place, photos: [] };
 
+  // Prefer content actually translated into the current language. When only the
+  // English/source text exists, show it plainly labeled instead of pretending it
+  // was written in the viewer's language.
+  const localizedText = (english: string | undefined, arabic: string | undefined, french: string | undefined): { text: string; isSourceLanguage: boolean } | null => {
+    if (isAr && arabic) return { text: arabic, isSourceLanguage: false };
+    if (isFr && french) return { text: french, isSourceLanguage: false };
+    if (!english) return null;
+    const isSourceLanguage = isAr || isFr; // showing English/base text while viewer reads Arabic or French
+    return { text: english, isSourceLanguage };
+  };
+  const sourceLanguageNote = localize('Shown in the original language', 'معروض باللغة الأصلية للمصدر', 'Affiché dans la langue d’origine');
+  const descriptionInfo = localizedText(place.description, place.descriptionAr, place.descriptionFr);
+  const formationInfoText = localizedText(place.formationInfo, place.formationInfoAr, place.formationInfoFr);
+  const subCategoryLabel = isAr && place.subCategoryAr ? place.subCategoryAr : isFr && place.subCategoryFr ? place.subCategoryFr : place.subCategory;
+  const openingHoursLabel = isAr && place.openingHoursAr ? place.openingHoursAr : isFr && place.openingHoursFr ? place.openingHoursFr : place.openingHours;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-md sm:p-4" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -88,7 +104,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
 
           <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between">
             <span className="rounded-full border border-white/20 bg-black/45 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-              {place.category.replace('_', ' ')}
+              {subCategoryLabel || place.category.replace('_', ' ')}
             </span>
             <div className="flex gap-2">
               <button type="button" onClick={() => onSaveToggle(place.id)} className={`rounded-full p-2.5 text-white backdrop-blur ${isSaved ? 'bg-rose-500' : 'bg-black/45 hover:bg-black/65'}`} aria-label={isSaved ? localize('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer')}>
@@ -124,12 +140,12 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             </div>
           )}
 
-          {place.description && <div><h3 className="mb-1 text-xs font-bold text-slate-500">{localize('About', 'عن المكان', 'À propos')}</h3><p className="leading-relaxed">{place.description}</p></div>}
-          {place.formationInfo && <div><h3 className="mb-1 text-xs font-bold text-slate-500">{localize('History', 'التاريخ', 'Histoire')}</h3><p className="leading-relaxed">{place.formationInfo}</p></div>}
+          {descriptionInfo && <div><h3 className="mb-1 text-xs font-bold text-slate-500">{localize('About', 'عن المكان', 'À propos')}</h3><p className="leading-relaxed">{descriptionInfo.text}</p>{descriptionInfo.isSourceLanguage && <p className="mt-1 text-[10px] font-bold text-slate-400">{sourceLanguageNote}</p>}</div>}
+          {formationInfoText && <div><h3 className="mb-1 text-xs font-bold text-slate-500">{localize('History', 'التاريخ', 'Histoire')}</h3><p className="leading-relaxed">{formationInfoText.text}</p>{formationInfoText.isSourceLanguage && <p className="mt-1 text-[10px] font-bold text-slate-400">{sourceLanguageNote}</p>}</div>}
 
-          {(place.openingHours || place.contactPhone) && (
+          {(openingHoursLabel || place.contactPhone) && (
             <div className="grid gap-2 sm:grid-cols-2">
-              {place.openingHours && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5"><Clock className="h-4 w-4 shrink-0 text-slate-500" /><span className="truncate">{place.openingHours}</span></div>}
+              {openingHoursLabel && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5"><Clock className="h-4 w-4 shrink-0 text-slate-500" /><span className="truncate">{openingHoursLabel}</span></div>}
               {place.contactPhone && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5"><Phone className="h-4 w-4 shrink-0 text-slate-500" /><a href={`tel:${place.contactPhone}`} className="truncate font-bold text-blue-600">{place.contactPhone}</a></div>}
             </div>
           )}

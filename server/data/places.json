@@ -9,7 +9,10 @@
     "subCategory": "Natural Arch & Waterfalls",
     "region": "Northern Morocco",
     "area": "Akchour, Rif Mountains",
-    "coordinates": [35.2392, -5.1764],
+    "coordinates": [
+      35.2392,
+      -5.1764
+    ],
     "address": "Talassemtane National Park, Akchour 91000, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=800&auto=format&fit=crop&q=80",
@@ -34,7 +37,11 @@
         "rating": 5,
         "date": "2026-03-02",
         "text": "Start early around 8:00 AM before the weekend day-trippers arrive from Tangier. The right-hand trail leads to the natural bridge while the left follows the river to the grand waterfall.",
-        "tags": ["Scenery", "Hiking", "Hidden Gem"]
+        "tags": [
+          "Scenery",
+          "Hiking",
+          "Hidden Gem"
+        ]
       },
       {
         "id": "rev-ak-2",
@@ -43,7 +50,10 @@
         "rating": 5,
         "date": "2026-02-14",
         "text": "Google Maps does not show the true trail markers, but local boys guiding the trail are very kind. Sitting with feet in the cold river eating fresh tagine was the highlight of our Morocco trip!",
-        "tags": ["Tagine by the river", "Crystal Water"]
+        "tags": [
+          "Tagine by the river",
+          "Crystal Water"
+        ]
       }
     ],
     "features": {
@@ -61,7 +71,15 @@
     "ownerVerified": false,
     "checkInsCount": 894,
     "aiConfidenceScore": 96,
-    "lastActivityTimestamp": "2026-03-09T11:20:00Z"
+    "lastActivityTimestamp": "2026-03-09T11:20:00Z",
+    "descriptionAr": "جسر حجري طبيعي مذهل معلّق على ارتفاع 25 متراً فوق واد جبلي فيروزي اللون، يقود إلى شلالات متدرّجة خفية في قلب جبال الريف.",
+    "descriptionFr": "Un magnifique pont de pierre naturel suspendu à 25 mètres au-dessus des gorges d'une rivière de montagne turquoise, menant à des cascades cachées en étages au cœur du Rif.",
+    "formationInfoAr": "تشكّل على مدى ملايين السنين عبر صخور الكارست الجيرية بفعل واد فردة. لم يكن معروفاً إلا لسكان قرى جبالة الأمازيغ ورعاة الماعز المحليين، إلى أن رسم الرحّالة مسارات الوصول إليه.",
+    "formationInfoFr": "Façonné sur des millions d'années dans le calcaire karstique par l'oued Farda. Longtemps connu uniquement des villageois berbères jbala et des bergers locaux, avant que les randonneurs ne cartographient les sentiers d'accès.",
+    "subCategoryAr": "قنطرة طبيعية وشلالات",
+    "subCategoryFr": "Arche naturelle et cascades",
+    "openingHoursAr": "مفتوح من شروق الشمس حتى غروبها (يُنصح بالزيارة نهاراً فقط)",
+    "openingHoursFr": "Ouvert du lever au coucher du soleil (visite de jour recommandée)"
   },
   {
     "id": "riad-cherifa-chefchaouen",
@@ -73,7 +91,10 @@
     "subCategory": "Traditional Blue Medina Riad",
     "region": "Northern Morocco",
     "area": "Chefchaouen Medina",
-    "coordinates": [35.1689, -5.2633],
+    "coordinates": [
+      35.1689,
+      -5.2633
+    ],
     "address": "3 Rue Ibn Askar, Chefchaouen Medina, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1548013146-72479768bada?w=800&auto=format&fit=crop&q=80",
@@ -98,7 +119,11 @@
         "rating": 5,
         "date": "2026-02-28",
         "text": "The quietest refuge in the blue labyrinth. The staff met us at Bab Souk gate with luggage wheelbarrows so we did not get lost in the steep stairways.",
-        "tags": ["Rooftop Breakfast", "Quiet", "Clean"]
+        "tags": [
+          "Rooftop Breakfast",
+          "Quiet",
+          "Clean"
+        ]
       }
     ],
     "features": {
@@ -116,7 +141,15 @@
     "businessOwnerName": "Fatima Zahra Bennani",
     "checkInsCount": 612,
     "aiConfidenceScore": 94,
-    "lastActivityTimestamp": "2026-03-08T19:40:00Z"
+    "lastActivityTimestamp": "2026-03-08T19:40:00Z",
+    "descriptionAr": "رياض أندلسي مغربي أصيل مُرمَّم بعناية، يضم ساحات بلون الكوبالت الأزرق وبلاط الزليج المصنوع يدوياً وحمّاماً تقليدياً وسطحاً بانورامياً يطل على المدينة الزرقاء وقمة جبل القلعة.",
+    "descriptionFr": "Un authentique riad andalou-marocain restauré, avec des patios bleu cobalt, des zelliges artisanaux, un hammam traditionnel et une terrasse panoramique surplombant la ville bleue et le pic du Jebel El Kelaa.",
+    "formationInfoAr": "شُيّد عام 1912 على يد حرفي متمرّس من أصول أندلسية، ويُصان بعناية ويقدّم أعشاباً جبلية عضوية وخبز الإفطار الأمازيغي المخبوز منزلياً.",
+    "formationInfoFr": "Construit en 1912 par un maître artisan d'origine andalouse ; entretenu avec soin, il propose des herbes de montagne biologiques et un pain berbère cuit maison pour le petit-déjeuner.",
+    "subCategoryAr": "رياض تقليدي في المدينة الزرقاء",
+    "subCategoryFr": "Riad traditionnel de la ville bleue",
+    "openingHoursAr": "الاستقبال متاح على مدار الساعة",
+    "openingHoursFr": "Réception ouverte 24h/24"
   },
   {
     "id": "gite-rural-talassemtane",
@@ -128,7 +161,10 @@
     "subCategory": "Rural Mountain Eco-Lodge",
     "region": "Northern Morocco",
     "area": "Bab Taza / Akchour Rural Valley",
-    "coordinates": [35.2154, -5.1983],
+    "coordinates": [
+      35.2154,
+      -5.1983
+    ],
     "address": "Douar Zaouiya Habteene, Talassemtane National Park, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1587061949409-02df41d5e562?w=800&auto=format&fit=crop&q=80",
@@ -153,7 +189,11 @@
         "rating": 5,
         "date": "2026-01-20",
         "text": "True hidden gem! You cannot reach it with low clearance sedans; call Hassan ahead and he will pick you up at the Bab Taza crossroad in his 4WD.",
-        "tags": ["Eco-Tourism", "Fireplace", "Stargazing"]
+        "tags": [
+          "Eco-Tourism",
+          "Fireplace",
+          "Stargazing"
+        ]
       }
     ],
     "features": {
@@ -172,7 +212,15 @@
     "businessOwnerName": "Hassan Habteene",
     "checkInsCount": 275,
     "aiConfidenceScore": 92,
-    "lastActivityTimestamp": "2026-03-05T14:15:00Z"
+    "lastActivityTimestamp": "2026-03-05T14:15:00Z",
+    "descriptionAr": "ملجأ جبلي بعيد عن الشبكة الكهربائية يعمل بالطاقة الشمسية، يقدّم جبن الماعز الطازج من المزرعة وشاي الزعتر البري، ويوفر إرشاداً لمسارات غابة الصنوبر المغربي النادر (Abies pinsapo).",
+    "descriptionFr": "Un refuge de montagne hors réseau alimenté à l'énergie solaire, servant du fromage de chèvre fermier et du thé au thym sauvage, avec un accès guidé aux sentiers de la rare sapinière marocaine (Abies pinsapo).",
+    "formationInfoAr": "أسّسته تعاونية من المرشدين الجبليين المحليين للحد من الهجرة الريفية والحفاظ على محمية المحيط الحيوي المتوسطية العابرة للقارات التابعة لليونسكو.",
+    "formationInfoFr": "Créé par une coopérative de guides de montagne locaux pour freiner l'exode rural et préserver la réserve de biosphère intercontinentale de la Méditerranée classée par l'UNESCO.",
+    "subCategoryAr": "نزل جبلي ريفي بيئي",
+    "subCategoryFr": "Éco-gîte rural de montagne",
+    "openingHoursAr": "تسجيل الوصول من 14:00 إلى 20:00",
+    "openingHoursFr": "Arrivée de 14h00 à 20h00"
   },
   {
     "id": "restaurant-chez-hassan-akchour",
@@ -184,7 +232,10 @@
     "subCategory": "Berber River Cafe & Grill",
     "region": "Northern Morocco",
     "area": "Akchour River Path",
-    "coordinates": [35.2341, -5.1798],
+    "coordinates": [
+      35.2341,
+      -5.1798
+    ],
     "address": "KM 1.5 Hiking Trail, Akchour River Valley, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=800&auto=format&fit=crop&q=80",
@@ -209,7 +260,11 @@
         "rating": 5,
         "date": "2026-02-18",
         "text": "Eating boiling hot kefta tagine with our bare feet dipping in freezing cold mountain runoff was pure bliss after hiking 4 kilometers!",
-        "tags": ["Fresh Tagine", "Stream Seating", "Under-the-radar"]
+        "tags": [
+          "Fresh Tagine",
+          "Stream Seating",
+          "Under-the-radar"
+        ]
       }
     ],
     "features": {
@@ -227,7 +282,15 @@
     "ownerVerified": false,
     "checkInsCount": 1120,
     "aiConfidenceScore": 95,
-    "lastActivityTimestamp": "2026-03-09T15:10:00Z"
+    "lastActivityTimestamp": "2026-03-09T15:10:00Z",
+    "descriptionAr": "تجربة طعام محلية شهيرة حيث توضع الطاولات والكراسي البلاستيكية الملوّنة مباشرة داخل جدول مائي بارد ضحل. يُقدَّم طاجين لحم الماعز والبرقوق المطهو ببطء مع خبز مخبوز على الحطب.",
+    "descriptionFr": "Une expérience culinaire locale réputée où des tables et chaises en plastique colorées sont installées directement dans un ruisseau frais peu profond. Tajine de chèvre mijoté aux pruneaux, servi avec du pain cuit au feu de bois.",
+    "formationInfoAr": "بدأ قبل 14 عاماً بموقدَي فحم فقط وستارة خشبية للظل، وأصبح اليوم محبوباً لدى المسافرين الباحثين عن ضيافة حقيقية دون أسعار مبالغ فيها.",
+    "formationInfoFr": "Débuté il y a 14 ans avec seulement deux réchauds à charbon (kanoun) et une bâche en bois pour l'ombre, aujourd'hui apprécié des voyageurs en quête d'une hospitalité authentique sans majoration touristique.",
+    "subCategoryAr": "مقهى ومشوى أمازيغي على النهر",
+    "subCategoryFr": "Café-grill berbère au bord de la rivière",
+    "openingHoursAr": "يومياً من 10:30 صباحاً حتى 18:00 مساءً",
+    "openingHoursFr": "Tous les jours de 10h30 à 18h00"
   },
   {
     "id": "restaurant-bab-ssour-chefchaouen",
@@ -239,7 +302,10 @@
     "subCategory": "Authentic Moroccan Cuisine",
     "region": "Northern Morocco",
     "area": "Chefchaouen Old Town",
-    "coordinates": [35.1698, -5.2612],
+    "coordinates": [
+      35.1698,
+      -5.2612
+    ],
     "address": "Rue Rue Chrif El Idrissi, Chefchaouen Medina, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80",
@@ -264,7 +330,11 @@
         "rating": 5,
         "date": "2026-01-30",
         "text": "The rooftop view at sunset is breathtaking. Do not miss the Friday couscous or the lamb with plums.",
-        "tags": ["Authentic", "Vegetarian Friendly", "Rooftop"]
+        "tags": [
+          "Authentic",
+          "Vegetarian Friendly",
+          "Rooftop"
+        ]
       }
     ],
     "features": {
@@ -282,7 +352,15 @@
     "businessOwnerName": "Abdelali Cherkaoui",
     "checkInsCount": 1420,
     "aiConfidenceScore": 91,
-    "lastActivityTimestamp": "2026-03-07T20:15:00Z"
+    "lastActivityTimestamp": "2026-03-07T20:15:00Z",
+    "descriptionAr": "مطعم أزرق ريفي متعدد المستويات يقدّم أطباق شمال المغرب: الزعلوك، وشوربة البيصارة الساخنة بزيت الزيتون البكر، ودجاج بالليمون المُخلّل والزيتون المُحلّى.",
+    "descriptionFr": "Restaurant bleu rustique à plusieurs niveaux servant les spécialités du nord du Maroc : zaalouk, bissara chaude à l'huile d'olive vierge, et poulet au citron confit et olives.",
+    "formationInfoAr": "مطبخ عائلي يعمل بوصفات متوارثة من قبائل جبالة في الشمال.",
+    "formationInfoFr": "Cuisine familiale utilisant des recettes ancestrales des tribus jbala du nord.",
+    "subCategoryAr": "مطبخ مغربي أصيل",
+    "subCategoryFr": "Cuisine marocaine authentique",
+    "openingHoursAr": "من 12:00 ظهراً حتى 22:30 مساءً",
+    "openingHoursFr": "De 12h00 à 22h30"
   },
   {
     "id": "spanish-mosque-bouzaafar",
@@ -294,7 +372,10 @@
     "subCategory": "Panoramic Sunset Vantage Point",
     "region": "Northern Morocco",
     "area": "Chefchaouen Foothills",
-    "coordinates": [35.1668, -5.2539],
+    "coordinates": [
+      35.1668,
+      -5.2539
+    ],
     "address": "Bouzaafar Hill Trail, Chefchaouen, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1539020140153-e479b8c22e70?w=800&auto=format&fit=crop&q=80",
@@ -319,7 +400,11 @@
         "rating": 5,
         "date": "2026-03-01",
         "text": "Walk up from Ras El Maa spring along the paved trail. It takes 20 minutes. Bring a light jacket because the mountain breeze gets chilly as soon as the sun dips.",
-        "tags": ["Sunset", "Free Entry", "Panoramic"]
+        "tags": [
+          "Sunset",
+          "Free Entry",
+          "Panoramic"
+        ]
       }
     ],
     "features": {
@@ -335,7 +420,15 @@
     "ownerVerified": false,
     "checkInsCount": 2480,
     "aiConfidenceScore": 98,
-    "lastActivityTimestamp": "2026-03-09T18:45:00Z"
+    "lastActivityTimestamp": "2026-03-09T18:45:00Z",
+    "descriptionAr": "مسجد مهجور يعود لعشرينيات القرن الماضي يقع فوق تلة منعزلة تطل على كامل المدرج الأزرق لمنازل شفشاون. نقطة المشاهدة الأفضل للغروب في شمال المغرب.",
+    "descriptionFr": "Une mosquée abandonnée des années 1920, perchée sur une colline isolée face à tout l'amphithéâtre des maisons bleues de Chefchaouen. Le point de vue incontournable au coucher du soleil dans le nord du Maroc.",
+    "formationInfoAr": "بُني في عشرينيات القرن العشرين خلال فترة الحماية الإسبانية، ونادراً ما استُخدم للصلاة من قبل السكان المحليين، ليصبح تلة تجمّع شهيرة يعزف فيها الموسيقيون المحليون العود الأندلسي عند غروب الشمس فوق وادي الريف.",
+    "formationInfoFr": "Construite dans les années 1920 durant le protectorat espagnol, rarement utilisée pour la prière par les habitants, elle est devenue une colline de rassemblement emblématique où des musiciens locaux jouent du luth andalou au coucher du soleil sur la vallée du Rif.",
+    "subCategoryAr": "نقطة مشاهدة بانورامية للغروب",
+    "subCategoryFr": "Point de vue panoramique au coucher du soleil",
+    "openingHoursAr": "مفتوح على مدار الساعة (الأفضل بين 17:30 و19:30)",
+    "openingHoursFr": "Ouvert 24h/24 (idéal entre 17h30 et 19h30)"
   },
   {
     "id": "camping-azilan-chefchaouen",
@@ -347,7 +440,10 @@
     "subCategory": "Pine Forest Campsite & Vanpark",
     "region": "Northern Morocco",
     "area": "Chefchaouen Upper Ridge",
-    "coordinates": [35.1746, -5.2651],
+    "coordinates": [
+      35.1746,
+      -5.2651
+    ],
     "address": "Boulevard Sidi Abdelhamid, Chefchaouen 91000, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop&q=80",
@@ -372,7 +468,11 @@
         "rating": 4,
         "date": "2026-02-11",
         "text": "Great base for campers. It is a steep 15-minute downhill walk into the medina (and a good workout coming back up, or a 15-dirham petit taxi).",
-        "tags": ["Vanlife", "Showers", "Pine Trees"]
+        "tags": [
+          "Vanlife",
+          "Showers",
+          "Pine Trees"
+        ]
       }
     ],
     "features": {
@@ -391,7 +491,15 @@
     "businessOwnerName": "Mohamed Azilan",
     "checkInsCount": 420,
     "aiConfidenceScore": 89,
-    "lastActivityTimestamp": "2026-03-07T12:00:00Z"
+    "lastActivityTimestamp": "2026-03-07T12:00:00Z",
+    "descriptionAr": "يقع على تلة صنوبرية مطلة فوق المدينة القديمة، ويوفر مواقف مستوية لعربات التخييم وأماكن للخيام ودشات ساخنة وتوصيلات كهربائية وإطلالات شروق شمس واسعة على الوادي الجبلي.",
+    "descriptionFr": "Perché sur une crête de pins boisée surplombant la médina, offrant des emplacements de camping-car de niveau, des espaces de tente, des douches chaudes, des branchements électriques et de vastes vues sur le lever du soleil dans la vallée montagneuse.",
+    "formationInfoAr": "أُنشئ لخدمة عربات التخييم المسافرة عبر طريق جبال الريف من ميناء طنجة إلى فاس.",
+    "formationInfoFr": "Créé pour accueillir les camping-cars parcourant la route du Rif depuis le port de Tanger jusqu'à Fès.",
+    "subCategoryAr": "مخيم في غابة الصنوبر ومنتزه للعربات",
+    "subCategoryFr": "Camping en forêt de pins et parc pour vans",
+    "openingHoursAr": "مفتوح للوصول على مدار الساعة طوال أيام الأسبوع",
+    "openingHoursFr": "Ouvert aux arrivées 24h/24 et 7j/7"
   },
   {
     "id": "hopital-mohammed-v-chefchaouen",
@@ -403,7 +511,10 @@
     "subCategory": "24/7 Emergency Hospital & Pharmacy",
     "region": "Northern Morocco",
     "area": "Chefchaouen City",
-    "coordinates": [35.1712, -5.2715],
+    "coordinates": [
+      35.1712,
+      -5.2715
+    ],
     "address": "Avenue Allal Ben Abdellah, Chefchaouen, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=800&auto=format&fit=crop&q=80"
@@ -427,7 +538,11 @@
         "rating": 5,
         "date": "2026-01-15",
         "text": "Emergency room (Urgences) is staffed 24 hours. For English or French assistance ask for the duty emergency intern.",
-        "tags": ["24/7", "Ambulance", "Emergency"]
+        "tags": [
+          "24/7",
+          "Ambulance",
+          "Emergency"
+        ]
       }
     ],
     "features": {
@@ -443,7 +558,15 @@
     "ownerVerified": true,
     "checkInsCount": 180,
     "aiConfidenceScore": 99,
-    "lastActivityTimestamp": "2026-03-09T08:00:00Z"
+    "lastActivityTimestamp": "2026-03-09T08:00:00Z",
+    "descriptionAr": "المرفق الطبي العمومي الرئيسي في الإقليم، ويضم قسم استعجالات يعمل على مدار الساعة، وعيادة فرز، ومخزون مضاد للسموم، وتنسيق إسعاف للمسافين المصابين في مسارات تالسمطان.",
+    "descriptionFr": "Principal établissement médical public de la province, avec un service d'urgences 24h/24, une clinique de tri, une banque d'antivenin et une coordination d'ambulances pour les randonneurs blessés sur les sentiers de Talassemtane.",
+    "formationInfoAr": "مركز صحي إقليمي يخدم شفشاون وباب تازة والمجتمعات النائية في الريف.",
+    "formationInfoFr": "Pôle de santé provincial desservant Chefchaouen, Bab Taza et les communautés isolées du Rif.",
+    "subCategoryAr": "مستشفى استعجالات وصيدلية على مدار الساعة",
+    "subCategoryFr": "Hôpital d'urgence et pharmacie 24h/24",
+    "openingHoursAr": "على مدار الساعة طوال أيام الأسبوع",
+    "openingHoursFr": "24h/24 et 7j/7"
   },
   {
     "id": "gendarmerie-akchour-post",
@@ -455,7 +578,10 @@
     "subCategory": "Mountain Police & Search and Rescue",
     "region": "Northern Morocco",
     "area": "Akchour Valley Gateway",
-    "coordinates": [35.2415, -5.1742],
+    "coordinates": [
+      35.2415,
+      -5.1742
+    ],
     "address": "Route P4105, Akchour Checkpoint, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80"
@@ -479,7 +605,11 @@
         "rating": 5,
         "date": "2026-02-05",
         "text": "Very polite officers. If hiking late into the canyon, inform them before departing so they know your expected return time.",
-        "tags": ["Safety", "Helpful", "Emergency Contact"]
+        "tags": [
+          "Safety",
+          "Helpful",
+          "Emergency Contact"
+        ]
       }
     ],
     "features": {
@@ -494,62 +624,15 @@
     "ownerVerified": true,
     "checkInsCount": 95,
     "aiConfidenceScore": 99,
-    "lastActivityTimestamp": "2026-03-08T00:00:00Z"
-  },
-  {
-    "id": "selene-restaurant-santorini",
-    "seed_data": true,
-    "name": "Selene Restaurant",
-    "arabicName": "مطعم سيلين الراقي",
-    "frenchName": "Restaurant Selene",
-    "category": "restaurant",
-    "subCategory": "Fine Dining Cycladic Gastronomy",
-    "region": "Santorini",
-    "area": "Fira, Santorini",
-    "coordinates": [36.4172, 25.4318],
-    "address": "Fira Central Promenade, Santorini 84700, Greece",
-    "photos": [
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=800&auto=format&fit=crop&q=80"
-    ],
-    "description": "Award-winning clifftop restaurant championing volcanic Aegean terroir, fresh fava purees, white eggplant delicacies, and native Assyrtiko pairings.",
-    "formationInfo": "Founded in 1986 in Fira; celebrated for putting indigenous volcanic Santorini ingredients on the world Michelin stage.",
-    "rating": 4.9,
-    "reviewCount": 380,
-    "ratingsBreakdown": {
-      "cleanliness": 5.0,
-      "scenery": 4.9,
-      "accessibility": 4.5,
-      "valueForMoney": 4.2,
-      "safety": 4.9
-    },
-    "reviews": [
-      {
-        "id": "rev-sel-1",
-        "authorName": "Sophie Laurent",
-        "authorRole": "traveler",
-        "rating": 5,
-        "date": "2026-02-12",
-        "text": "Every course was poetry. Be sure to reserve 3 weeks in advance for a front caldera table.",
-        "tags": ["Caldera Sunset", "Michelin Guide", "Wine Pairing"]
-      }
-    ],
-    "features": {
-      "familyFriendly": true,
-      "accessible": true,
-      "wifi": true,
-      "parking": false
-    },
-    "priceLevel": "$$$$",
-    "openingHours": "18:00 - 23:30 (Reservations required)",
-    "contactPhone": "+30 2286 022249",
-    "isUnderDocumentedGem": false,
-    "source": "business_owner",
-    "ownerVerified": true,
-    "businessOwnerName": "Eleni & Giorgos",
-    "checkInsCount": 3100,
-    "aiConfidenceScore": 98,
-    "lastActivityTimestamp": "2026-03-08T22:00:00Z"
+    "lastActivityTimestamp": "2026-03-08T00:00:00Z",
+    "descriptionAr": "مركز أساسي للطوارئ الجبلية يوفر مساعدة الشرطة وتنسيق البحث عن المسارات وفحوصات سلامة الطرق لوادي المنتزه الوطني.",
+    "descriptionFr": "Poste essentiel d'urgence en montagne fournissant assistance policière, coordination de recherche de sentiers et contrôles de sécurité routière pour la vallée du parc national.",
+    "formationInfoAr": "يتمركز لضمان سلامة المسافرين ومنع ضياع المتنزهين خارج المسار أثناء الأمطار المفاجئة.",
+    "formationInfoFr": "Positionné pour garantir la sécurité des voyageurs et empêcher les randonneurs de se perdre hors piste lors de crues soudaines.",
+    "subCategoryAr": "شرطة جبلية وبحث وإنقاذ",
+    "subCategoryFr": "Police de montagne et recherche et sauvetage",
+    "openingHoursAr": "تغطية أمنية على مدار الساعة",
+    "openingHoursFr": "Couverture sécuritaire 24h/24"
   },
   {
     "id": "hotel-royal-mansour-marrakech",
@@ -561,7 +644,10 @@
     "subCategory": "Palatial Historic Riad Hotel",
     "region": "Marrakech",
     "area": "Marrakech City Center",
-    "coordinates": [31.6248, -7.9984],
+    "coordinates": [
+      31.6248,
+      -7.9984
+    ],
     "address": "Rue Abou Abbas El Sebti, Marrakech 40000, Morocco",
     "photos": [
       "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&auto=format&fit=crop&q=80",
@@ -586,7 +672,11 @@
         "rating": 5,
         "date": "2026-03-01",
         "text": "The pinnacle of world hospitality. Private rooftop plunge pool overlooking the Koutoubia minaret was unforgettable.",
-        "tags": ["Luxury", "Private Riad", "Spa"]
+        "tags": [
+          "Luxury",
+          "Private Riad",
+          "Spa"
+        ]
       }
     ],
     "features": {
@@ -604,6 +694,14 @@
     "businessOwnerName": "Royal Mansour Management",
     "checkInsCount": 4800,
     "aiConfidenceScore": 99,
-    "lastActivityTimestamp": "2026-03-09T17:00:00Z"
+    "lastActivityTimestamp": "2026-03-09T17:00:00Z",
+    "descriptionAr": "مجمّع قصر رائع داخل أسوار مدينة مراكش القديمة، يتكوّن من 53 رياضاً خاصاً متعدد الطوابق تربطها ساحات معطّرة بزهر البرتقال وأنفاق سرية.",
+    "descriptionFr": "Un exquis complexe palatial dans les murs de la médina de Marrakech, composé de 53 riads privés à plusieurs étages reliés par des patios parfumés à la fleur d'oranger et des tunnels discrets.",
+    "formationInfoAr": "أمرت العائلة الملكية ببنائه كواجهة لبراعة الحرفيين المغاربة في الزليج والجص المنحوت يدوياً وأعمال خشب الأرز والضيافة الراقية لشمال إفريقيا.",
+    "formationInfoFr": "Commandité par la famille royale pour mettre en valeur le savoir-faire artisanal marocain : zelliges, plâtre sculpté à la main, boiseries de cèdre et une hospitalité nord-africaine d'exception.",
+    "subCategoryAr": "فندق رياض تاريخي فخم",
+    "subCategoryFr": "Hôtel-riad historique et palatial",
+    "openingHoursAr": "استقبال وخدمة كونسيرج على مدار الساعة",
+    "openingHoursFr": "Conciergerie et réception 24h/24"
   }
 ]

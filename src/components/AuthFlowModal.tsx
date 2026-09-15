@@ -11,10 +11,10 @@ import {
   X,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
-import santoriniBg from '../assets/images/santorini_bg.jpg';
+import moroccoAuthBg from '../assets/images/morocco_auth_bg.jpg';
 import { SupportedLanguage } from '../data/translations';
 import { LanguageFlagSelector } from './LanguageFlagSelector';
-import { getAuthRedirectUrl, getPasswordRecoveryRedirectUrl, supabase } from '../lib/supabase';
+import { getAuthRedirectUrl, getPasswordRecoveryRedirectUrl, isSupabaseConfigured, supabase } from '../lib/supabase';
 
 export type AuthScreenType =
   | 'welcome'
@@ -78,6 +78,13 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     }
     if (normalized.includes('user already registered')) {
       return localize('This email is already registered.', 'هذا البريد الإلكتروني مسجل بالفعل.', 'Cette adresse e-mail est déjà inscrite.');
+    }
+    if (!isSupabaseConfigured || normalized.includes('fetch failed') || normalized.includes('failed to fetch')) {
+      return localize(
+        'Sign-in is not available right now. This deployment is missing its account service configuration.',
+        'تسجيل الدخول غير متاح حالياً. لم يتم إعداد خدمة الحسابات لهذه النسخة.',
+        "La connexion n'est pas disponible pour le moment. Le service de comptes n'est pas configuré pour ce déploiement.",
+      );
     }
     return message;
   };
@@ -237,7 +244,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/75 p-0 backdrop-blur-md sm:p-4">
       <div className="relative z-10 flex h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-slate-900 shadow-2xl sm:h-auto sm:min-h-[680px] sm:max-h-[92vh] sm:rounded-3xl">
         <div className="absolute inset-0 z-0 overflow-hidden">
-          <img src={santoriniBg} alt="Santorini coastal backdrop" className="h-full w-full object-cover object-center brightness-[0.82]" />
+          <img src={moroccoAuthBg} alt="Chefchaouen blue medina backdrop" className="h-full w-full object-cover object-center brightness-[0.82]" />
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/30 to-slate-950/75" />
         </div>
 
@@ -265,6 +272,16 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
           {statusMessage && (
             <div className="mx-auto mb-4 w-full max-w-sm rounded-2xl border border-blue-300/30 bg-slate-950/75 px-4 py-3 text-center text-xs font-bold text-white backdrop-blur">
               {statusMessage}
+            </div>
+          )}
+
+          {!isSupabaseConfigured && (
+            <div className="mx-auto mb-4 w-full max-w-sm rounded-2xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-center text-xs font-bold text-amber-100 backdrop-blur">
+              {localize(
+                'Accounts are not configured on this deployment yet, so sign-in, saved trips, and reviews are unavailable. You can still search and browse.',
+                'لم يتم إعداد الحسابات على هذه النسخة بعد، لذا تسجيل الدخول والرحلات المحفوظة والمراجعات غير متاحة حالياً. يمكنك متابعة البحث والتصفح.',
+                "Les comptes ne sont pas encore configurés sur ce déploiement, la connexion, les voyages enregistrés et les avis sont indisponibles. Vous pouvez continuer à rechercher et parcourir.",
+              )}
             </div>
           )}
 
