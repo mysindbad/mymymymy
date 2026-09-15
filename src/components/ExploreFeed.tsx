@@ -154,12 +154,14 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
           const displayName = isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name;
           return (
             <article key={place.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <button type="button" onClick={() => onSelectPlace(place)} className="block w-full text-start">
-                <div className="relative h-40 bg-slate-200">
+              <div className="relative h-40 bg-slate-200">
+                <button type="button" onClick={() => onSelectPlace(place)} className="absolute inset-0 block h-full w-full text-start" aria-label={`${t('Open details for', 'فتح تفاصيل', 'Ouvrir les détails de')} ${displayName}`}>
                   <PlaceVisual place={place} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
-                  <button type="button" onClick={(event) => { event.stopPropagation(); onToggleSave(place.id); }} className={`absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full ${isSaved ? 'bg-rose-500' : 'bg-black/45'} text-white`} aria-label={isSaved ? t('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : t('Save place', 'حفظ المكان', 'Enregistrer')}><Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} /></button>
-                </div>
-                <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-black text-slate-900">{displayName}</h2><p className="mt-1 truncate text-xs text-slate-500">{place.area} · {place.region}</p></div><span className="shrink-0 text-xs font-bold text-slate-600">{rating ? `★ ${rating}` : unratedShortLabel(language)}</span></div><div className="mt-2 flex items-center justify-between text-xs text-slate-500"><span>{formatPriceLevel(place.priceLevel, currency)}</span>{typeof place.distanceKm === 'number' && <span>{place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km</span>}</div></div>
+                </button>
+                <button type="button" onClick={() => onToggleSave(place.id)} className={`absolute end-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full ${isSaved ? 'bg-rose-500' : 'bg-black/45'} text-white`} aria-label={isSaved ? t('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : t('Save place', 'حفظ المكان', 'Enregistrer')}><Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} /></button>
+              </div>
+              <button type="button" onClick={() => onSelectPlace(place)} className="block w-full p-4 text-start">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-black text-slate-900">{displayName}</h2><p className="mt-1 truncate text-xs text-slate-500">{place.area} · {place.region}</p></div><span className="shrink-0 text-xs font-bold text-slate-600">{rating ? `★ ${rating}` : unratedShortLabel(language)}</span></div><div className="mt-2 flex items-center justify-between text-xs text-slate-500"><span>{formatPriceLevel(place.priceLevel, currency)}</span>{typeof place.distanceKm === 'number' && <span>{place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km</span>}</div>
               </button>
               <div className="border-t border-slate-100 p-3"><button type="button" onClick={() => onStartRoute(place)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-bold text-white"><Navigation className="h-4 w-4" />{t('Directions', 'الاتجاهات', 'Itinéraire')}</button></div>
             </article>

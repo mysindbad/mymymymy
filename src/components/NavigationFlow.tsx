@@ -234,7 +234,9 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={onClose}
+                aria-label={isAr ? 'إغلاق' : 'Close'}
                 className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition"
               >
                 <ArrowLeft className="w-5 h-5 rtl:rotate-180" />

@@ -79,8 +79,25 @@ function formatDate(value: string, language: string) {
   return new Intl.DateTimeFormat(language === 'ar' ? 'ar-MA' : language, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`));
 }
 
-function messageFrom(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
+// Internal error codes/messages that must never reach the user verbatim.
+// Anything that looks like a machine code (ALL_CAPS_WITH_UNDERSCORES) is
+// treated as internal, regardless of where it was thrown from.
+const INTERNAL_ERROR_PATTERN = /^[A-Z][A-Z0-9_]{3,}$/;
+
+function sessionExpiredMessage(language: string) {
+  return language === 'ar'
+    ? 'انتهت صلاحية جلسة الدخول. سجّل الدخول مجدداً للمتابعة.'
+    : language === 'fr'
+      ? 'Votre session a expiré. Reconnectez-vous pour continuer.'
+      : 'Your session has expired. Sign in again to continue.';
+}
+
+function messageFrom(error: unknown, fallback: string, language: string = 'en'): string {
+  if (error instanceof ApiAuthenticationError) return sessionExpiredMessage(language);
+  if (error instanceof Error && error.message && !INTERNAL_ERROR_PATTERN.test(error.message.trim())) {
+    return error.message;
+  }
+  return fallback;
 }
 
 function mergePlaceResults(primary: Place[], additional: Place[]) {
@@ -183,7 +200,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       setIsAuthLoadError(authFailure);
       setError(authFailure
         ? l('Your session could not be verified.', 'تعذر التحقق من جلسة الدخول.', 'Votre session n’a pas pu être vérifiée.')
-        : messageFrom(loadError, l('Unable to load trips.', 'تعذر تحميل الرحلات.', 'Impossible de charger les voyages.')));
+        : messageFrom(loadError, l('Unable to load trips.', 'تعذر تحميل الرحلات.', 'Impossible de charger les voyages.'), language));
     } finally {
       setLoading(false);
     }
@@ -239,7 +256,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
         if (sequence !== searchSequence.current) return;
         setPlaces([]);
         setPlacesSearched(true);
-        setPlacesError(messageFrom(searchError, l('Unable to search destinations.', 'تعذر البحث عن الوجهات.', 'Impossible de rechercher les destinations.')));
+        setPlacesError(messageFrom(searchError, l('Unable to search destinations.', 'تعذر البحث عن الوجهات.', 'Impossible de rechercher les destinations.'), language));
       } finally {
         if (sequence === searchSequence.current) setPlacesLoading(false);
       }
@@ -266,6 +283,14 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
 
   const runPlan = async () => {
     if (!selectedPlace) return;
+    if (authStatus !== 'authed') {
+      setPlanError(l(
+        'Sign in to generate your AI itinerary. Your destination, dates, budget, and preferences are kept.',
+        'سجّل الدخول لإنشاء خطتك بالذكاء الاصطناعي. سيتم الاحتفاظ بالوجهة والتواريخ والميزانية والتفضيلات التي أدخلتها.',
+        'Connectez-vous pour générer votre itinéraire IA. Votre destination, vos dates, votre budget et vos préférences sont conservés.',
+      ));
+      return;
+    }
     setPlanning(true);
     setPlanError('');
     try {
@@ -290,7 +315,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       setItinerary(result.itinerary);
       setOverBudget(result.overBudget);
     } catch (planFailure) {
-      setPlanError(messageFrom(planFailure, l('Unable to create the plan.', 'تعذر إنشاء الخطة.', 'Impossible de créer le plan.')));
+      setPlanError(messageFrom(planFailure, l('Unable to create the plan.', 'تعذر إنشاء الخطة.', 'Impossible de créer le plan.'), language));
     } finally {
       setPlanning(false);
     }
@@ -325,7 +350,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       resetPlanner();
       onTripCreated?.(destination);
     } catch (saveFailure) {
-      setPlanError(messageFrom(saveFailure, l('Unable to save the trip.', 'تعذر حفظ الرحلة.', 'Impossible d’enregistrer le voyage.')));
+      setPlanError(messageFrom(saveFailure, l('Unable to save the trip.', 'تعذر حفظ الرحلة.', 'Impossible d’enregistrer le voyage.'), language));
     } finally {
       setSaving(false);
     }
@@ -336,7 +361,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       const updated = await updateTrip(trip.id, { status });
       setTrips((current) => current.map((item) => item.id === trip.id ? { ...updated, spentTotal: item.spentTotal } : item));
     } catch (statusError) {
-      setError(messageFrom(statusError, l('Unable to update trip.', 'تعذر تحديث الرحلة.', 'Impossible de mettre à jour le voyage.')));
+      setError(messageFrom(statusError, l('Unable to update trip.', 'تعذر تحديث الرحلة.', 'Impossible de mettre à jour le voyage.'), language));
     }
   };
 
@@ -347,7 +372,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       setTrips((current) => current.filter((item) => item.id !== trip.id));
       setExpandedTripId((current) => current === trip.id ? null : current);
     } catch (deleteError) {
-      setError(messageFrom(deleteError, l('Unable to delete trip.', 'تعذر حذف الرحلة.', 'Impossible de supprimer le voyage.')));
+      setError(messageFrom(deleteError, l('Unable to delete trip.', 'تعذر حذف الرحلة.', 'Impossible de supprimer le voyage.'), language));
     }
   };
 
@@ -362,7 +387,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     try {
       applyBudget(tripId, await fetchTripExpenses(tripId));
     } catch (loadError) {
-      setBudgetErrorByTripId((current) => ({ ...current, [tripId]: messageFrom(loadError, l('Unable to load expenses.', 'تعذر تحميل المصروفات.', 'Impossible de charger les dépenses.')) }));
+      setBudgetErrorByTripId((current) => ({ ...current, [tripId]: messageFrom(loadError, l('Unable to load expenses.', 'تعذر تحميل المصروفات.', 'Impossible de charger les dépenses.'), language) }));
     } finally {
       setBudgetLoadingId((current) => current === tripId ? null : current);
     }
@@ -394,7 +419,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       applyBudget(expenseModalTripId, updated);
       setExpenseModalTripId(null);
     } catch (saveError) {
-      setExpenseError(messageFrom(saveError, l('Unable to save expense.', 'تعذر حفظ المصروف.', 'Impossible d’enregistrer la dépense.')));
+      setExpenseError(messageFrom(saveError, l('Unable to save expense.', 'تعذر حفظ المصروف.', 'Impossible d’enregistrer la dépense.'), language));
     } finally {
       setExpenseSaving(false);
     }
@@ -406,14 +431,13 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     try {
       applyBudget(tripId, await deleteTripExpense(tripId, expenseId));
     } catch (deleteError) {
-      setBudgetErrorByTripId((current) => ({ ...current, [tripId]: messageFrom(deleteError, l('Unable to delete expense.', 'تعذر حذف المصروف.', 'Impossible de supprimer la dépense.')) }));
+      setBudgetErrorByTripId((current) => ({ ...current, [tripId]: messageFrom(deleteError, l('Unable to delete expense.', 'تعذر حذف المصروف.', 'Impossible de supprimer la dépense.'), language) }));
     } finally {
       setDeletingExpenseId(null);
     }
   };
 
   if (authStatus === 'restoring') return <CenteredLoading text={l('Loading…', 'جارٍ التحميل…', 'Chargement…')} />;
-  if (authStatus === 'anonymous') return <div className="mx-auto flex max-w-xl justify-center p-8 pb-24"><button type="button" onClick={onOpenAuth} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white">{l('Sign in to view your trips', 'سجّل الدخول لعرض رحلاتك', 'Connectez-vous pour voir vos voyages')}</button></div>;
 
   const statusLabel = (status: Trip['status']) => ({
     planning: l('Planning', 'قيد التخطيط', 'Planification'),
@@ -449,14 +473,16 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
         {step === 3 && <div className="grid gap-4 sm:grid-cols-[1fr_140px]"><label className="text-sm font-bold text-slate-700">{l('Budget', 'الميزانية', 'Budget')}<input type="number" min="1" value={form.budget} onChange={(event) => updateForm({ budget: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label><label className="text-sm font-bold text-slate-700">{l('Currency', 'العملة', 'Devise')}<select value={form.currency} onChange={(event) => updateForm({ currency: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal"><option>MAD</option><option>EUR</option><option>USD</option></select></label></div>}
         {step === 4 && <label className="block max-w-sm text-sm font-bold text-slate-700">{l('Travelers', 'المسافرون', 'Voyageurs')}<input type="number" min="1" max="50" value={form.participants} onChange={(event) => updateForm({ participants: Math.max(1, Number(event.target.value) || 1) })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label>}
         {step === 5 && <div><p className="mb-3 text-sm font-bold text-slate-700">{l('Preferences', 'التفضيلات', 'Préférences')}</p><div className="grid gap-2 sm:grid-cols-2">{preferenceOptions.map((preference) => <label key={preference.value} className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3 ${form.preferences.includes(preference.value) ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}><input type="checkbox" checked={form.preferences.includes(preference.value)} onChange={() => togglePreference(preference.value)} /><span className="text-sm font-bold text-slate-700">{isAr ? preference.ar : isFr ? preference.fr : preference.en}</span></label>)}</div></div>}
-        {planError && <div className="mt-4 flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><AlertTriangle className="h-4 w-4" />{planError}</div>}
+        {step === 5 && authStatus === 'anonymous' && !planError && <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-800">{l('Sign-in is required to generate and save the plan. Your inputs will stay filled in.', 'يلزم تسجيل الدخول لإنشاء الخطة وحفظها. ستبقى مدخلاتك محفوظة كما هي.', 'La connexion est requise pour générer et enregistrer le plan. Vos informations resteront renseignées.')}</div>}
+        {planError && <div className="mt-4 flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><AlertTriangle className="h-4 w-4" /><span className="flex-1">{planError}</span>{authStatus === 'anonymous' && onOpenAuth && <button type="button" onClick={onOpenAuth} className="font-bold underline">{l('Sign in', 'تسجيل الدخول', 'Se connecter')}</button>}</div>}
         <div className="mt-6 flex items-center justify-between gap-3"><button type="button" disabled={step === 1} onClick={() => { setPlanError(''); setStep((current) => Math.max(1, current - 1)); }} className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 disabled:invisible"><ChevronLeft className="h-4 w-4 rtl:rotate-180" />{l('Back', 'السابق', 'Retour')}</button>{step < 5 ? <button type="button" onClick={nextStep} className="flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white">{l('Next', 'التالي', 'Suivant')}<ChevronRight className="h-4 w-4 rtl:rotate-180" /></button> : <button type="button" onClick={() => void runPlan()} disabled={planning} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{planning && <Loader2 className="h-4 w-4 animate-spin" />}{l('Create Plan', 'إنشاء الخطة', 'Créer le plan')}</button>}</div>
       </section>
 
       {itinerary && <section className="space-y-4 rounded-3xl border border-blue-100 bg-blue-50/40 p-4 sm:p-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-900">{selectedPlace?.name}</h2><p className="text-xs text-slate-500">{formatDate(form.startDate, language)} – {formatDate(form.endDate, language)}</p></div><strong className="text-lg text-blue-700">{itinerary.totalEstimatedCost.toFixed(2)} {form.currency}</strong></div>{overBudget && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">{l('This plan exceeds the budget.', 'هذه الخطة تتجاوز الميزانية.', 'Ce plan dépasse le budget.')}</div>}<div className="grid gap-3 md:grid-cols-2">{itinerary.days.map((day) => <article key={day.day} className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="mb-2 font-black text-slate-900">{l('Day', 'اليوم', 'Jour')} {day.day} · {day.title}</h3><div className="space-y-2">{day.items.map((item, index) => <div key={`${day.day}-${index}`} className="rounded-xl bg-slate-50 p-3"><div className="flex justify-between gap-2"><strong className="text-sm text-slate-800">{item.activity}</strong><span className="text-xs text-slate-500">{item.time}</span></div><p className="mt-1 text-xs text-slate-500">{item.note}</p></div>)}</div></article>)}</div><button type="button" onClick={() => void saveTrip()} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{l('Save Trip', 'حفظ الرحلة', 'Enregistrer le voyage')}</button></section>}
 
       <section className="space-y-3">
-        {loading ? <CenteredLoading text={l('Loading trips…', 'جارٍ تحميل الرحلات…', 'Chargement des voyages…')} />
+        {authStatus === 'anonymous' ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><CalendarDays className="mx-auto mb-3 h-8 w-8 text-blue-500" /><p className="font-bold text-slate-700">{l('Sign in to save this plan and see it here later.', 'سجّل الدخول لحفظ هذه الخطة ورؤيتها لاحقًا هنا.', 'Connectez-vous pour enregistrer ce plan et le retrouver ici plus tard.')}</p>{onOpenAuth && <button type="button" onClick={onOpenAuth} className="mt-3 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white">{l('Sign in', 'تسجيل الدخول', 'Se connecter')}</button>}</div>
+          : loading ? <CenteredLoading text={l('Loading trips…', 'جارٍ تحميل الرحلات…', 'Chargement des voyages…')} />
           : trips.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><CalendarDays className="mx-auto mb-3 h-8 w-8 text-blue-500" /><p className="font-bold text-slate-700">{l('No trips yet.', 'لا توجد رحلات بعد.', 'Aucun voyage pour le moment.')}</p></div>
             : <div className="grid gap-3 md:grid-cols-2">{trips.map((trip) => {
               const budget = budgetByTripId[trip.id];

@@ -34,13 +34,19 @@ export interface Place {
   frenchName?: string;
   category: PlaceCategory;
   subCategory?: string;
+  subCategoryAr?: string;
+  subCategoryFr?: string;
   region: string;
   area: string;
   coordinates: [number, number]; // [lat, lng]
   address: string;
   photos: string[];
   description: string;
+  descriptionAr?: string;
+  descriptionFr?: string;
   formationInfo?: string;
+  formationInfoAr?: string;
+  formationInfoFr?: string;
   rating: number | null;
   reviewCount: number;
   ratingsBreakdown?: {
@@ -54,6 +60,8 @@ export interface Place {
   features?: PlaceFeatures;
   priceLevel?: '$' | '$$' | '$$$' | '$$$$';
   openingHours?: string;
+  openingHoursAr?: string;
+  openingHoursFr?: string;
   contactPhone?: string;
   isUnderDocumentedGem?: boolean;
   source: 'initial_seed' | 'community_traveler' | 'business_owner' | 'external';
