@@ -60,15 +60,15 @@ test('account appearance supports automatic device light and dark modes', async 
   await openApp(page);
   await page.locator('#tab-profile').click();
   await expect(page.getByText('Appearance', { exact: true })).toBeVisible();
-  await page.getByRole('button').filter({ hasText: 'Dark' }).first().click();
+  await page.getByRole('button', { name: /^Dark\b/ }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
   expect(await page.evaluate(() => localStorage.getItem('sindbad_theme_preference'))).toBe('dark');
-  await page.getByRole('button').filter({ hasText: 'Light' }).first().click();
+  await page.getByRole('button', { name: /^Light\b/ }).click();
   await expect(page.locator('html')).not.toHaveClass(/dark/);
   expect(await page.evaluate(() => localStorage.getItem('sindbad_theme_preference'))).toBe('light');
-  await page.getByRole('button').filter({ hasText: 'Device' }).first().click();
+  await page.getByRole('button', { name: /^Device\b/ }).click();
   expect(await page.evaluate(() => localStorage.getItem('sindbad_theme_preference'))).toBe('system');
-  await page.getByRole('button').filter({ hasText: 'Automatic' }).first().click();
+  await page.getByRole('button', { name: /^Automatic\b/ }).click();
   expect(await page.evaluate(() => localStorage.getItem('sindbad_theme_preference'))).toBe('auto');
 });
 
