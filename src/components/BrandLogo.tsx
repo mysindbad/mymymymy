@@ -1,5 +1,5 @@
 import React from 'react';
-import mySindbadTransparent from '../assets/images/my_sindbad_logo_transparent.png';
+import mySindbadTransparent from '../assets/images/my_sindbad_logo_user_v4.webp';
 import { SupportedLanguage } from '../data/translations';
 
 interface BrandLogoProps {
