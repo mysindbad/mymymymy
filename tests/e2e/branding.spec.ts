@@ -21,8 +21,8 @@ test('renders and decodes the My Sindbad branding in Chromium', async ({ page })
     })
   ))), [
     '/brand/my-sindbad-logo-v7.png',
-    '/icons/my-sindbad-app-icon-v7-192.jpg',
-    '/icons/my-sindbad-app-icon-v7-512.jpg',
+    '/icons/my-sindbad-app-icon-v8-192.jpg',
+    '/icons/my-sindbad-app-icon-v8-512.jpg',
   ]);
 
   expect(decoded[0]).toMatchObject({ width: 256, height: 256 });
@@ -30,27 +30,37 @@ test('renders and decodes the My Sindbad branding in Chromium', async ({ page })
   expect(decoded[2]).toMatchObject({ width: 512, height: 512 });
 });
 
-test('serves the exact logo and PWA icons referenced by the app', async ({ request }) => {
+test('serves full-frame adaptive PWA icons referenced by the app', async ({ request }) => {
   const logoResponse = await request.get('/brand/my-sindbad-logo-v7.png');
   expect(logoResponse.ok()).toBeTruthy();
   expect(logoResponse.headers()['content-type']).toContain('image/png');
   expect((await logoResponse.body()).byteLength).toBeGreaterThan(1_000);
 
-  const manifestResponse = await request.get('/manifest.webmanifest?v=7');
+  const manifestResponse = await request.get('/manifest.webmanifest?v=8');
   expect(manifestResponse.ok()).toBeTruthy();
   const manifest = await manifestResponse.json();
   expect(manifest.icons).toEqual(expect.arrayContaining([
-    expect.objectContaining({ src: '/icons/my-sindbad-app-icon-v7-192.jpg', sizes: '192x192' }),
-    expect.objectContaining({ src: '/icons/my-sindbad-app-icon-v7-512.jpg', sizes: '512x512' }),
+    expect.objectContaining({
+      src: '/icons/my-sindbad-app-icon-v8-192.jpg',
+      sizes: '192x192',
+      purpose: expect.stringContaining('maskable'),
+    }),
+    expect.objectContaining({
+      src: '/icons/my-sindbad-app-icon-v8-512.jpg',
+      sizes: '512x512',
+      purpose: expect.stringContaining('maskable'),
+    }),
   ]));
 
-  for (const iconPath of [
-    '/icons/my-sindbad-app-icon-v7-192.jpg',
-    '/icons/my-sindbad-app-icon-v7-512.jpg',
-  ]) {
-    const iconResponse = await request.get(iconPath);
+  const iconExpectations = [
+    { path: '/icons/my-sindbad-app-icon-v8-192.jpg', minBytes: 20_000 },
+    { path: '/icons/my-sindbad-app-icon-v8-512.jpg', minBytes: 80_000 },
+  ];
+
+  for (const { path, minBytes } of iconExpectations) {
+    const iconResponse = await request.get(path);
     expect(iconResponse.ok()).toBeTruthy();
     expect(iconResponse.headers()['content-type']).toContain('image/jpeg');
-    expect((await iconResponse.body()).byteLength).toBeGreaterThan(1_000);
+    expect((await iconResponse.body()).byteLength).toBeGreaterThan(minBytes);
   }
 });
