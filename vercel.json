@@ -20,6 +20,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/plan-trip.ts",
+      "use": "@vercel/node"
+    },
+    {
       "src": "api/trace-summary.ts",
       "use": "@vercel/node"
     },
@@ -42,6 +46,7 @@
   ],
   "routes": [
     { "src": "/api/ai/navigation-guidance", "dest": "/api/navigation.ts" },
+    { "src": "/api/ai/plan-trip", "dest": "/api/plan-trip.ts" },
     { "src": "/api/traces/summary", "dest": "/api/trace-summary.ts" },
     { "src": "/api/nearby-places", "dest": "/api/nearby-places.ts" },
     { "src": "/api/(.*)", "dest": "/api/runtime.ts" },
