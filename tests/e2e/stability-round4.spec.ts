@@ -21,7 +21,7 @@ function authUser() {
   };
 }
 
-async function installAnonymousMocks(page: Page) {
+async function installAnonymousMocks(page: Page, place = nearbyPlace) {
   await page.route('http://127.0.0.1:54321/auth/v1/**', async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith('/user')) return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'not signed in' }) });
@@ -29,7 +29,7 @@ async function installAnonymousMocks(page: Page) {
   });
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname === '/api/places') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ places: [nearbyPlace] }) });
+    if (url.pathname === '/api/places') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ places: [place] }) });
     if (url.pathname === '/api/nearby-places') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ places: [] }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
@@ -53,6 +53,18 @@ test('home keeps the polished nearby card and See all opens the list', async ({ 
   await page.locator('#home-nearby-see-all').click();
   await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'List', exact: true })).toHaveCount(0);
+});
+
+test('broken remote place images fall back inside the existing rounded card', async ({ page, context }) => {
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: 35.77, longitude: -5.82 });
+  const broken = { ...nearbyPlace, id: 'broken-photo-place', photos: ['https://images.invalid.example/broken.jpg'] };
+  await installAnonymousMocks(page, broken);
+  await page.route('https://images.invalid.example/**', (route) => route.abort());
+  await openApp(page);
+  const card = page.locator('section article').first();
+  await expect(card).toHaveClass(/rounded-3xl/);
+  await expect(card.locator('[data-place-photo-fallback="true"]')).toBeVisible();
 });
 
 test('account appearance supports automatic device light and dark modes', async ({ page }) => {
