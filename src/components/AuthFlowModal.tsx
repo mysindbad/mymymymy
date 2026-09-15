@@ -116,25 +116,17 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   const handleGoogleAuth = async () => {
     setIsLoading(true);
     setStatusMessage(null);
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: getAuthRedirectUrl(),
-        skipBrowserRedirect: true,
         queryParams: { prompt: 'select_account' },
       },
     });
     if (error) {
       setIsLoading(false);
       setStatusMessage(localizeAuthError(error.message));
-      return;
     }
-    if (!data.url) {
-      setIsLoading(false);
-      setStatusMessage(localize('Google sign-in is unavailable.', 'تسجيل الدخول عبر Google غير متاح.', 'La connexion Google est indisponible.'));
-      return;
-    }
-    window.location.assign(data.url);
   };
 
   const handleEmailSignIn = async (event: React.FormEvent) => {
