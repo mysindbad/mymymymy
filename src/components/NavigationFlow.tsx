@@ -69,6 +69,10 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
+  // Navigation is used live, in the field. French speakers must not be dropped
+  // back to English mid-route, so every string resolves in all three languages.
+  const text = (en: string, ar: string, fr: string) => (isAr ? ar : isFr ? fr : en);
 
   const requestCurrentLocation = () => {
     setIsLocating(true);
@@ -78,7 +82,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
     setRouteError(null);
 
     if (!navigator.geolocation) {
-      setLocationError(isAr ? 'الموقع الجغرافي غير مدعوم في هذا المتصفح.' : 'Geolocation is not supported by this browser.');
+      setLocationError(text('Geolocation is not supported by this browser.', 'الموقع الجغرافي غير مدعوم في هذا المتصفح.', 'La géolocalisation n’est pas prise en charge par ce navigateur.'));
       setIsLocating(false);
       return;
     }
@@ -92,9 +96,10 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       () => {
         setUserLocation(null);
         setSpeed(null);
-        setLocationError(isAr
-          ? 'تعذر الحصول على موقعك الحالي. اسمح بالوصول إلى الموقع ثم حاول مجدداً.'
-          : 'Could not get your current location. Allow location access and try again.');
+        setLocationError(text(
+          'Could not get your current location. Allow location access and try again.',
+          'تعذر الحصول على موقعك الحالي. اسمح بالوصول إلى الموقع ثم حاول مجدداً.',
+          'Impossible d’obtenir votre position actuelle. Autorisez l’accès à la localisation puis réessayez.'));
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
@@ -108,12 +113,12 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const loadRoute = async (mode: TravelMode) => {
     if (mode === 'transit') {
       setRouteData(null);
-      setRouteError(isAr ? 'التوجيه عبر النقل العام غير متاح حالياً.' : 'Public-transit routing is not available yet.');
+      setRouteError(text('Public-transit routing is not available yet.', 'التوجيه عبر النقل العام غير متاح حالياً.', 'L’itinéraire en transport en commun n’est pas encore disponible.'));
       return;
     }
     if (!userLocation) {
       setRouteData(null);
-      setRouteError(isAr ? 'يلزم موقعك الحالي لحساب المسار.' : 'Your current location is required to calculate a route.');
+      setRouteError(text('Your current location is required to calculate a route.', 'يلزم موقعك الحالي لحساب المسار.', 'Votre position actuelle est nécessaire pour calculer un itinéraire.'));
       return;
     }
 
@@ -125,7 +130,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       setRouteData(data);
     } catch {
       setRouteData(null);
-      setRouteError(isAr ? 'خدمة حساب المسار غير متاحة مؤقتاً' : 'Route service temporarily unavailable');
+      setRouteError(text('Route service temporarily unavailable', 'خدمة حساب المسار غير متاحة مؤقتاً', 'Service d’itinéraire temporairement indisponible'));
     } finally {
       setIsLoadingRoute(false);
     }
@@ -218,9 +223,10 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       if (success) {
         setIsCheckedIn(true);
       } else {
-        setCheckInError(isAr
-          ? 'تعذر تأكيد تسجيل الوصول. تحقق من تسجيل الدخول والاتصال.'
-          : 'Check-in could not be confirmed. Check your sign-in and connection.');
+        setCheckInError(text(
+          'Check-in could not be confirmed. Check your sign-in and connection.',
+          'تعذر تأكيد تسجيل الوصول. تحقق من تسجيل الدخول والاتصال.',
+          'Le check-in n’a pas pu être confirmé. Vérifiez votre connexion et votre compte.'));
       }
     } finally {
       setIsCheckingIn(false);
@@ -236,7 +242,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label={isAr ? 'إغلاق' : 'Close'}
+                aria-label={text('Close', 'إغلاق', 'Fermer')}
                 className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition"
               >
                 <ArrowLeft className="w-5 h-5 rtl:rotate-180" />
@@ -258,7 +264,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                 {destination.subCategory || destination.category}
               </span>
               <h2 className="text-base font-bold text-white truncate mt-1">
-                {isAr && destination.arabicName ? destination.arabicName : destination.name}
+                {isAr && destination.arabicName ? destination.arabicName : isFr && destination.frenchName ? destination.frenchName : destination.name}
               </h2>
               <p className="text-xs text-slate-400 truncate mt-0.5 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -300,9 +306,9 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                     <span className="text-[11px] whitespace-nowrap">{item.label}</span>
                     <span className="text-[10px] text-slate-300 font-normal">
                       {isUnavailable
-                        ? (isAr ? 'غير متاح' : 'Unavailable')
+                        ? text('Unavailable', 'غير متاح', 'Indisponible')
                         : isSelected && routeData?.travelMode === item.mode
-                          ? (isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`)
+                          ? text(`${routeData.durationMinutes} min`, `${routeData.durationMinutes} دقيقة`, `${routeData.durationMinutes} min`)
                           : '—'}
                     </span>
                   </button>
@@ -310,39 +316,39 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               })}
             </div>
             <p className="mt-2 text-[11px] text-slate-500">
-              {isAr ? 'التوجيه الحقيقي عبر النقل العام سيظهر هنا عند ربط مزود نقل يدعمه.' : 'Public-transit routing will be enabled here when a supported transit provider is connected.'}
+              {text('Public-transit routing will be enabled here when a supported transit provider is connected.', 'التوجيه الحقيقي عبر النقل العام سيظهر هنا عند ربط مزود نقل يدعمه.', 'L’itinéraire en transport en commun sera activé ici dès qu’un fournisseur compatible sera connecté.')}
             </p>
           </div>
 
           {isLocating ? (
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center gap-2 text-slate-400 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-              <span>{isAr ? 'جاري الحصول على موقعك الحالي...' : 'Getting your current location...'}</span>
+              <span>{text('Getting your current location...', 'جاري الحصول على موقعك الحالي...', 'Obtention de votre position actuelle…')}</span>
             </div>
           ) : locationError ? (
             <div className="p-5 rounded-2xl bg-amber-950/60 border border-amber-800 space-y-3 text-xs text-amber-100">
               <p>{locationError}</p>
               <button onClick={requestCurrentLocation} className="rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white">
-                {isAr ? 'طلب الموقع مجدداً' : 'Request location again'}
+                {text('Request location again', 'طلب الموقع مجدداً', 'Redemander la position')}
               </button>
             </div>
           ) : isLoadingRoute ? (
             <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center gap-2 text-slate-400 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-              <span>{isAr ? 'جاري حساب المسار...' : 'Calculating route...'}</span>
+              <span>{text('Calculating route...', 'جاري حساب المسار...', 'Calcul de l’itinéraire…')}</span>
             </div>
           ) : routeError ? (
             <div className="p-5 rounded-2xl bg-rose-950/60 border border-rose-800 flex items-center justify-between gap-3 text-xs text-rose-200">
               <span>{routeError}</span>
               <button onClick={() => void loadRoute(travelMode)} className="rounded-lg bg-rose-600 px-3 py-1.5 font-bold text-white">
-                {isAr ? 'إعادة المحاولة' : 'Retry'}
+                {text('Retry', 'إعادة المحاولة', 'Réessayer')}
               </button>
             </div>
           ) : routeData ? (
             <div className="mb-4 p-4 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-md">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-2xl font-black text-white">{isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`}</span>
+                  <span className="text-2xl font-black text-white">{text(`${routeData.durationMinutes} min`, `${routeData.durationMinutes} دقيقة`, `${routeData.durationMinutes} min`)}</span>
                   <span className="text-xs text-slate-400 ml-2">({routeData.totalDistanceKm} km)</span>
                 </div>
                 <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-bold border border-slate-700">
@@ -358,7 +364,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>{isAr ? 'تم استلام هندسة المسار من خدمة الملاحة' : 'Route geometry received from the navigation service'}</span>
+                  <span>{text('Route geometry received from the navigation service', 'تم استلام هندسة المسار من خدمة الملاحة', 'Tracé de l’itinéraire reçu du service de navigation')}</span>
                 </span>
                 <span className="text-[11px] font-bold text-blue-300">ROUTE DATA</span>
               </div>
@@ -373,7 +379,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-base shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Navigation className="w-5 h-5 fill-current" />
-              <span>{isAr ? 'بدء إرشادات المسار' : 'Start Route Guidance'}</span>
+              <span>{text('Start Route Guidance', 'بدء إرشادات المسار', 'Démarrer le guidage')}</span>
               <ArrowRight className="w-5 h-5 ml-1 rtl:rotate-180" />
             </button>
             <button
@@ -418,9 +424,10 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             </div>
 
             <div className="max-w-xl mx-auto mt-2.5 pt-2 border-t border-emerald-600/60 text-[11px] text-emerald-100 font-medium">
-              {isAr
-                ? 'إرشادات يدوية للخطوات: الموقع لا يُتتبّع باستمرار. استخدم «التالي» لمراجعة خطوات المسار.'
-                : 'Manual step guidance: your position is not continuously tracked. Use Next to review route steps.'}
+              {text(
+                'Manual step guidance: your position is not continuously tracked. Use Next to review route steps.',
+                'إرشادات يدوية للخطوات: الموقع لا يُتتبّع باستمرار. استخدم «التالي» لمراجعة خطوات المسار.',
+                'Guidage manuel par étapes : votre position n’est pas suivie en continu. Utilisez « Suivant » pour parcourir les étapes.')}
             </div>
 
             {currentStep.aiTip && (
@@ -434,16 +441,17 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           <div ref={routeMapRef} className="relative flex-1 bg-slate-950 overflow-hidden">
             <div className="absolute top-4 left-4 rtl:left-auto rtl:right-4 z-20 flex flex-col items-center bg-slate-900/90 backdrop-blur-md rounded-2xl p-2.5 border border-slate-800 shadow-xl">
               <div className="text-2xl font-black text-white">{speed === null ? '—' : speed}</div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase">{isAr ? 'عينة سرعة GPS كم/س' : 'GPS speed sample km/h'}</div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase">{text('GPS speed sample km/h', 'عينة سرعة GPS كم/س', 'Échantillon de vitesse GPS km/h')}</div>
             </div>
 
             <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 z-20 max-w-[230px]">
               <div className="p-2.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800 shadow-xl flex items-center gap-2">
                 <MascotSindbad size="sm" mood="navigating" />
                 <p className="text-[11px] text-slate-200 font-medium leading-tight">
-                  {isAr
-                    ? 'هذه هندسة المسار المحسوبة من نقطة موقعك عند بدء الطلب.'
-                    : 'This route geometry was calculated from your location sample when the route was requested.'}
+                  {text(
+                    'This route geometry was calculated from your location sample when the route was requested.',
+                    'هذه هندسة المسار المحسوبة من نقطة موقعك عند بدء الطلب.',
+                    'Ce tracé a été calculé à partir de votre position au moment de la demande d’itinéraire.')}
                 </p>
               </div>
             </div>
@@ -453,7 +461,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
               <div>
                 <div className="text-xl font-black text-white tracking-tight">
-                  {isAr ? `تقدير المسار: ${routeData?.durationMinutes} دقيقة` : `Route estimate: ${routeData?.durationMinutes} min`}
+                  {text(`Route estimate: ${routeData?.durationMinutes} min`, `تقدير المسار: ${routeData?.durationMinutes} دقيقة`, `Estimation : ${routeData?.durationMinutes} min`)}
                 </div>
                 <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
                   <span>{routeData?.totalDistanceKm} km total</span>
@@ -475,14 +483,14 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                   className="py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition active:scale-95"
                 >
                   {currentStepIndex < steps.length - 1
-                    ? (isAr ? 'التالي' : 'Next')
-                    : (isAr ? 'إنهاء الإرشادات' : 'Finish Guidance')}
+                    ? text('Next', 'التالي', 'Suivant')
+                    : text('Finish Guidance', 'إنهاء الإرشادات', 'Terminer le guidage')}
                 </button>
                 <button
                   onClick={() => setNavState('route_selection')}
                   className="py-3 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md transition active:scale-95"
                 >
-                  {isAr ? 'إنهاء' : 'End'}
+                  {text('End', 'إنهاء', 'Terminer')}
                 </button>
               </div>
             </div>
@@ -490,7 +498,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             {showTurnList && (
               <div className="max-w-xl mx-auto mt-3 pt-3 border-t border-slate-800 space-y-2 max-h-48 overflow-y-auto">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  {isAr ? 'خطوات المسار' : 'Route Steps'}
+                  {text('Route Steps', 'خطوات المسار', 'Étapes de l’itinéraire')}
                 </div>
                 {steps.map((step, idx) => (
                   <div
@@ -518,12 +526,13 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               <CheckCircle2 className="w-10 h-10" />
             </div>
             <h1 className="text-2xl font-black text-white">
-              {isAr ? 'اكتملت إرشادات المسار' : 'Route Guidance Complete'}
+              {text('Route Guidance Complete', 'اكتملت إرشادات المسار', 'Guidage terminé')}
             </h1>
             <p className="text-xs text-slate-400 font-medium mt-1">
-              {isAr
-                ? 'هذا لا يؤكد وصولك الفعلي. سجّل الوصول فقط إذا كنت في المكان.'
-                : 'This does not confirm physical arrival. Check in only if you are actually at the place.'}
+              {text(
+                'This does not confirm physical arrival. Check in only if you are actually at the place.',
+                'هذا لا يؤكد وصولك الفعلي. سجّل الوصول فقط إذا كنت في المكان.',
+                'Cela ne confirme pas votre arrivée sur place. Enregistrez votre passage uniquement si vous y êtes vraiment.')}
             </p>
           </div>
 
@@ -571,13 +580,13 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             >
               <CheckCircle2 className={`w-5 h-5 ${isCheckedIn ? 'text-emerald-400' : 'text-blue-400'}`} />
               <span className="text-xs font-semibold">
-                {isCheckedIn ? t.checkedIn : isCheckingIn ? (isAr ? 'جاري التأكيد...' : 'Confirming...') : t.checkIn}
+                {isCheckedIn ? t.checkedIn : isCheckingIn ? text('Confirming...', 'جاري التأكيد...', 'Confirmation…') : t.checkIn}
               </span>
             </button>
 
             <label className="p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 flex flex-col items-center gap-1 cursor-pointer transition text-center">
               <Camera className="w-5 h-5 text-blue-400" />
-              <span className="text-xs font-semibold text-slate-200">{isAr ? 'معاينة صورة' : 'Preview Photo'}</span>
+              <span className="text-xs font-semibold text-slate-200">{text('Preview Photo', 'معاينة صورة', 'Aperçu photo')}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -610,7 +619,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           <div className="mb-4 p-3.5 rounded-2xl bg-blue-950/60 border border-blue-800/60 flex items-center gap-3">
             <MascotSindbad size="sm" mood="celebrating" />
             <p className="text-xs text-blue-200 leading-relaxed">
-              <strong>{isAr ? 'معلومة عن المكان:' : 'Place note:'}</strong>{' '}
+              <strong>{text('Place note:', 'معلومة عن المكان:', 'Note sur le lieu :')}</strong>{' '}
               {destination.formationInfo || destination.description}
             </p>
           </div>
@@ -621,7 +630,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
               onClick={() => onArrivedExplore(destination)}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md transition active:scale-98"
             >
-              {isAr ? 'فتح تفاصيل المكان' : 'Open Place Details'}
+              {text('Open Place Details', 'فتح تفاصيل المكان', 'Ouvrir les détails du lieu')}
             </button>
             <button
               onClick={onClose}

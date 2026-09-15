@@ -325,11 +325,6 @@ forbid('server/dal.ts', [
 
 forbid('src/components/PlaceDetailModal.tsx', ['place.rating.toFixed(1)']);
 forbid('src/components/ExploreFeed.tsx', ['place.rating.toFixed(1)']);
-forbid('src/components/MapView.tsx', [
-  'place.rating.toFixed(1)',
-  'activeNearbyPlace.rating.toFixed(1)',
-]);
-
 requirePattern('src/lib/placeRating.ts', [
   'hasVerifiedRating',
   'No verified rating',

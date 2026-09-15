@@ -4,6 +4,9 @@ import { SupportedLanguage } from '../data/translations';
 import { getWeather, WeatherData } from '../services/api';
 import type { UserLocation } from '../hooks/useGeolocation';
 import type { Place } from '../types';
+import { FALLBACK_WEATHER_PLACES, localizedFallbackLabel, weatherCodeToLabel } from '../lib/weatherConditions';
+
+export { weatherCodeToLabel };
 
 interface WeatherModalProps {
   isOpen: boolean;
@@ -13,36 +16,17 @@ interface WeatherModalProps {
   tripDestination?: Place | null;
 }
 
-// Manual fallback list used only when the traveler has no shared location and
-// no active trip destination yet. This is explicit, not a hidden default.
-const knownPlaces = [
-  { id: 'chefchaouen', label: 'Chefchaouen, Morocco', coordinates: [35.1695, -5.2625] as [number, number] },
-  { id: 'akchour', label: 'Akchour Cascades, Morocco', coordinates: [35.2415, -5.1742] as [number, number] },
-  { id: 'marrakech', label: 'Marrakech, Morocco', coordinates: [31.625, -7.99] as [number, number] },
-  { id: 'casablanca', label: 'Casablanca, Morocco', coordinates: [33.5731, -7.5898] as [number, number] },
-  { id: 'fes', label: 'Fes, Morocco', coordinates: [34.0331, -5.0003] as [number, number] },
-  { id: 'tangier', label: 'Tangier, Morocco', coordinates: [35.7595, -5.834] as [number, number] },
-];
-
-export function weatherCodeToLabel(code: number, isAr = false): string {
-  if (code === 0) return isAr ? 'سماء صافية' : 'Clear sky';
-  if ([1, 2, 3].includes(code)) return isAr ? 'غائم جزئياً' : 'Partly cloudy';
-  if ([45, 48].includes(code)) return isAr ? 'ضباب' : 'Fog';
-  if ([51, 52, 53, 54, 55, 56, 57].includes(code)) return isAr ? 'رذاذ' : 'Drizzle';
-  if ([61, 62, 63, 64, 65, 66, 67].includes(code)) return isAr ? 'أمطار' : 'Rain';
-  if ([71, 72, 73, 74, 75, 76, 77, 85, 86].includes(code)) return isAr ? 'ثلوج' : 'Snow';
-  if ([80, 81, 82].includes(code)) return isAr ? 'زخات مطرية' : 'Rain showers';
-  if ([95, 96, 99].includes(code)) return isAr ? 'عواصف رعدية' : 'Thunderstorm';
-  return isAr ? 'غير معروف' : 'Unknown';
-}
-
 export const WeatherModal: React.FC<WeatherModalProps> = ({
   isOpen,
   onClose,
-  language = 'en',
+  language: languageProp,
   userLocation = null,
   tripDestination = null,
 }) => {
+  // Annotated explicitly: this project does not enable `strict`, so a
+  // destructuring default would widen the prop back to `string` and lose the
+  // SupportedLanguage union that the localized lookups below depend on.
+  const language: SupportedLanguage = languageProp ?? 'en';
   const isAr = language === 'ar';
   const isFr = language === 'fr';
   const t = (en: string, ar: string, fr: string) => (isAr ? ar : isFr ? fr : en);
@@ -68,11 +52,16 @@ export const WeatherModal: React.FC<WeatherModalProps> = ({
         source: 'trip',
       });
     }
-    knownPlaces.forEach((place) => list.push({ ...place, source: 'known' }));
+    FALLBACK_WEATHER_PLACES.forEach((place) => list.push({
+      id: place.id,
+      label: localizedFallbackLabel(place, language),
+      coordinates: place.coordinates,
+      source: 'known',
+    }));
     return list;
   }, [userLocation?.latitude, userLocation?.longitude, tripDestination?.id, language]);
 
-  const [selectedId, setSelectedId] = useState(() => options[0]?.id || knownPlaces[0].id);
+  const [selectedId, setSelectedId] = useState(() => options[0]?.id || FALLBACK_WEATHER_PLACES[0].id);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,10 +70,16 @@ export const WeatherModal: React.FC<WeatherModalProps> = ({
     if (!isOpen) return;
     // Prefer the traveler's real context (their location, else their active trip)
     // every time the modal opens, instead of remembering a stale manual pick.
-    setSelectedId(options[0]?.id || knownPlaces[0].id);
+    setSelectedId(options[0]?.id || FALLBACK_WEATHER_PLACES[0].id);
   }, [isOpen]);
 
-  const selected = options.find((option) => option.id === selectedId) || options[0] || { ...knownPlaces[0], source: 'known' as const };
+  const fallbackOption: LocationOption = {
+    id: FALLBACK_WEATHER_PLACES[0].id,
+    label: localizedFallbackLabel(FALLBACK_WEATHER_PLACES[0], language),
+    coordinates: FALLBACK_WEATHER_PLACES[0].coordinates,
+    source: 'known',
+  };
+  const selected = options.find((option) => option.id === selectedId) || options[0] || fallbackOption;
 
   const loadWeather = async (target: LocationOption) => {
     setIsLoading(true);
@@ -162,7 +157,7 @@ export const WeatherModal: React.FC<WeatherModalProps> = ({
               <div className="p-5 rounded-3xl bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 flex items-center justify-between">
                 <div>
                   <span className="text-3xl font-black text-slate-900">{typeof weather.temperatureC === 'number' ? `${Math.round(weather.temperatureC)}°C` : '—'}</span>
-                  <p className="text-xs font-bold text-blue-600 mt-0.5">{weatherCodeToLabel(weather.weatherCode, isAr)}</p>
+                  <p className="text-xs font-bold text-blue-600 mt-0.5">{weatherCodeToLabel(weather.weatherCode, language)}</p>
                   {weather.observedAt && (
                     <span className="text-[11px] text-slate-500">
                       {t('Observed', 'آخر تحديث', 'Observé')}: {new Date(weather.observedAt).toLocaleString(language)}

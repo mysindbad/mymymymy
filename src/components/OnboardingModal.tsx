@@ -39,6 +39,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [locationError, setLocationError] = useState<string | null>(null);
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
+  // Onboarding is the very first screen a traveler sees. It offers French as a
+  // choice, so every string here must actually exist in French instead of
+  // silently falling back to English.
+  const text = (en: string, ar: string, fr: string) => (isAr ? ar : isFr ? fr : en);
 
   const complete = () => {
     try {
@@ -53,7 +58,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     setLocationError(null);
     const location = await requestPermission();
     if (!location) {
-      setLocationError(isAr ? 'تعذر الحصول على موقعك. يمكنك المتابعة بدون الموقع.' : 'We could not get your location. You can continue without it.');
+      setLocationError(text('We could not get your location. You can continue without it.', 'تعذر الحصول على موقعك. يمكنك المتابعة بدون الموقع.', 'Nous n’avons pas pu obtenir votre position. Vous pouvez continuer sans elle.'));
     }
   };
 
@@ -70,9 +75,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           <div className="mx-auto mb-3 flex justify-center">
             <BrandLogo size="md" showSlogan={false} language={language} className="drop-shadow-xl" />
           </div>
-          <h2 className="text-center text-2xl font-black tracking-tight">{isAr ? 'مرحباً بك في My Sindbad' : 'Welcome to My Sindbad'}</h2>
+          <h2 className="text-center text-2xl font-black tracking-tight">{text('Welcome to My Sindbad', 'مرحباً بك في My Sindbad', 'Bienvenue sur My Sindbad')}</h2>
           <p className="mt-2 text-center text-sm font-medium text-white/90">
-            {isAr ? 'لنجهّز تجربتك بسرعة، ثم ابدأ اكتشاف الأماكن.' : 'Let us personalize your experience, then start exploring.'}
+            {text('Let us personalize your experience, then start exploring.', 'لنجهّز تجربتك بسرعة، ثم ابدأ اكتشاف الأماكن.', 'Personnalisons votre expérience, puis commencez à explorer.')}
           </p>
         </div>
 
@@ -88,8 +93,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <div className="mb-5 flex items-start gap-3">
                 <Globe2 className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">{isAr ? 'اختر لغتك المفضلة' : 'Choose your preferred language'}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{isAr ? 'يمكنك تغييرها لاحقاً من داخل التطبيق.' : 'You can change it later from the app.'}</p>
+                  <h3 className="text-lg font-black text-slate-900">{text('Choose your preferred language', 'اختر لغتك المفضلة', 'Choisissez votre langue préférée')}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{text('You can change it later from the app.', 'يمكنك تغييرها لاحقاً من داخل التطبيق.', 'Vous pourrez la changer plus tard dans l’application.')}</p>
                 </div>
               </div>
 
@@ -112,7 +117,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
 
               <button type="button" onClick={() => setStep(2)} className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3.5 text-sm font-black text-white hover:bg-slate-800">
-                {t.startNavigation === 'Start Navigation' ? 'Continue' : isAr ? 'متابعة' : 'Continue'}
+                {text('Continue', 'متابعة', 'Continuer')}
               </button>
             </section>
           )}
@@ -122,9 +127,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <div className="mb-5 flex items-start gap-3">
                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">{isAr ? 'اسمح بالوصول إلى موقعك' : 'Allow location access'}</h3>
+                  <h3 className="text-lg font-black text-slate-900">{text('Allow location access', 'اسمح بالوصول إلى موقعك', 'Autoriser l’accès à votre position')}</h3>
                   <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                    {isAr ? 'سنستخدم موقعك الحالي لعرض الأماكن الأقرب. لا يلزم السماح بالوصول للاستمرار.' : 'We use your current position to show nearby places. Location access is optional.'}
+                    {text('We use your current position to show nearby places. Location access is optional.', 'سنستخدم موقعك الحالي لعرض الأماكن الأقرب. لا يلزم السماح بالوصول للاستمرار.', 'Nous utilisons votre position actuelle pour afficher les lieux proches. L’accès à la position est facultatif.')}
                   </p>
                 </div>
               </div>
@@ -132,19 +137,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-                  <span>{isAr ? 'يتم إرسال آخر موقع معروف فقط عند موافقتك، وبموافقة الحساب المسجل.' : 'Your last known location is only synced after you grant permission while signed in.'}</span>
+                  <span>{text('Your last known location is only synced after you grant permission while signed in.', 'يتم إرسال آخر موقع معروف فقط عند موافقتك، وبموافقة الحساب المسجل.', 'Votre dernière position connue n’est synchronisée qu’après votre autorisation, une fois connecté.')}</span>
                 </div>
               </div>
 
               {userLocation && (
                 <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">
-                  {isAr ? 'تم تحديد موقعك بنجاح.' : 'Your location was detected successfully.'}
+                  {text('Your location was detected successfully.', 'تم تحديد موقعك بنجاح.', 'Votre position a été détectée avec succès.')}
                 </div>
               )}
 
               {permission === 'denied' && !userLocation && (
                 <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">
-                  {isAr ? 'تم رفض إذن الموقع. يمكنك تفعيله من إعدادات المتصفح.' : 'Location permission is denied. You can enable it from your browser settings.'}
+                  {text('Location permission is denied. You can enable it from your browser settings.', 'تم رفض إذن الموقع. يمكنك تفعيله من إعدادات المتصفح.', 'L’autorisation de localisation est refusée. Vous pouvez l’activer dans les réglages de votre navigateur.')}
                 </div>
               )}
 
@@ -154,10 +159,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               <div className="mt-6 flex gap-2">
                 <button type="button" onClick={() => setStep(3)} className="flex-1 rounded-2xl border border-slate-200 px-4 py-3.5 text-sm font-black text-slate-700 hover:bg-slate-50">
-                  {isAr ? 'تخطي' : 'Skip'}
+                  {text('Skip', 'تخطي', 'Ignorer')}
                 </button>
                 <button type="button" onClick={() => void handleRequestLocation().then(() => setStep(3))} className="flex-1 rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-black text-white hover:bg-blue-700">
-                  {userLocation ? (isAr ? 'متابعة' : 'Continue') : (isAr ? 'السماح بالموقع' : 'Allow location')}
+                  {userLocation ? text('Continue', 'متابعة', 'Continuer') : text('Allow location', 'السماح بالموقع', 'Autoriser la position')}
                 </button>
               </div>
             </section>
@@ -168,14 +173,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <div className="mx-auto flex justify-center">
                 <BrandLogo size="icon" showSlogan={false} language={language} className="h-20 w-20" />
               </div>
-              <h3 className="mt-4 text-center text-xl font-black text-slate-900">{isAr ? 'أنت جاهز للاستكشاف' : 'You are ready to explore'}</h3>
+              <h3 className="mt-4 text-center text-xl font-black text-slate-900">{text('You are ready to explore', 'أنت جاهز للاستكشاف', 'Vous êtes prêt à explorer')}</h3>
               <p className="mx-auto mt-2 max-w-md text-center text-sm leading-relaxed text-slate-500">
                 {userLocation
-                  ? (isAr ? 'سنرتب لك الأماكن الأقرب إلى موقعك الحقيقي عندما تكون البيانات متاحة.' : 'We will prioritize nearby places using your real position when available.')
-                  : (isAr ? 'يمكنك استخدام My Sindbad بدون مشاركة الموقع، ثم تفعيلها لاحقاً.' : 'You can use My Sindbad without sharing your location and enable it later.')}
+                  ? (text('We will prioritize nearby places using your real position when available.', 'سنرتب لك الأماكن الأقرب إلى موقعك الحقيقي عندما تكون البيانات متاحة.', 'Nous mettrons en avant les lieux proches selon votre position réelle lorsqu’elle est disponible.'))
+                  : (text('You can use My Sindbad without sharing your location and enable it later.', 'يمكنك استخدام My Sindbad بدون مشاركة الموقع، ثم تفعيلها لاحقاً.', 'Vous pouvez utiliser My Sindbad sans partager votre position et l’activer plus tard.'))}
               </p>
               <button type="button" onClick={complete} className="mt-7 w-full rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700">
-                {isAr ? 'ابدأ الاستكشاف' : 'Start exploring'}
+                {text('Start exploring', 'ابدأ الاستكشاف', 'Commencer à explorer')}
               </button>
             </section>
           )}
