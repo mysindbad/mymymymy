@@ -1,7 +1,7 @@
 import React from 'react';
 import { SupportedLanguage } from '../data/translations';
 
-const MY_SINDBAD_LOGO_URL = '/brand/my-sindbad-logo-v6.webp';
+const MY_SINDBAD_LOGO_URL = '/brand/my-sindbad-logo-v7.png';
 
 interface BrandLogoProps {
   className?: string;
