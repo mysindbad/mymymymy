@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Building2,
   CalendarDays,
   Check,
   ChevronDown,
@@ -9,9 +10,7 @@ import {
   Loader2,
   MapPin,
   Plus,
-  RefreshCw,
   Trash2,
-  Wallet,
   X,
 } from 'lucide-react';
 import {
@@ -33,7 +32,7 @@ import {
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import { AuthStatus } from '../lib/authSession';
-import { rankFuzzyDestinations } from '../lib/fuzzyDestination';
+import { buildCityDestination, rankFuzzyDestinations } from '../lib/fuzzyDestination';
 
 interface TripsPlannerProps {
   language?: SupportedLanguage;
@@ -82,6 +81,14 @@ function formatDate(value: string, language: string) {
 
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function mergePlaceResults(primary: Place[], additional: Place[]) {
+  const merged = [...primary];
+  for (const place of additional) {
+    if (!merged.some((candidate) => candidate.id === place.id)) merged.push(place);
+  }
+  return merged;
 }
 
 export const TripsPlanner: React.FC<TripsPlannerProps> = ({
@@ -139,6 +146,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   const today = dateFromToday(0);
   const latestEndDate = addDays(form.startDate, MAX_PLAN_DAYS - 1);
   const selectedPlace = places.find((place) => place.id === form.destinationId) || null;
+  const selectedIsCity = Boolean(selectedPlace?.id.startsWith('city:'));
 
   const resetPlanner = (destinationQuery = '') => {
     setStep(1);
@@ -200,21 +208,31 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       if (form.destinationId) setForm((current) => ({ ...current, destinationId: '' }));
       return;
     }
+
     setPlacesLoading(true);
     setPlacesError('');
     const timer = window.setTimeout(async () => {
       try {
-        let results = await fetchPlaces({ query });
+        const direct = await fetchPlaces({ query });
         if (sequence !== searchSequence.current) return;
-        if (results.length === 0 && query.length >= 4) {
+        let results = direct;
+
+        // A sparse exact search (for example one hotel in Marrakech) must not make that
+        // hotel pretend to be the city. Supplement with catalog matches and derive a city row.
+        if (query.length >= 3 && direct.length < 8) {
           const liveCatalog = await fetchPlaces();
           if (sequence !== searchSequence.current) return;
-          results = rankFuzzyDestinations(query, liveCatalog, 24);
+          results = mergePlaceResults(direct, rankFuzzyDestinations(query, liveCatalog, 24));
         }
+
+        const city = buildCityDestination(query, results);
+        const finalResults = city
+          ? [city, ...results.filter((place) => place.id !== city.id)].slice(0, 24)
+          : results.slice(0, 24);
         if (sequence !== searchSequence.current) return;
-        setPlaces(results.slice(0, 24));
+        setPlaces(finalResults);
         setPlacesSearched(true);
-        if (form.destinationId && !results.some((place) => place.id === form.destinationId)) {
+        if (form.destinationId && !finalResults.some((place) => place.id === form.destinationId)) {
           setForm((current) => ({ ...current, destinationId: '' }));
         }
       } catch (searchError) {
@@ -247,12 +265,21 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   };
 
   const runPlan = async () => {
-    if (!form.destinationId) return;
+    if (!selectedPlace) return;
     setPlanning(true);
     setPlanError('');
     try {
       const result = await planTrip({
-        destinationId: form.destinationId,
+        destinationId: selectedIsCity ? undefined : selectedPlace.id,
+        destination: selectedIsCity ? {
+          name: selectedPlace.name,
+          arabicName: selectedPlace.arabicName,
+          frenchName: selectedPlace.frenchName,
+          region: selectedPlace.region,
+          area: selectedPlace.area,
+          address: selectedPlace.address,
+          coordinates: selectedPlace.coordinates,
+        } : undefined,
         startDate: form.startDate,
         endDate: form.endDate,
         budget: Number(form.budget),
@@ -274,18 +301,26 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     setSaving(true);
     setPlanError('');
     try {
+      const enrichedItinerary: TripItinerary = {
+        ...itinerary,
+        destinationName: itinerary.destinationName || selectedPlace.name,
+        destinationArea: itinerary.destinationArea || selectedPlace.area,
+        destinationRegion: itinerary.destinationRegion || selectedPlace.region,
+        destinationCoordinates: itinerary.destinationCoordinates || selectedPlace.coordinates,
+      };
       const trip = await createTrip({
-        name: isAr ? `رحلة إلى ${selectedPlace.arabicName || selectedPlace.name}` : isFr ? `Voyage à ${selectedPlace.name}` : `Trip to ${selectedPlace.name}`,
-        destinationId: selectedPlace.id,
+        name: isAr ? `رحلة إلى ${selectedPlace.arabicName || selectedPlace.name}` : isFr ? `Voyage à ${selectedPlace.frenchName || selectedPlace.name}` : `Trip to ${selectedPlace.name}`,
+        destinationId: selectedIsCity ? undefined : selectedPlace.id,
         startDate: form.startDate,
         endDate: form.endDate,
         budget: Number(form.budget),
         currency: form.currency,
         participantsCount: form.participants,
         preferences: form.preferences,
-        aiItinerary: itinerary,
+        aiItinerary: enrichedItinerary,
       });
-      setTrips((current) => [trip, ...current]);
+      const saved = selectedIsCity && !trip.destinationName ? { ...trip, destinationName: selectedPlace.name, aiItinerary: enrichedItinerary } : trip;
+      setTrips((current) => [saved, ...current]);
       const destination = selectedPlace;
       resetPlanner();
       onTripCreated?.(destination);
@@ -405,7 +440,10 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
             : placesLoading ? <CenteredLoading text={l('Searching…', 'جارٍ البحث…', 'Recherche…')} compact />
               : placesError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{placesError}</div>
                 : placesSearched && places.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">{l('No destinations found.', 'لم يتم العثور على وجهات.', 'Aucune destination trouvée.')}</div>
-                  : <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{places.map((place) => <button key={place.id} type="button" onClick={() => updateForm({ destinationId: place.id })} className={`flex items-center gap-3 rounded-2xl border p-3 text-start ${form.destinationId === place.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 hover:border-blue-300'}`}><MapPin className="h-5 w-5 shrink-0 text-blue-600" /><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-900">{isAr && place.arabicName ? place.arabicName : place.name}</strong><small className="block truncate text-slate-500">{place.area} · {place.region}</small></span>{form.destinationId === place.id && <Check className="h-4 w-4 text-blue-600" />}</button>)}</div>}
+                  : <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{places.map((place) => {
+                    const isCity = place.id.startsWith('city:');
+                    return <button key={place.id} type="button" onClick={() => updateForm({ destinationId: place.id })} className={`flex items-center gap-3 rounded-2xl border p-3 text-start ${form.destinationId === place.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 hover:border-blue-300'}`} data-destination-kind={isCity ? 'city' : 'place'}>{isCity ? <Building2 className="h-5 w-5 shrink-0 text-indigo-600" /> : <MapPin className="h-5 w-5 shrink-0 text-blue-600" />}<span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-900">{isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name}</strong><small className="block truncate text-slate-500">{isCity ? l('City', 'مدينة', 'Ville') : `${place.area} · ${place.region}`}</small></span>{form.destinationId === place.id && <Check className="h-4 w-4 text-blue-600" />}</button>;
+                  })}</div>}
         </div>}
         {step === 2 && <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">{l('Start date', 'تاريخ البداية', 'Date de début')}<input type="date" value={form.startDate} min={today} onChange={(event) => updateForm({ startDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label><label className="text-sm font-bold text-slate-700">{l('End date', 'تاريخ النهاية', 'Date de fin')}<input type="date" value={form.endDate} min={form.startDate} max={latestEndDate} onChange={(event) => updateForm({ endDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label></div>}
         {step === 3 && <div className="grid gap-4 sm:grid-cols-[1fr_140px]"><label className="text-sm font-bold text-slate-700">{l('Budget', 'الميزانية', 'Budget')}<input type="number" min="1" value={form.budget} onChange={(event) => updateForm({ budget: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label><label className="text-sm font-bold text-slate-700">{l('Currency', 'العملة', 'Devise')}<select value={form.currency} onChange={(event) => updateForm({ currency: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal"><option>MAD</option><option>EUR</option><option>USD</option></select></label></div>}
@@ -424,7 +462,8 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
               const budget = budgetByTripId[trip.id];
               const spent = budget?.spentTotal ?? trip.spentTotal ?? 0;
               const expanded = expandedTripId === trip.id;
-              return <article key={trip.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><button type="button" onClick={() => toggleTrip(trip.id)} className="min-w-0 flex-1 text-start"><strong className="block truncate text-slate-900">{trip.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{trip.destinationName || l('Destination', 'وجهة', 'Destination')} · {formatDate(trip.startDate, language)} – {formatDate(trip.endDate, language)}</span></button><div className="flex"><button type="button" onClick={() => toggleTrip(trip.id)} className="rounded-xl p-2 text-slate-400"><ChevronDown className={`h-4 w-4 ${expanded ? 'rotate-180' : ''}`} /></button><button type="button" onClick={() => void removeTrip(trip)} className="rounded-xl p-2 text-slate-400 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{statusLabel(trip.status)}</span><select value={trip.status} onChange={(event) => void changeStatus(trip, event.target.value as Trip['status'])} className="rounded-xl border border-slate-200 px-2 py-1 text-xs"><option value="planning">{statusLabel('planning')}</option><option value="active">{statusLabel('active')}</option><option value="completed">{statusLabel('completed')}</option><option value="cancelled">{statusLabel('cancelled')}</option></select></div><div className="mt-3 text-xs text-slate-500">{l('Spent', 'المصروف', 'Dépensé')}: <strong>{spent.toFixed(2)} / {trip.budget.toFixed(2)} {trip.currency}</strong></div>
+              const destinationName = trip.destinationName || trip.aiItinerary?.destinationName || l('Destination', 'وجهة', 'Destination');
+              return <article key={trip.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><button type="button" onClick={() => toggleTrip(trip.id)} className="min-w-0 flex-1 text-start"><strong className="block truncate text-slate-900">{trip.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{destinationName} · {formatDate(trip.startDate, language)} – {formatDate(trip.endDate, language)}</span></button><div className="flex"><button type="button" onClick={() => toggleTrip(trip.id)} className="rounded-xl p-2 text-slate-400"><ChevronDown className={`h-4 w-4 ${expanded ? 'rotate-180' : ''}`} /></button><button type="button" onClick={() => void removeTrip(trip)} className="rounded-xl p-2 text-slate-400 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{statusLabel(trip.status)}</span><select value={trip.status} onChange={(event) => void changeStatus(trip, event.target.value as Trip['status'])} className="rounded-xl border border-slate-200 px-2 py-1 text-xs"><option value="planning">{statusLabel('planning')}</option><option value="active">{statusLabel('active')}</option><option value="completed">{statusLabel('completed')}</option><option value="cancelled">{statusLabel('cancelled')}</option></select></div><div className="mt-3 text-xs text-slate-500">{l('Spent', 'المصروف', 'Dépensé')}: <strong>{spent.toFixed(2)} / {trip.budget.toFixed(2)} {trip.currency}</strong></div>
                 {expanded && <div className="mt-4 border-t border-slate-100 pt-4">{budgetLoadingId === trip.id ? <CenteredLoading text={l('Loading expenses…', 'جارٍ تحميل المصروفات…', 'Chargement des dépenses…')} compact /> : budgetErrorByTripId[trip.id] ? <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">{budgetErrorByTripId[trip.id]} <button type="button" onClick={() => void loadExpenses(trip.id)} className="font-bold underline">{l('Retry', 'إعادة', 'Réessayer')}</button></div> : budget ? <div className="space-y-3"><div className="flex items-center justify-between"><strong className="text-sm text-slate-900">{l('Expenses', 'المصروفات', 'Dépenses')}</strong><button type="button" onClick={() => { setExpenseModalTripId(trip.id); setExpenseError(''); setExpenseForm({ category: 'food', amount: '', description: '', expenseDate: dateFromToday(0) }); }} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" />{l('Add expense', 'إضافة مصروف', 'Ajouter')}</button></div>{budget.expenses.length === 0 ? <p className="rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">{l('No expenses yet.', 'لا توجد مصروفات بعد.', 'Aucune dépense.')}</p> : budget.expenses.map((expense) => <div key={expense.id} className="flex items-center gap-2 rounded-xl border border-slate-100 p-2"><div className="min-w-0 flex-1"><strong className="block truncate text-xs text-slate-800">{expense.description || expense.category}</strong><span className="text-[11px] text-slate-500">{expense.amount.toFixed(2)} {expense.currency}</span></div><button type="button" disabled={deletingExpenseId === expense.id} onClick={() => void removeExpense(trip.id, expense.id)} className="p-2 text-slate-400 hover:text-rose-600">{deletingExpenseId === expense.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div>)}</div> : null}</div>}
               </article>;
             })}</div>}
