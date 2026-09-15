@@ -95,6 +95,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
     return place.category === selectedFilter;
   }), [places, selectedFilter]);
 
+  const hasOpenStreetMapData = places.some((place) => place.dataSource === 'openstreetmap');
   const contextTitle = searchQuery.trim()
     ? t('Search results', 'نتائج البحث', 'Résultats de recherche')
     : tripDestination
@@ -117,7 +118,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <div><h1 className="text-base font-black text-slate-900">{contextTitle}</h1>{tripDestination && !searchQuery.trim() && <p className="mt-0.5 text-xs text-slate-500">{t('Near the destination and along your direction of travel.', 'قرب الوجهة وعلى اتجاه رحلتك.', 'Près de la destination et sur votre direction de trajet.')}</p>}</div>
+        <h1 className="text-base font-black text-slate-900">{contextTitle}</h1>
         <div className="flex gap-2">
           <button type="button" onClick={onOpenPassiveModal} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">{t('Location', 'الموقع', 'Localisation')}</button>
           <button type="button" onClick={onOpenAddModal} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" />{t('Add Place', 'إضافة مكان', 'Ajouter')}</button>
@@ -134,7 +135,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
         ].map(([id, label]) => <button key={id} type="button" onClick={() => setSelectedFilter(id as typeof selectedFilter)} className={`whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-bold ${selectedFilter === id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{label}</button>)}
       </div>
 
-      {isLoading && <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin text-blue-600" />{t('Loading places…', 'جارٍ تحميل الأماكن…', 'Chargement des lieux…')}</div>}
+      {isLoading && <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin text-blue-600" />{t('Loading places…', 'جارٍ تحميل الأماكن…', 'Chargement…')}</div>}
       {loadError && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">{t('Could not load places.', 'تعذر تحميل الأماكن.', 'Impossible de charger les lieux.')}</div>}
 
       {!isLoading && !loadError && !searchQuery.trim() && !userLocation && !tripDestination && (
@@ -153,7 +154,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
             <article key={place.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
               <button type="button" onClick={() => onSelectPlace(place)} className="block w-full text-start">
                 <div className="relative h-40 bg-slate-200">
-                  {place.photos?.[0] ? <img src={place.photos[0]} alt={isAr && place.arabicName ? place.arabicName : place.name} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-slate-200 to-slate-400" />}
+                  {place.photos?.[0] ? <img src={place.photos[0]} alt={isAr && place.arabicName ? place.arabicName : place.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-200 to-slate-400"><MapPin className="h-8 w-8 text-slate-500" /></div>}
                   <button type="button" onClick={(event) => { event.stopPropagation(); onToggleSave(place.id); }} className={`absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full ${isSaved ? 'bg-rose-500' : 'bg-black/45'} text-white`} aria-label={isSaved ? t('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : t('Save place', 'حفظ المكان', 'Enregistrer')}><Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} /></button>
                 </div>
                 <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-black text-slate-900">{isAr && place.arabicName ? place.arabicName : place.name}</h2><p className="mt-1 truncate text-xs text-slate-500">{place.area} · {place.region}</p></div><span className="shrink-0 text-xs font-bold text-slate-600">{rating ? `★ ${rating}` : unratedShortLabel(language)}</span></div><div className="mt-2 flex items-center justify-between text-xs text-slate-500"><span>{formatPriceLevel(place.priceLevel, currency)}</span>{typeof place.distanceKm === 'number' && <span>{place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km</span>}</div></div>
@@ -163,6 +164,8 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
           );
         })}
       </div>
+
+      {hasOpenStreetMapData && <p className="text-center text-[10px] text-slate-400">© OpenStreetMap contributors</p>}
     </div>
   );
 };

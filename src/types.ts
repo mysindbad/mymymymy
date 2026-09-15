@@ -41,7 +41,7 @@ export interface Place {
   photos: string[];
   description: string;
   formationInfo?: string;
-  rating: number;
+  rating: number | null;
   reviewCount: number;
   ratingsBreakdown?: {
     cleanliness: number;
@@ -56,7 +56,7 @@ export interface Place {
   openingHours?: string;
   contactPhone?: string;
   isUnderDocumentedGem?: boolean;
-  source: 'initial_seed' | 'community_traveler' | 'business_owner';
+  source: 'initial_seed' | 'community_traveler' | 'business_owner' | 'external';
   ownerVerified?: boolean;
   businessOwnerName?: string;
   checkInsCount: number;

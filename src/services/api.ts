@@ -1,6 +1,7 @@
 import { Place, PlaceReview, NavigationRouteData, TravelMode } from '../types';
 import { supabase } from '../lib/supabase';
 import { getAuthSessionSnapshot, waitForSessionReady } from '../lib/authSession';
+import { haversineDistanceKm } from '../lib/placeContext';
 
 export class ApiAuthenticationError extends Error {
   status = 401;
@@ -112,6 +113,31 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   return payload;
 }
 
+function mergeUniquePlaces(primary: Place[], additional: Place[]) {
+  const merged = [...primary];
+  for (const place of additional) {
+    const duplicate = merged.some((current) => {
+      if (current.id === place.id) return true;
+      if (current.name.trim().toLocaleLowerCase() !== place.name.trim().toLocaleLowerCase()) return false;
+      return haversineDistanceKm(current.coordinates, place.coordinates) < 0.15;
+    });
+    if (!duplicate) merged.push(place);
+  }
+  return merged;
+}
+
+async function fetchNearbyBaseline(latitude: number, longitude: number) {
+  try {
+    const data = await apiRequest<{ places?: Place[] }>(
+      `/api/nearby-places?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`,
+    );
+    return data.places || [];
+  } catch (error) {
+    console.warn('Nearby baseline unavailable:', error);
+    return [];
+  }
+}
+
 export async function fetchPlaces(params?: {
   category?: string;
   region?: string;
@@ -133,7 +159,18 @@ export async function fetchPlaces(params?: {
   }
   const queryString = searchParams.toString();
   const data = await apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
-  return data.places || [];
+  const databasePlaces = data.places || [];
+
+  if (params?.userLat !== undefined && params.userLng !== undefined && !params.query) {
+    const origin: [number, number] = [params.userLat, params.userLng];
+    const localDatabaseCount = databasePlaces.filter((place) => haversineDistanceKm(origin, place.coordinates) <= 50).length;
+    if (localDatabaseCount < 6) {
+      const discovered = await fetchNearbyBaseline(params.userLat, params.userLng);
+      return mergeUniquePlaces(databasePlaces, discovered);
+    }
+  }
+
+  return databasePlaces;
 }
 
 export async function fetchPlaceById(id: string): Promise<Place | null> {
