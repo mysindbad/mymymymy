@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Compass, Home as HomeIcon, Loader2, ShoppingBag, User } from 'lucide-react';
 import { Place } from './types';
+import { SupportedLanguage } from './data/translations';
 import { fetchPlaces, sendChatMessage } from './services/api';
 import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
 import { signOut, useAuthSession } from './lib/authSession';
