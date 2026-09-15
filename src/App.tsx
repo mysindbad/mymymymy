@@ -96,6 +96,8 @@ export default function App() {
   const { location: userLocation, permission, requestPermission } = useGeolocation();
   const { canInstall, promptInstall, showIosHint: showIosInstallHint, dismissIosHint: dismissIosInstallHint } = usePwaInstall();
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
+  const shellText = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
 
   const handlePassiveOptInChange = (optedIn: boolean) => {
     setIsPassiveOptedIn(optedIn);
@@ -266,11 +268,11 @@ export default function App() {
     if (destination) return destinationVoiceReply(destination, language);
     if (authStatus !== 'authed') {
       return {
-        text: isAr ? 'سجّل الدخول لطرح أسئلة مفتوحة على سندباد.' : language === 'fr' ? 'Connectez-vous pour poser une question à Sindbad.' : 'Sign in to ask Sindbad open-ended questions.',
-        actions: [{ target: 'account', label: isAr ? 'الحساب' : language === 'fr' ? 'Compte' : 'Account' }],
+        text: shellText('Sign in to ask Sindbad open-ended questions.', 'سجّل الدخول لطرح أسئلة مفتوحة على سندباد.', 'Connectez-vous pour poser une question à Sindbad.'),
+        actions: [{ target: 'account', label: shellText('Account', 'الحساب', 'Compte') }],
       };
     }
-    const text = await sendChatMessage(message, 'Morocco & Global Destinations', language, []);
+    const text = await sendChatMessage(message, shellText('Travel and destinations', 'السفر والوجهات', 'Voyages et destinations'), language, []);
     return { text, actions: [] };
   };
 
@@ -283,15 +285,15 @@ export default function App() {
 
   const topBar = (title: string) => (
     <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
-      <button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {isAr ? 'الرئيسية' : 'Home'}</button>
+      <button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button>
       <h2 className="text-sm font-black text-slate-900">{title}</h2><div className="w-16" />
     </div>
   );
 
   return (
     <div className={`flex min-h-screen flex-col bg-slate-100 font-sans ${isAr ? 'rtl' : 'ltr'}`}>
-      {placesLoading && <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg">{isAr ? 'جارٍ تحميل الأماكن…' : 'Loading places…'}</div>}
-      {placesError && <div className="fixed left-1/2 top-3 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-800 shadow-lg"><span>{isAr ? 'تعذر تحميل الأماكن' : 'Could not load places'}</span>{userLocation && !tripDestination && <button type="button" onClick={() => void loadNearbyPlaces()} className="rounded-lg bg-rose-600 px-2.5 py-1 text-white">{isAr ? 'إعادة' : 'Retry'}</button>}</div>}
+      {placesLoading && <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg">{shellText('Loading places…', 'جارٍ تحميل الأماكن…', 'Chargement des lieux…')}</div>}
+      {placesError && <div className="fixed left-1/2 top-3 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-800 shadow-lg"><span>{shellText('Could not load places', 'تعذر تحميل الأماكن', 'Impossible de charger les lieux')}</span>{userLocation && !tripDestination && <button type="button" onClick={() => void loadNearbyPlaces()} className="rounded-lg bg-rose-600 px-2.5 py-1 text-white">{shellText('Retry', 'إعادة', 'Réessayer')}</button>}</div>}
 
       <main className="relative flex-1 overflow-hidden">
         {activeTab === 'home' && <HomeScreen
@@ -318,7 +320,7 @@ export default function App() {
         />}
 
         {activeTab === 'explore' && <div className="h-full w-full overflow-y-auto">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5"><button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {isAr ? 'الرئيسية' : 'Home'}</button><h2 className="truncate text-sm font-black text-slate-900">{exploreView === 'feed' ? (isAr ? 'استكشف' : 'Explore') : (isAr ? 'الخريطة' : 'Map')}</h2><button type="button" onClick={() => setExploreView((current) => current === 'feed' ? 'map' : 'feed')} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{exploreView === 'feed' ? (isAr ? 'الخريطة' : 'Map') : (isAr ? 'القائمة' : 'List')}</button></div>
+          <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5"><button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button><h2 className="truncate text-sm font-black text-slate-900">{exploreView === 'feed' ? shellText('Explore', 'استكشف', 'Explorer') : shellText('Map', 'الخريطة', 'Carte')}</h2><button type="button" onClick={() => setExploreView((current) => current === 'feed' ? 'map' : 'feed')} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{exploreView === 'feed' ? shellText('Map', 'الخريطة', 'Carte') : shellText('List', 'القائمة', 'Liste')}</button></div>
           {exploreView === 'feed' ? <ExploreFeed
             initialQuery={exploreQuery}
             onSelectPlace={setSelectedPlace}
@@ -343,9 +345,9 @@ export default function App() {
           />}
         </div>}
 
-        {activeTab === 'trips' && <div className="h-full w-full overflow-y-auto">{topBar(isAr ? 'رحلاتي' : 'My Trips')}<TripsPlanner language={language} authStatus={authStatus} onOpenAuth={() => handleOpenAuth('welcome')} onTripCreated={(destination) => void handleTripCreated(destination)} initialDestinationQuery={tripInitialQuery} /></div>}
+        {activeTab === 'trips' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('My Trips', 'رحلاتي', 'Mes voyages'))}<TripsPlanner language={language} authStatus={authStatus} onOpenAuth={() => handleOpenAuth('welcome')} onTripCreated={(destination) => void handleTripCreated(destination)} initialDestinationQuery={tripInitialQuery} /></div>}
 
-        {activeTab === 'community' && <div className="h-full w-full overflow-y-auto">{topBar(isAr ? 'المجتمع' : 'Community')}<CommunityHub onOpenAddModal={() => setIsAddPlaceOpen(true)} onOpenPassiveModal={() => setIsPassiveModalOpen(true)} isPassiveOptedIn={isPassiveOptedIn} language={language} /></div>}
+        {activeTab === 'community' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('Community', 'المجتمع', 'Communauté'))}<CommunityHub onOpenAddModal={() => setIsAddPlaceOpen(true)} onOpenPassiveModal={() => setIsPassiveModalOpen(true)} isPassiveOptedIn={isPassiveOptedIn} language={language} /></div>}
 
         {activeTab === 'account' && <div className="h-full w-full overflow-y-auto"><AccountProfilePage
           language={language}
@@ -368,11 +370,11 @@ export default function App() {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-2 shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-xl">
         <div className="relative mx-auto flex max-w-md items-end justify-between px-2">
-          <BottomTab id="tab-home" active={activeTab === 'home'} label={isAr ? 'الرئيسية' : 'Home'} icon={<HomeIcon className="h-5 w-5" />} onClick={() => setActiveTab('home')} />
-          <BottomTab id="tab-explore" active={activeTab === 'explore'} label={isAr ? 'استكشف' : 'Explore'} icon={<Compass className="h-5 w-5" />} onClick={() => setActiveTab('explore')} />
+          <BottomTab id="tab-home" active={activeTab === 'home'} label={shellText('Home', 'الرئيسية', 'Accueil')} icon={<HomeIcon className="h-5 w-5" />} onClick={() => setActiveTab('home')} />
+          <BottomTab id="tab-explore" active={activeTab === 'explore'} label={shellText('Explore', 'استكشف', 'Explorer')} icon={<Compass className="h-5 w-5" />} onClick={() => setActiveTab('explore')} />
           <button id="tab-ai-assistant" type="button" onClick={() => setIsAIChatOpen(true)} className="flex flex-col items-center gap-1 px-3 py-0.5 text-blue-600"><AIIcon size={22} variant="badge" /><span className="text-[11px] font-extrabold">AI</span></button>
-          <BottomTab id="tab-trips" active={activeTab === 'trips'} label={isAr ? 'رحلاتي' : 'Trips'} icon={<ShoppingBag className="h-5 w-5" />} onClick={() => setActiveTab('trips')} />
-          <BottomTab id="tab-profile" active={activeTab === 'account'} label={isAr ? 'حسابي' : 'Profile'} icon={<User className="h-5 w-5" />} onClick={() => setActiveTab('account')} />
+          <BottomTab id="tab-trips" active={activeTab === 'trips'} label={shellText('Trips', 'رحلاتي', 'Voyages')} icon={<ShoppingBag className="h-5 w-5" />} onClick={() => setActiveTab('trips')} />
+          <BottomTab id="tab-profile" active={activeTab === 'account'} label={shellText('Profile', 'حسابي', 'Compte')} icon={<User className="h-5 w-5" />} onClick={() => setActiveTab('account')} />
         </div>
       </nav>
 
@@ -402,7 +404,7 @@ export default function App() {
 
       <PlaceDetailModal place={selectedPlace} onClose={() => setSelectedPlace(null)} onStartNavigation={(place) => { setSelectedPlace(null); setActiveNavDestination(place); }} onSaveToggle={handleToggleSave} isSaved={selectedPlace ? savedPlaceIds.includes(selectedPlace.id) : false} onPlaceUpdated={(updated) => { setPlaces((current) => current.map((place) => place.id === updated.id ? updated : place)); setSelectedPlace(updated); }} language={language} currency={currency} />
 
-      <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} destination="Morocco & Global Destinations" onNavigateApp={handleAppAction} language={language} />
+      <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} destination={shellText('Travel and destinations', 'السفر والوجهات', 'Voyages et destinations')} onNavigateApp={handleAppAction} language={language} />
       <AddPlaceModal isOpen={isAddPlaceOpen} onClose={() => setIsAddPlaceOpen(false)} onPlaceAdded={handlePlaceAdded} language={language} />
       <PassiveDataModal isOpen={isPassiveModalOpen} onClose={() => setIsPassiveModalOpen(false)} isOptedIn={isPassiveOptedIn} onToggleOptIn={handlePassiveOptInChange} language={language} />
     </div>
