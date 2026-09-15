@@ -314,7 +314,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             onKeyDown={(event) => { if (event.key === 'Enter') void sendMessage(inputValue); }}
-            placeholder={localize('Ask about travel or the app', 'اسأل عن السفر أو التطبيق', 'Question sur le voyage ou l’application')}
+            placeholder={localize('Ask anything about travel or the app', 'اسأل عن السفر أو التطبيق', 'Question sur le voyage ou l’application')}
             className="flex-1 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
           />
           <button id="send-ai-chat-btn" type="button" onClick={() => void sendMessage(inputValue)} disabled={!inputValue.trim() || isLoading} className="rounded-2xl bg-blue-600 p-2.5 text-white disabled:opacity-40"><Send className="h-4 w-4 rtl:rotate-180" /></button>
