@@ -33,6 +33,7 @@ import {
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import { AuthStatus } from '../lib/authSession';
+import { rankFuzzyDestinations } from '../lib/fuzzyDestination';
 
 interface TripsPlannerProps {
   language?: SupportedLanguage;
@@ -203,7 +204,13 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     setPlacesError('');
     const timer = window.setTimeout(async () => {
       try {
-        const results = await fetchPlaces({ query });
+        let results = await fetchPlaces({ query });
+        if (sequence !== searchSequence.current) return;
+        if (results.length === 0 && query.length >= 4) {
+          const liveCatalog = await fetchPlaces();
+          if (sequence !== searchSequence.current) return;
+          results = rankFuzzyDestinations(query, liveCatalog, 24);
+        }
         if (sequence !== searchSequence.current) return;
         setPlaces(results.slice(0, 24));
         setPlacesSearched(true);
