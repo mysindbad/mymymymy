@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Download, Globe2, LogOut, MapPin, Radio, UserRound } from 'lucide-react';
+import { ChevronLeft, Clock3, Download, Globe2, LogOut, MapPin, Monitor, Moon, Radio, Sun, UserRound } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import type { GeolocationPermission, UserLocation } from '../hooks/useGeolocation';
 import type { AuthStatus, AuthUser } from '../lib/authSession';
+import { getThemePreference, setThemePreference, type ThemePreference } from '../lib/dayNightTheme';
 import { UserAvatar } from './UserAvatar';
 
 interface AccountProfilePageProps {
@@ -42,6 +43,7 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
 }) => {
   const [locating, setLocating] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [appearance, setAppearance] = useState<ThemePreference>(() => getThemePreference());
   const isAr = language === 'ar';
   const isFr = language === 'fr';
   const t = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
@@ -66,6 +68,11 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
     }
   };
 
+  const chooseAppearance = (value: ThemePreference) => {
+    setAppearance(value);
+    setThemePreference(value);
+  };
+
   const locationLabel = userLocation
     ? t('Location available', 'الموقع متاح', 'Localisation disponible')
     : locationPermission === 'denied'
@@ -73,6 +80,38 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
       : locationPermission === 'unsupported'
         ? t('Location unavailable', 'الموقع غير متاح', 'Localisation indisponible')
         : t('Location not shared', 'لم تتم مشاركة الموقع', 'Localisation non partagée');
+
+  const appearanceOptions: Array<{
+    value: ThemePreference;
+    icon: React.ReactNode;
+    label: string;
+    detail: string;
+  }> = [
+    {
+      value: 'auto',
+      icon: <Clock3 className="h-4 w-4" />,
+      label: t('Automatic', 'تلقائي', 'Automatique'),
+      detail: t('Light by day, dark at night', 'فاتح نهاراً ومظلم ليلاً', 'Clair le jour, sombre la nuit'),
+    },
+    {
+      value: 'system',
+      icon: <Monitor className="h-4 w-4" />,
+      label: t('Device', 'الجهاز', 'Appareil'),
+      detail: t('Follow device appearance', 'يتبع مظهر جهازك', 'Suit le thème de l’appareil'),
+    },
+    {
+      value: 'light',
+      icon: <Sun className="h-4 w-4" />,
+      label: t('Light', 'فاتح', 'Clair'),
+      detail: t('Always light', 'فاتح دائماً', 'Toujours clair'),
+    },
+    {
+      value: 'dark',
+      icon: <Moon className="h-4 w-4" />,
+      label: t('Dark', 'مظلم', 'Sombre'),
+      detail: t('Always dark', 'مظلم دائماً', 'Toujours sombre'),
+    },
+  ];
 
   return (
     <div className="min-h-full bg-slate-50 pb-24" dir={isAr ? 'rtl' : 'ltr'}>
@@ -97,6 +136,27 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
               {t('Sign in', 'تسجيل الدخول', 'Se connecter')}
             </button>
           )}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2"><Moon className="h-5 w-5 text-blue-600" /><h2 className="font-black text-slate-900">{t('Appearance', 'المظهر', 'Apparence')}</h2></div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {appearanceOptions.map((option) => {
+              const selected = appearance === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => chooseAppearance(option.value)}
+                  aria-pressed={selected}
+                  className={`flex items-center gap-3 rounded-2xl border p-3 text-start transition ${selected ? 'border-blue-500 bg-blue-50 text-blue-800 ring-2 ring-blue-100' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  <span className={`rounded-xl p-2 ${selected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{option.icon}</span>
+                  <span className="min-w-0"><strong className="block text-sm">{option.label}</strong><small className="block text-[11px] text-slate-500">{option.detail}</small></span>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
