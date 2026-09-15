@@ -25,7 +25,7 @@ test('renders and decodes the My Sindbad branding in Chromium', async ({ page })
     '/icons/my-sindbad-app-icon-v7-512.jpg',
   ]);
 
-  expect(decoded[0]).toMatchObject({ width: 384, height: 384 });
+  expect(decoded[0]).toMatchObject({ width: 256, height: 256 });
   expect(decoded[1]).toMatchObject({ width: 192, height: 192 });
   expect(decoded[2]).toMatchObject({ width: 512, height: 512 });
 });
