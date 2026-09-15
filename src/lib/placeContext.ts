@@ -63,6 +63,19 @@ export function withComputedDistance(places: Place[], location: UserLocation): P
   }));
 }
 
+function nearbyDisplayScore(place: Place) {
+  const reviewSignal = place.reviewCount > 0 ? Math.min(10, Math.log10(place.reviewCount + 1) * 4) : 0;
+  const ratingSignal = place.rating !== null && place.reviewCount > 0 ? Math.max(0, place.rating - 3) * 2 : 0;
+  const distancePenalty = Math.min(6, (place.distanceKm ?? 0) * 0.12);
+  return (place.prominenceScore ?? 0)
+    + (place.ownerVerified ? 12 : 0)
+    + (place.photos?.length ? 5 : 0)
+    + (place.category === 'tourist_poi' ? 3 : 0)
+    + reviewSignal
+    + ratingSignal
+    - distancePenalty;
+}
+
 export function filterNearbyPlaces(
   places: Place[],
   location: UserLocation,
@@ -70,7 +83,11 @@ export function filterNearbyPlaces(
 ): Place[] {
   return withComputedDistance(places, location)
     .filter((place) => typeof place.distanceKm === 'number' && place.distanceKm <= radiusKm)
-    .sort((a, b) => (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY));
+    .sort((a, b) => {
+      const relevanceDelta = nearbyDisplayScore(b) - nearbyDisplayScore(a);
+      if (Math.abs(relevanceDelta) > 0.01) return relevanceDelta;
+      return (a.distanceKm ?? Number.POSITIVE_INFINITY) - (b.distanceKm ?? Number.POSITIVE_INFINITY);
+    });
 }
 
 export function filterPlacesForTrip(
