@@ -48,7 +48,7 @@ test('Arabic assistant handles field-video phrases without verbose backend fille
   await openApp(page);
 
   await page.locator('#tab-ai-assistant').click();
-  const input = page.getByPlaceholder('اسأل عن السفر أو التطبيق');
+  const input = page.getByPlaceholder('اكتب رسالتك');
   await input.fill('أريد أنشأ رحلة');
   await page.locator('#send-ai-chat-btn').click();
   await expect(page.getByRole('button', { name: 'إضافة رحلة', exact: true })).toBeVisible();
