@@ -64,7 +64,10 @@ test('navigation preview keeps the existing rounded card and uses a visual fallb
   await expect(page.getByText('Gran Teatro Cervantes', { exact: true })).toBeVisible();
   await page.getByText('Gran Teatro Cervantes', { exact: true }).click();
   await page.locator('#modal-start-navigation-btn').click();
-  await expect(page.locator('[data-place-photo-fallback="true"]').first()).toBeVisible();
-  await expect(page.getByText('Gran Teatro Cervantes', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('[data-place-photo-fallback="true"]').first().locator('xpath=ancestor::div[contains(@class,"rounded-2xl")]')).toBeVisible();
+
+  const navigation = page.locator('.fixed.inset-0.z-50.bg-slate-950');
+  const fallback = navigation.locator('[data-place-photo-fallback="true"]');
+  await expect(fallback).toBeVisible();
+  await expect(navigation.getByText('Gran Teatro Cervantes', { exact: true }).first()).toBeVisible();
+  await expect(navigation.locator('div.rounded-3xl').filter({ has: fallback })).toBeVisible();
 });
