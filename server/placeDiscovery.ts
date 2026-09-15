@@ -32,6 +32,7 @@ export type DiscoveredPlace = {
   lastVerifiedAt: string;
   trustLevel: 'external';
   distanceKm?: number;
+  prominenceScore?: number;
 };
 
 type OsmElement = {
@@ -78,6 +79,13 @@ function safeHttpUrl(value: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function commonsImageUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  const match = value.trim().match(/^File:(.+)$/i);
+  if (!match?.[1]) return null;
+  return `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(match[1])}`;
 }
 
 function titleCase(value: string) {
@@ -133,13 +141,15 @@ function featureFlags(tags: Record<string, string>) {
 export function prominenceScore(element: OsmElement) {
   const tags = element.tags || {};
   let score = 0;
-  if (tags.wikipedia) score += 14;
-  if (tags.wikidata) score += 10;
-  if (tags.tourism === 'attraction' || tags.tourism === 'museum') score += 9;
-  if (tags.historic) score += 8;
-  if (tags.tourism === 'viewpoint') score += 7;
-  if (tags.leisure === 'park' || tags.leisure === 'garden') score += 6;
-  if (tags.amenity === 'place_of_worship' || tags.amenity === 'theatre') score += 5;
+  if (tags.wikipedia) score += 24;
+  if (tags.wikidata) score += 18;
+  if (tags.image || tags.wikimedia_commons) score += 8;
+  if (tags.tourism === 'attraction' || tags.tourism === 'museum') score += 12;
+  if (tags.historic) score += 10;
+  if (tags.tourism === 'viewpoint') score += 8;
+  if (tags.leisure === 'park' || tags.leisure === 'garden') score += 7;
+  if (tags.amenity === 'theatre') score += 6;
+  if (tags.amenity === 'place_of_worship') score += tags.wikipedia || tags.wikidata ? 5 : 1;
   if (tags.tourism === 'hotel' || tags.tourism === 'guest_house') score += 3;
   if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') score += 2;
   if (tags.website || tags['contact:website']) score += 1;
@@ -159,7 +169,9 @@ export function normalizeOsmPlace(element: OsmElement, origin: Coordinate): Disc
   const coordinates: Coordinate = [Number(latitude), Number(longitude)];
   const area = placeArea(tags);
   const subtype = placeSubtype(tags);
-  const image = safeHttpUrl(tags.image);
+  const taggedImage = safeHttpUrl(tags.image);
+  const commonsImage = commonsImageUrl(tags.wikimedia_commons);
+  const image = taggedImage || commonsImage;
   const description = tags.description?.trim() || tags['description:en']?.trim() || `${subtype} · ${area}`;
 
   return {
@@ -187,12 +199,13 @@ export function normalizeOsmPlace(element: OsmElement, origin: Coordinate): Disc
     ownerVerified: false,
     checkInsCount: 0,
     seedData: false,
-    photoProvenance: image ? 'openstreetmap_tag' : null,
+    photoProvenance: taggedImage ? 'openstreetmap_tag' : commonsImage ? 'wikimedia_commons' : null,
     ratingProvenance: 'unrated',
     dataSource: 'openstreetmap',
     lastVerifiedAt: new Date().toISOString(),
     trustLevel: 'external',
     distanceKm: Number(distanceKm(origin, coordinates).toFixed(2)),
+    prominenceScore: prominenceScore(element),
   };
 }
 
