@@ -176,6 +176,14 @@ html.dark .shadow-2xl {
   --tw-shadow-color: rgba(0, 0, 0, 0.45);
 }
 
+html.dark .sindbad-dark-osm-tile {
+  filter: brightness(0.72) invert(1) contrast(1.2) hue-rotate(180deg) saturate(0.55);
+}
+
+html.dark .leaflet-container {
+  background: #0b1220;
+}
+
 html.dark ::selection {
   background: #2563eb;
   color: #fff;
