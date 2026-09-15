@@ -41,7 +41,7 @@ export interface Place {
   photos: string[];
   description: string;
   formationInfo?: string;
-  rating: number;
+  rating: number | null;
   reviewCount: number;
   ratingsBreakdown?: {
     cleanliness: number;
@@ -56,7 +56,7 @@ export interface Place {
   openingHours?: string;
   contactPhone?: string;
   isUnderDocumentedGem?: boolean;
-  source: 'initial_seed' | 'community_traveler' | 'business_owner';
+  source: 'initial_seed' | 'community_traveler' | 'business_owner' | 'external_public';
   ownerVerified?: boolean;
   businessOwnerName?: string;
   checkInsCount: number;
@@ -178,54 +178,14 @@ export interface UserProfile {
   name: string;
   username: string;
   avatar: string;
-  level: number;
-  currentXp: number;
-  nextLevelXp: number;
-  homeCity: string;
-  travelStyle: 'explorer' | 'cultural' | 'adventurer' | 'relaxer';
-  interests: string[];
+  country: string;
+  language: string;
+  memberSince: string;
   stats: {
-    placesSaved: number;
-    countriesVisited: number;
-    reviewsWritten: number;
+    trips: number;
+    places: number;
+    reviews: number;
     checkIns: number;
-    passiveTracesShared: number;
   };
   badges: UserBadge[];
-}
-
-export interface CommunityPost {
-  id: string;
-  authorName: string;
-  authorAvatar: string;
-  authorLevel: number;
-  locationName: string;
-  timestamp: string;
-  content: string;
-  photo?: string;
-  likes: number;
-  isLiked?: boolean;
-  commentsCount: number;
-  isSaved?: boolean;
-  savesCount: number;
-  tags: string[];
-}
-
-export interface CommunityStory {
-  id: string;
-  userName: string;
-  userAvatar: string;
-  storyPhoto: string;
-  locationName: string;
-  caption: string;
-  hasUnseenStory?: boolean;
-}
-
-export interface TravelChallenge {
-  id: string;
-  title: string;
-  description: string;
-  xpReward: number;
-  completed: boolean;
-  progress: string;
 }
