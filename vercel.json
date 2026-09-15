@@ -24,6 +24,13 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/nearby-places.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["server/placeDiscovery.ts"]
+      }
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -36,6 +43,7 @@
   "routes": [
     { "src": "/api/ai/navigation-guidance", "dest": "/api/navigation.ts" },
     { "src": "/api/traces/summary", "dest": "/api/trace-summary.ts" },
+    { "src": "/api/nearby-places", "dest": "/api/nearby-places.ts" },
     { "src": "/api/(.*)", "dest": "/api/runtime.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
