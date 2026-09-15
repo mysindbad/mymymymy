@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plane } from 'lucide-react';
+import { Plane, X } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 
 interface FlightsModalProps {
@@ -16,6 +16,8 @@ function tomorrowDate() {
 
 export const FlightsModal: React.FC<FlightsModalProps> = ({ isOpen, onClose, language = 'en' }) => {
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
+  const t = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
   const [fromCity, setFromCity] = useState('Casablanca (CMN)');
   const [toCity, setToCity] = useState('Tangier / Tetouan (TNG)');
   const [flightDate, setFlightDate] = useState(tomorrowDate);
@@ -29,80 +31,28 @@ export const FlightsModal: React.FC<FlightsModalProps> = ({ isOpen, onClose, lan
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-sky-500 to-blue-600 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-              <Plane className="w-5 h-5 text-white -rotate-45" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base">{isAr ? 'تخطيط الرحلات الجوية' : 'Flight Planning'}</h3>
-              <p className="text-xs text-sky-100">{isAr ? 'جهّز مسارك — البحث الحي والأسعار غير متصلين بعد' : 'Prepare your route — live search and fares are not connected yet'}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-4" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <header className="flex items-center justify-between bg-gradient-to-r from-sky-500 to-blue-600 p-4 text-white sm:p-5">
+          <div className="flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20"><Plane className="h-5 w-5 -rotate-45" /></span><h3 className="text-base font-black">{t('Flights', 'الرحلات الجوية', 'Vols')}</h3></div>
+          <button type="button" onClick={onClose} aria-label={t('Close', 'إغلاق', 'Fermer')} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20"><X className="h-4 w-4" /></button>
+        </header>
 
-        <form onSubmit={handleReview} className="p-5 space-y-4 text-xs">
+        <form onSubmit={handleReview} className="space-y-4 p-5 text-xs">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1">{isAr ? 'من' : 'From'}</label>
-              <input
-                type="text"
-                value={fromCity}
-                onChange={(e) => setFromCity(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 font-medium"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1">{isAr ? 'إلى' : 'To'}</label>
-              <input
-                type="text"
-                value={toCity}
-                onChange={(e) => setToCity(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 font-medium"
-              />
-            </div>
+            <label className="block text-[11px] font-bold text-slate-500">{t('From', 'من', 'De')}<input type="text" value={fromCity} onChange={(event) => setFromCity(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-slate-800" /></label>
+            <label className="block text-[11px] font-bold text-slate-500">{t('To', 'إلى', 'À')}<input type="text" value={toCity} onChange={(event) => setToCity(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-slate-800" /></label>
           </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 mb-1">{isAr ? 'تاريخ السفر' : 'Departure Date'}</label>
-            <input
-              type="date"
-              value={flightDate}
-              min={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setFlightDate(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-800 font-medium"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2"
-          >
-            <Plane className="w-4 h-4" />
-            <span>{isAr ? 'مراجعة مسار الرحلة' : 'Review Flight Route'}</span>
-          </button>
+          <label className="block text-[11px] font-bold text-slate-500">{t('Date', 'التاريخ', 'Date')}<input type="date" value={flightDate} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setFlightDate(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-slate-800" /></label>
+          <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3 font-bold text-white"><Plane className="h-4 w-4" />{t('Check route', 'مراجعة المسار', 'Vérifier le trajet')}</button>
 
           {showResults && (
-            <div className="space-y-2 pt-3 border-t border-slate-100">
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
-                <h4 className="text-xs font-bold text-amber-900">
-                  {isAr ? 'البحث المباشر عن الرحلات غير متصل بعد' : 'Live flight search is not connected yet'}
-                </h4>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  {isAr
-                    ? 'هذه مراجعة لتفاصيل المسار فقط. لا توجد أسعار أو رحلات أو توفر مقاعد مباشر في هذه الشاشة.'
-                    : 'This is a route-details review only. No live fares, flight inventory, or seat availability is being queried on this screen.'}
-                </p>
-                <div className="text-[11px] font-semibold text-slate-700 space-y-0.5">
-                  <div>{isAr ? 'من:' : 'From:'} {fromCity || '—'}</div>
-                  <div>{isAr ? 'إلى:' : 'To:'} {toCity || '—'}</div>
-                  <div>{isAr ? 'التاريخ:' : 'Date:'} {flightDate || '—'}</div>
-                </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="font-bold text-amber-900">{t('Flight search is unavailable right now.', 'البحث عن الرحلات غير متاح حالياً.', 'La recherche de vols est indisponible pour le moment.')}</p>
+              <div className="mt-2 space-y-1 text-slate-700">
+                <div>{t('From', 'من', 'De')}: {fromCity || '—'}</div>
+                <div>{t('To', 'إلى', 'À')}: {toCity || '—'}</div>
+                <div>{t('Date', 'التاريخ', 'Date')}: {flightDate || '—'}</div>
               </div>
             </div>
           )}
