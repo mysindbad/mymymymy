@@ -5,9 +5,9 @@ import {
   Compass,
   Download,
   Home,
-  LogOut,
   Map,
   Radio,
+  Settings,
   Users,
   X,
 } from 'lucide-react';
@@ -20,14 +20,12 @@ interface SideMenuDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateTab: (tab: 'home' | 'explore' | 'map' | 'trips' | 'community') => void;
+  onOpenAccount: () => void;
   onOpenAddPlace: () => void;
   onOpenPassiveGps: () => void;
-  onOpenAIChat: () => void;
   onOpenAuth?: (screen?: any) => void;
-  onSignOut?: () => void;
   authStatus?: AuthStatus;
   authUser?: AuthUser | null;
-  userXp: number;
   language: SupportedLanguage;
   canInstall?: boolean;
   onInstall?: () => void;
@@ -39,10 +37,10 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   isOpen,
   onClose,
   onNavigateTab,
+  onOpenAccount,
   onOpenAddPlace,
   onOpenPassiveGps,
   onOpenAuth,
-  onSignOut,
   authStatus = 'anonymous',
   authUser = null,
   language,
@@ -56,97 +54,64 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
   const isFr = language === 'fr';
   const localize = (english: string, arabic: string, french: string) => isAr ? arabic : isFr ? french : english;
   const navItems = [
-    { key: 'home' as const, label: localize('Home', 'الرئيسية', 'Accueil'), icon: <Home className="h-5 w-5" /> },
-    { key: 'map' as const, label: localize('Map', 'الخريطة', 'Carte'), icon: <Map className="h-5 w-5" /> },
-    { key: 'explore' as const, label: localize('Explore', 'استكشاف', 'Explorer'), icon: <Compass className="h-5 w-5" /> },
-    { key: 'trips' as const, label: localize('My trips', 'رحلاتي', 'Mes voyages'), icon: <CalendarDays className="h-5 w-5" /> },
-    { key: 'community' as const, label: localize('Community', 'المجتمع', 'Communauté'), icon: <Users className="h-5 w-5" /> },
+    { key: 'explore' as const, label: localize('Explore', 'استكشاف', 'Explorer'), icon: <Compass className="h-4 w-4" /> },
+    { key: 'map' as const, label: localize('Map', 'الخريطة', 'Carte'), icon: <Map className="h-4 w-4" /> },
+    { key: 'trips' as const, label: localize('My trips', 'رحلاتي', 'Mes voyages'), icon: <CalendarDays className="h-4 w-4" /> },
+    { key: 'community' as const, label: localize('Community', 'المجتمع', 'Communauté'), icon: <Users className="h-4 w-4" /> },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex animate-in fade-in" dir={isAr ? 'rtl' : 'ltr'}>
-      <button type="button" aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="fixed inset-0 cursor-default bg-black/45 backdrop-blur-xs" onClick={onClose} />
-      <aside className="relative z-10 flex h-full w-[292px] max-w-[86vw] flex-col bg-white shadow-2xl animate-in slide-in-from-left duration-300 rtl:slide-in-from-right">
-        <div className="flex items-center justify-between bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 p-4 text-white">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <BrandLogo size="icon" showSlogan={false} language={language} className="h-12 w-12 shrink-0" />
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-black tracking-tight">My Sindbad</h2>
-              <p className="mt-0.5 truncate text-[11px] text-blue-100">{localize('Your travel guide', 'دليلك للسفر', 'Votre guide de voyage')}</p>
-            </div>
+    <div className={`fixed inset-0 z-50 flex ${isAr ? 'justify-end' : 'justify-start'}`} dir={isAr ? 'rtl' : 'ltr'}>
+      <button type="button" aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="fixed inset-0 bg-black/45 backdrop-blur-[1px]" onClick={onClose} />
+      <aside className={`relative z-10 flex h-full w-[256px] max-w-[78vw] flex-col bg-white shadow-2xl animate-in duration-200 ${isAr ? 'slide-in-from-right' : 'slide-in-from-left'}`}>
+        <header className="flex items-center justify-between bg-gradient-to-br from-blue-600 to-indigo-700 px-3 py-3 text-white">
+          <div className="flex min-w-0 items-center gap-2">
+            <BrandLogo size="icon" showSlogan={false} language={language} className="h-10 w-10 shrink-0" />
+            <strong className="truncate text-sm">My Sindbad</strong>
           </div>
-          <button type="button" onClick={onClose} aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition hover:bg-white/30">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15" aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')}><X className="h-4 w-4" /></button>
+        </header>
 
-        <div className="bg-slate-50 p-3">
-          <div className="flex items-center gap-2.5">
-            <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-bold text-slate-800">
-                {authStatus === 'authed' && authUser?.name ? authUser.name : localize('Hello, traveler', 'مرحباً، أيها المسافر', 'Bonjour, voyageur')}
-              </div>
-              <div className="truncate text-[11px] text-slate-500">
-                {authStatus === 'authed' && authUser?.email
-                  ? authUser.email
-                  : localize('Sign in to manage trips and contributions', 'سجّل الدخول لإدارة الرحلات والمساهمات', 'Connectez-vous pour gérer voyages et contributions')}
-              </div>
-            </div>
-            <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-800">{localize('Traveler', 'مسافر', 'Voyageur')}</span>
-            {authStatus === 'authed' && onSignOut && (
-              <button type="button" onClick={onSignOut} aria-label={localize('Sign out', 'تسجيل الخروج', 'Déconnexion')} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          {authStatus !== 'authed' && onOpenAuth && (
-            <button type="button" onClick={() => { onClose(); onOpenAuth('welcome'); }} className="mt-3 h-9 w-full rounded-xl bg-blue-600 text-xs font-bold text-white transition hover:bg-blue-700">
-              {localize('Sign in', 'تسجيل الدخول', 'Se connecter')}
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            if (authStatus === 'authed') onOpenAccount();
+            else onOpenAuth?.('welcome');
+          }}
+          className="flex items-center gap-2.5 border-b border-slate-100 bg-slate-50 px-3 py-3 text-start hover:bg-slate-100"
+        >
+          <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} className="h-10 w-10 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <strong className="block truncate text-xs text-slate-900">{authStatus === 'authed' && authUser?.name ? authUser.name : localize('Sign in', 'تسجيل الدخول', 'Se connecter')}</strong>
+            <small className="block truncate text-[10px] text-slate-500">{authStatus === 'authed' ? localize('Account settings', 'إعدادات الحساب', 'Paramètres du compte') : localize('Open your account', 'افتح حسابك', 'Ouvrir votre compte')}</small>
+          </span>
+          <Settings className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
 
-        <nav className="flex-1 px-3 py-3">
+        <nav className="flex-1 overflow-y-auto px-2.5 py-3">
           <div className="space-y-1">
             {navItems.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => { onNavigateTab(item.key); onClose(); }}
-                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-start text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
-              >
-                <span className="text-slate-500">{item.icon}</span>
-                <span>{item.label}</span>
+              <button key={item.key} type="button" onClick={() => { onNavigateTab(item.key); onClose(); }} className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-start text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700">
+                <span className="text-slate-500">{item.icon}</span><span>{item.label}</span>
               </button>
             ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={() => { onOpenAddPlace(); onClose(); }} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-blue-50 px-3 text-[11px] font-bold text-blue-700 transition hover:bg-blue-100">
-              <Building2 className="h-4 w-4" />
-              {localize('Add place', 'إضافة مكان', 'Ajouter un lieu')}
-            </button>
-            <button type="button" onClick={() => { onOpenPassiveGps(); onClose(); }} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-50 px-3 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100">
-              <Radio className="h-4 w-4" />
-              {localize('Optional GPS', 'GPS اختياري', 'GPS facultatif')}
-            </button>
-            {canInstall && onInstall && (
-              <button type="button" onClick={onInstall} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[11px] font-bold text-slate-700 transition hover:bg-slate-200">
-                <Download className="h-4 w-4" />
-                {localize('Install', 'تثبيت', 'Installer')}
-              </button>
-            )}
+          <div className="my-3 border-t border-slate-100" />
+          <div className="space-y-1">
+            <button type="button" onClick={() => { onOpenAddPlace(); onClose(); }} className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-start text-xs font-bold text-slate-700 hover:bg-slate-50"><Building2 className="h-4 w-4 text-blue-600" />{localize('Add place', 'إضافة مكان', 'Ajouter un lieu')}</button>
+            <button type="button" onClick={() => { onOpenPassiveGps(); onClose(); }} className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-start text-xs font-bold text-slate-700 hover:bg-slate-50"><Radio className="h-4 w-4 text-emerald-600" />{localize('Location sharing', 'مشاركة الموقع', 'Partage de localisation')}</button>
+            {canInstall && onInstall && <button type="button" onClick={() => { onInstall(); onClose(); }} className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 text-start text-xs font-bold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" />{localize('Install app', 'تثبيت التطبيق', 'Installer l’application')}</button>}
           </div>
-          {showIosInstallHint && onDismissIosInstallHint && (
-            <div className="mt-3 rounded-xl bg-blue-50 p-2.5 text-[11px] text-blue-800">
-              <div className="flex items-start gap-2">
-                <span className="flex-1">{localize('In Safari: Share, then Add to Home Screen', 'في Safari: مشاركة ثم إضافة إلى الشاشة الرئيسية', 'Dans Safari : Partager, puis Ajouter à l’écran d’accueil')}</span>
-                <button type="button" onClick={onDismissIosInstallHint} aria-label={localize('Dismiss', 'إغلاق', 'Fermer')} className="shrink-0">×</button>
-              </div>
-            </div>
-          )}
+          {showIosInstallHint && onDismissIosInstallHint && <div className="mt-3 rounded-xl bg-blue-50 p-2.5 text-[10px] text-blue-800"><div className="flex items-start gap-2"><span className="flex-1">{localize('Safari: Share → Add to Home Screen', 'Safari: مشاركة ← إضافة إلى الشاشة الرئيسية', 'Safari : Partager → Ajouter à l’écran d’accueil')}</span><button type="button" onClick={onDismissIosInstallHint} aria-label={localize('Dismiss', 'إغلاق', 'Fermer')}>×</button></div></div>}
         </nav>
+
+        <footer className="border-t border-slate-200 bg-white p-2.5">
+          <button type="button" onClick={() => { onNavigateTab('home'); onClose(); }} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-sm font-black text-white shadow-sm hover:bg-blue-700">
+            <Home className="h-4 w-4" />{localize('Home', 'الرئيسية', 'Accueil')}
+          </button>
+        </footer>
       </aside>
     </div>
   );
