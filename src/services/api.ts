@@ -74,8 +74,6 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   const { requiresAuth = false, body, headers, ...requestOptions } = options;
   let token: string | null = null;
 
-  // Public discovery/navigation endpoints should not wait for Supabase session restoration.
-  // Auth work is only performed for endpoints that actually require a signed-in user.
   if (requiresAuth) {
     await waitForSessionReady();
     token = await getAccessToken();
@@ -87,9 +85,7 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   const sendRequest = (requestToken: string | null) => {
     const requestHeaders = new Headers(headers);
     if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
-    if (typeof document !== 'undefined') {
-      requestHeaders.set('Accept-Language', document.documentElement.lang || 'en');
-    }
+    if (typeof document !== 'undefined') requestHeaders.set('Accept-Language', document.documentElement.lang || 'en');
     if (requestToken) requestHeaders.set('Authorization', `Bearer ${requestToken}`);
     return fetch(url, {
       ...requestOptions,
@@ -112,9 +108,7 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
       throw new ApiAuthenticationError('TOKEN_INVALID', 'TOKEN_INVALID');
     }
   }
-  if (response.status === 401) {
-    throw new ApiAuthenticationError(payload.error || payload.en || 'Authentication required', payload.code || 'AUTH_REQUIRED');
-  }
+  if (response.status === 401) throw new ApiAuthenticationError(payload.error || payload.en || 'Authentication required', payload.code || 'AUTH_REQUIRED');
   if (!response.ok) throw new Error(payload.error || payload.en || `Request failed with status ${response.status}`);
   return payload;
 }
@@ -188,8 +182,6 @@ export async function fetchPlaces(params?: {
   const databasePromise = apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
 
   if (params?.userLat !== undefined && params.userLng !== undefined && !params.query) {
-    // Database and public nearby discovery are independent. Starting both together removes
-    // the previous DB-then-Overpass waterfall when the local catalog is sparse.
     const baselinePromise = fetchNearbyBaseline(params.userLat, params.userLng);
     const [data, discovered] = await Promise.all([databasePromise, baselinePromise]);
     const databasePlaces = data.places || [];
@@ -214,11 +206,7 @@ export async function fetchPlaceById(id: string): Promise<Place | null> {
 
 export async function createPlace(placeData: Partial<Place>): Promise<{ success: boolean; place?: Place; error?: string }> {
   try {
-    const data = await apiRequest<{ place?: Place }>('/api/places', {
-      method: 'POST',
-      body: placeData,
-      requiresAuth: true,
-    });
+    const data = await apiRequest<{ place?: Place }>('/api/places', { method: 'POST', body: placeData, requiresAuth: true });
     return { success: true, place: data.place };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create listing';
@@ -227,23 +215,9 @@ export async function createPlace(placeData: Partial<Place>): Promise<{ success:
   }
 }
 
-export async function submitPlaceReview(
-  placeId: string,
-  review: {
-    authorName: string;
-    authorRole?: string;
-    rating: number;
-    text: string;
-    tags: string[];
-    photo?: string;
-  }
-): Promise<{ success: boolean; updatedPlace?: Place; review?: PlaceReview }> {
+export async function submitPlaceReview(placeId: string, review: { authorName: string; authorRole?: string; rating: number; text: string; tags: string[]; photo?: string; }): Promise<{ success: boolean; updatedPlace?: Place; review?: PlaceReview }> {
   try {
-    const data = await apiRequest<{ updatedPlace?: Place; review?: PlaceReview }>(`/api/places/${encodeURIComponent(placeId)}/reviews`, {
-      method: 'POST',
-      body: review,
-      requiresAuth: true,
-    });
+    const data = await apiRequest<{ updatedPlace?: Place; review?: PlaceReview }>(`/api/places/${encodeURIComponent(placeId)}/reviews`, { method: 'POST', body: review, requiresAuth: true });
     return { success: true, updatedPlace: data.updatedPlace, review: data.review };
   } catch (error) {
     console.error('submitPlaceReview error:', error);
@@ -261,14 +235,7 @@ export async function submitPlaceCheckIn(placeId: string): Promise<boolean> {
   }
 }
 
-export async function submitPassiveTrace(trace: {
-  coordinates: [number, number];
-  mode: string;
-  speedKmh?: number;
-  anonymousUserId?: string;
-  nearPlaceId?: string;
-  region?: string;
-}): Promise<boolean> {
+export async function submitPassiveTrace(trace: { coordinates: [number, number]; mode: string; speedKmh?: number; anonymousUserId?: string; nearPlaceId?: string; region?: string; }): Promise<boolean> {
   try {
     await apiRequest('/api/traces/passive', { method: 'POST', body: trace, requiresAuth: true });
     return true;
@@ -282,31 +249,13 @@ export async function fetchTracesSummary(): Promise<TraceSummary> {
   return apiRequest<TraceSummary>('/api/traces/summary');
 }
 
-export async function sendChatMessage(
-  message: string,
-  destination: string,
-  language: string,
-  history: Array<Record<string, unknown>> = []
-): Promise<string> {
-  const data = await apiRequest<{ text: string }>('/api/ai/chat', {
-    method: 'POST',
-    body: { message, destination, language, history },
-    requiresAuth: true,
-  });
+export async function sendChatMessage(message: string, destination: string, language: string, history: Array<Record<string, unknown>> = []): Promise<string> {
+  const data = await apiRequest<{ text: string }>('/api/ai/chat', { method: 'POST', body: { message, destination, language, history }, requiresAuth: true });
   return data.text;
 }
 
-export async function fetchNavigationGuidance(
-  destinationId: string,
-  travelMode: TravelMode = 'driving',
-  language: string = 'en',
-  startLatitude?: number,
-  startLongitude?: number
-): Promise<NavigationRouteData> {
-  return apiRequest<NavigationRouteData>('/api/ai/navigation-guidance', {
-    method: 'POST',
-    body: { destinationId, travelMode, language, startLatitude, startLongitude },
-  });
+export async function fetchNavigationGuidance(destinationId: string, travelMode: TravelMode = 'driving', language: string = 'en', startLatitude?: number, startLongitude?: number): Promise<NavigationRouteData> {
+  return apiRequest<NavigationRouteData>('/api/ai/navigation-guidance', { method: 'POST', body: { destinationId, travelMode, language, startLatitude, startLongitude } });
 }
 
 export async function fetchAiMemoryInsights(): Promise<AiMemoryInsights> {
@@ -338,6 +287,10 @@ export interface TripItinerary {
   totalEstimatedCost: number;
   currency: string;
   tips: string[];
+  destinationName?: string;
+  destinationArea?: string;
+  destinationRegion?: string;
+  destinationCoordinates?: [number, number];
 }
 
 export interface Trip {
@@ -412,21 +365,12 @@ export async function fetchTrips(): Promise<Trip[]> {
 }
 
 export async function createTrip(payload: TripCreatePayload): Promise<Trip> {
-  const data = await apiRequest<{ trip: Trip }>('/api/trips', {
-    method: 'POST',
-    body: payload,
-    requiresAuth: true,
-  });
+  const data = await apiRequest<{ trip: Trip }>('/api/trips', { method: 'POST', body: payload, requiresAuth: true });
   if (!payload.aiItinerary) return data.trip;
-
   try {
     return await updateTrip(data.trip.id, { aiItinerary: payload.aiItinerary });
   } catch (error) {
-    try {
-      await deleteTrip(data.trip.id);
-    } catch {
-      // Best-effort rollback: preserve the original persistence error for the caller.
-    }
+    try { await deleteTrip(data.trip.id); } catch { /* preserve persistence error */ }
     throw error;
   }
 }
@@ -441,7 +385,8 @@ export async function deleteTrip(id: string): Promise<void> {
 }
 
 export async function planTrip(payload: {
-  destinationId: string;
+  destinationId?: string;
+  destination?: Pick<Place, 'name' | 'arabicName' | 'frenchName' | 'region' | 'area' | 'address' | 'coordinates'>;
   startDate: string;
   endDate: string;
   budget: number;
@@ -449,47 +394,21 @@ export async function planTrip(payload: {
   participants: number;
   preferences: string[];
 }): Promise<{ itinerary: TripItinerary; overBudget: boolean; aiGenerated: true }> {
-  return apiRequest('/api/ai/plan-trip', {
-    method: 'POST',
-    body: { ...payload, name: 'AI itinerary request' },
-    requiresAuth: true,
-  });
+  return apiRequest('/api/ai/plan-trip', { method: 'POST', body: { ...payload, name: 'AI itinerary request' }, requiresAuth: true });
 }
 
 export async function fetchTripExpenses(tripId: string): Promise<TripBudget> {
   return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, { requiresAuth: true });
 }
 
-export async function addTripExpense(tripId: string, payload: {
-  category: TripExpenseCategory;
-  amount: number;
-  currency: string;
-  description?: string;
-  expenseDate: string;
-}): Promise<TripBudget> {
-  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, {
-    method: 'POST',
-    body: payload,
-    requiresAuth: true,
-  });
+export async function addTripExpense(tripId: string, payload: { category: TripExpenseCategory; amount: number; currency: string; description?: string; expenseDate: string; }): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, { method: 'POST', body: payload, requiresAuth: true });
 }
 
-export async function updateTripExpense(tripId: string, expenseId: string, patch: Partial<{
-  category: TripExpenseCategory;
-  amount: number;
-  description: string | null;
-  expenseDate: string;
-}>): Promise<TripBudget> {
-  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
-    method: 'PATCH',
-    body: patch,
-    requiresAuth: true,
-  });
+export async function updateTripExpense(tripId: string, expenseId: string, patch: Partial<{ category: TripExpenseCategory; amount: number; description: string | null; expenseDate: string; }>): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, { method: 'PATCH', body: patch, requiresAuth: true });
 }
 
 export async function deleteTripExpense(tripId: string, expenseId: string): Promise<TripBudget> {
-  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
-    method: 'DELETE',
-    requiresAuth: true,
-  });
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, { method: 'DELETE', requiresAuth: true });
 }
