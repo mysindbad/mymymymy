@@ -1,9 +1,10 @@
-const CACHE_NAME = 'my-sindbad-shell-v5';
+const CACHE_NAME = 'my-sindbad-shell-v6';
 const PRECACHE_URLS = [
   '/index.html',
-  '/manifest.webmanifest?v=5',
-  '/icons/my-sindbad-app-icon-user-v4-192.jpg',
-  '/icons/my-sindbad-app-icon-user-v4-512.jpg',
+  '/manifest.webmanifest?v=6',
+  '/brand/my-sindbad-logo-v6.webp',
+  '/icons/my-sindbad-app-icon-v6-192.jpg',
+  '/icons/my-sindbad-app-icon-v6-512.jpg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -77,7 +78,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Fixed URLs such as manifest and icons should prefer the network so future
+  // Fixed URLs such as manifest, logo, and icons prefer the network so future
   // branding changes are visible without requiring users to clear site data.
   event.respondWith(
     fetch(request)
