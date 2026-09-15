@@ -25,28 +25,15 @@ async function openApp(page: Page) {
 }
 
 async function installPublicPlaceMocks(page: Page) {
-  await page.route('https://nominatim.openstreetmap.org/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'access-control-allow-origin': '*' },
-      body: JSON.stringify({ address: { city: 'Tangier', state: 'Tanger-Tetouan-Al Hoceima' } }),
-    });
-  });
-  const overpassPayload = {
-    elements: [
-      { type: 'node', id: 101, lat: 35.789, lon: -5.812, tags: { name: 'Kasbah Museum Tangier', tourism: 'museum', wikipedia: 'en:Kasbah Museum' } },
-      { type: 'node', id: 102, lat: 35.792, lon: -5.81, tags: { name: 'Tangier Viewpoint', tourism: 'viewpoint' } },
-      { type: 'node', id: 103, lat: 35.785, lon: -5.815, tags: { name: 'Historic Gate Tangier', historic: 'city_gate' } },
-      { type: 'node', id: 104, lat: 35.787, lon: -5.817, tags: { name: 'Tangier City Park', leisure: 'park' } },
-      { type: 'node', id: 105, lat: 35.786, lon: -5.818, tags: { name: 'Tangier Gallery', tourism: 'gallery' } },
-    ],
-  };
-  await page.route('https://overpass-api.de/**', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(overpassPayload) });
-  });
-  await page.route('https://overpass.kumi.systems/**', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(overpassPayload) });
+  const places = [
+    { id: 'osm-node-101', name: 'Kasbah Museum Tangier', category: 'tourist_poi', subCategory: 'Museum', region: 'Tanger-Tetouan-Al Hoceima', area: 'Tangier', coordinates: [35.789, -5.812], address: 'Tangier', photos: [], description: 'Kasbah Museum Tangier · Tangier', rating: null, reviewCount: 0, reviews: [], features: {}, isUnderDocumentedGem: false, source: 'external_public', ownerVerified: false, checkInsCount: 0, aiConfidenceScore: 0, distanceKm: 0.11, seedData: false, ratingProvenance: 'unrated', dataSource: 'openstreetmap', trustLevel: 'external' },
+    { id: 'osm-node-102', name: 'Tangier Viewpoint', category: 'tourist_poi', subCategory: 'Viewpoint', region: 'Tanger-Tetouan-Al Hoceima', area: 'Tangier', coordinates: [35.792, -5.81], address: 'Tangier', photos: [], description: 'Tangier Viewpoint · Tangier', rating: null, reviewCount: 0, reviews: [], features: {}, isUnderDocumentedGem: false, source: 'external_public', ownerVerified: false, checkInsCount: 0, aiConfidenceScore: 0, distanceKm: 0.47, seedData: false, ratingProvenance: 'unrated', dataSource: 'openstreetmap', trustLevel: 'external' },
+    { id: 'osm-node-103', name: 'Historic Gate Tangier', category: 'tourist_poi', subCategory: 'City Gate', region: 'Tanger-Tetouan-Al Hoceima', area: 'Tangier', coordinates: [35.785, -5.815], address: 'Tangier', photos: [], description: 'Historic Gate Tangier · Tangier', rating: null, reviewCount: 0, reviews: [], features: {}, isUnderDocumentedGem: false, source: 'external_public', ownerVerified: false, checkInsCount: 0, aiConfidenceScore: 0, distanceKm: 0.43, seedData: false, ratingProvenance: 'unrated', dataSource: 'openstreetmap', trustLevel: 'external' },
+    { id: 'osm-node-104', name: 'Tangier City Park', category: 'tourist_poi', subCategory: 'Park', region: 'Tanger-Tetouan-Al Hoceima', area: 'Tangier', coordinates: [35.787, -5.817], address: 'Tangier', photos: [], description: 'Tangier City Park · Tangier', rating: null, reviewCount: 0, reviews: [], features: {}, isUnderDocumentedGem: false, source: 'external_public', ownerVerified: false, checkInsCount: 0, aiConfidenceScore: 0, distanceKm: 0.46, seedData: false, ratingProvenance: 'unrated', dataSource: 'openstreetmap', trustLevel: 'external' },
+    { id: 'osm-node-105', name: 'Tangier Gallery', category: 'tourist_poi', subCategory: 'Gallery', region: 'Tanger-Tetouan-Al Hoceima', area: 'Tangier', coordinates: [35.786, -5.818], address: 'Tangier', photos: [], description: 'Tangier Gallery · Tangier', rating: null, reviewCount: 0, reviews: [], features: {}, isUnderDocumentedGem: false, source: 'external_public', ownerVerified: false, checkInsCount: 0, aiConfidenceScore: 0, distanceKm: 0.58, seedData: false, ratingProvenance: 'unrated', dataSource: 'openstreetmap', trustLevel: 'external' },
+  ];
+  await page.route('**/api/public-places**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ places }) });
   });
 }
 
