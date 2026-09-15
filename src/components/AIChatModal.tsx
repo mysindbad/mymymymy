@@ -50,9 +50,9 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   const { status: authStatus } = useAuthSession();
   const localize = (english: string, arabic: string, french: string) => isAr ? arabic : isFr ? french : english;
   const welcome = localize(
-    'Hi. Ask me about travel or My Sindbad.',
-    'مرحباً. اسألني عن السفر أو My Sindbad.',
-    'Bonjour. Posez-moi une question sur le voyage ou My Sindbad.'
+    'Hi, I’m Sindbad. Where would you like to go?',
+    'أهلاً، أنا سندباد. إلى أين تريد أن تذهب؟',
+    'Bonjour, je suis Sindbad. Où souhaitez-vous aller ?'
   );
   const nowLabel = isAr ? 'الآن' : isFr ? "À l'instant" : 'Now';
   const [messages, setMessages] = useState<Message[]>([{ id: 'welcome', sender: 'sindbad', text: welcome, timestamp: nowLabel }]);
@@ -210,7 +210,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
     }
 
     if (authStatus !== 'authed') {
-      const notice = localize('Sign in to ask travel questions.', 'سجّل الدخول لطرح أسئلة السفر.', 'Connectez-vous pour poser des questions de voyage.');
+      const notice = localize('Sign in to continue.', 'سجّل الدخول للمتابعة.', 'Connectez-vous pour continuer.');
       setServiceNotice(notice);
       if (fromVoice) speakAndContinue(notice);
       return;
@@ -314,7 +314,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
             onKeyDown={(event) => { if (event.key === 'Enter') void sendMessage(inputValue); }}
-            placeholder={localize('Ask anything about travel or the app', 'اسأل عن السفر أو التطبيق', 'Question sur le voyage ou l’application')}
+            placeholder={localize('Write a message', 'اكتب رسالتك', 'Écrivez un message')}
             className="flex-1 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
           />
           <button id="send-ai-chat-btn" type="button" onClick={() => void sendMessage(inputValue)} disabled={!inputValue.trim() || isLoading} className="rounded-2xl bg-blue-600 p-2.5 text-white disabled:opacity-40"><Send className="h-4 w-4 rtl:rotate-180" /></button>
