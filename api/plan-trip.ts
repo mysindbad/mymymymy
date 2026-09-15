@@ -2,8 +2,8 @@ import { createHmac } from 'node:crypto';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
-let authClient: ReturnType<typeof createClient> | null = null;
-let adminClient: ReturnType<typeof createClient> | null = null;
+let authClient: any = null;
+let adminClient: any = null;
 let aiClient: GoogleGenAI | null = null;
 
 function config() {
@@ -14,7 +14,7 @@ function config() {
   return { url, anonKey, serviceRoleKey };
 }
 
-function auth() {
+function auth(): any {
   if (!authClient) {
     const { url, anonKey } = config();
     authClient = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
@@ -22,7 +22,7 @@ function auth() {
   return authClient;
 }
 
-function admin() {
+function admin(): any {
   if (!adminClient) {
     const { url, serviceRoleKey } = config();
     adminClient = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
@@ -81,7 +81,7 @@ async function consumeQuota(id: string) {
     p_window_seconds: 600,
   });
   if (error) throw error;
-  const row = Array.isArray(data) ? data[0] : data;
+  const row: any = Array.isArray(data) ? data[0] : data;
   return {
     allowed: Boolean(row?.allowed),
     retryAfterSeconds: Math.max(1, Number(row?.retry_after_seconds || 1)),
