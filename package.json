@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "npm run build:web && npm run build:server",
-    "build:web": "node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
+    "build:web": "node scripts/materialize-brand-assets.mjs && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "build:server": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "node -e \"const fs=require('node:fs'); for (const path of ['dist','playwright-report','test-results']) fs.rmSync(path,{recursive:true,force:true}); fs.rmSync('server.js',{force:true});\"",
@@ -25,7 +25,6 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/canvas-confetti": "^1.9.0",
     "@types/leaflet": "^1.9.22",
-    "@vitejs/plugin-react": "^5.0.4",
     "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
