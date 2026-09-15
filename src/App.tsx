@@ -1,27 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Compass, Home as HomeIcon, ShoppingBag, User } from 'lucide-react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
+import { Compass, Home as HomeIcon, Loader2, ShoppingBag, User } from 'lucide-react';
 import { Place } from './types';
 import { fetchPlaces, sendChatMessage } from './services/api';
 import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
 import { signOut, useAuthSession } from './lib/authSession';
 import { HomeScreen } from './components/HomeScreen';
-import { ContextMapView } from './components/ContextMapView';
-import { ExploreFeed } from './components/ExploreFeed';
-import { TripsPlanner } from './components/TripsPlanner';
-import { CommunityHub } from './components/CommunityHub';
-import { NavigationFlow } from './components/NavigationFlow';
-import { PlaceDetailModal } from './components/PlaceDetailModal';
-import { AIChatModal } from './components/AIChatModal';
-import { AddPlaceModal } from './components/AddPlaceModal';
-import { PassiveDataModal } from './components/PassiveDataModal';
-import { SideMenuDrawer } from './components/SideMenuDrawer';
-import { FlightsModal } from './components/FlightsModal';
-import { WeatherModal } from './components/WeatherModal';
-import { SupportedLanguage } from './data/translations';
-import { AuthFlowModal, AuthScreenType } from './components/AuthFlowModal';
+import type { AuthScreenType } from './components/AuthFlowModal';
 import { AIIcon } from './components/AIIcon';
-import { OnboardingModal, hasCompletedOnboarding } from './components/OnboardingModal';
-import { AccountProfilePage } from './components/AccountProfilePage';
+import { hasCompletedOnboarding } from './components/OnboardingModal';
 import { useGeolocation } from './hooks/useGeolocation';
 import { usePwaInstall } from './hooks/usePwaInstall';
 import { filterNearbyPlaces, filterPlacesForTrip } from './lib/placeContext';
@@ -32,6 +18,22 @@ import {
   extractDestinationIntent,
   resolveAppNavigationHelp,
 } from './lib/appNavigation';
+
+const ContextMapView = lazy(() => import('./components/ContextMapView').then((module) => ({ default: module.ContextMapView })));
+const ExploreFeed = lazy(() => import('./components/ExploreFeed').then((module) => ({ default: module.ExploreFeed })));
+const TripsPlanner = lazy(() => import('./components/TripsPlanner').then((module) => ({ default: module.TripsPlanner })));
+const CommunityHub = lazy(() => import('./components/CommunityHub').then((module) => ({ default: module.CommunityHub })));
+const NavigationFlow = lazy(() => import('./components/NavigationFlow').then((module) => ({ default: module.NavigationFlow })));
+const PlaceDetailModal = lazy(() => import('./components/PlaceDetailModal').then((module) => ({ default: module.PlaceDetailModal })));
+const AIChatModal = lazy(() => import('./components/AIChatModal').then((module) => ({ default: module.AIChatModal })));
+const AddPlaceModal = lazy(() => import('./components/AddPlaceModal').then((module) => ({ default: module.AddPlaceModal })));
+const PassiveDataModal = lazy(() => import('./components/PassiveDataModal').then((module) => ({ default: module.PassiveDataModal })));
+const SideMenuDrawer = lazy(() => import('./components/SideMenuDrawer').then((module) => ({ default: module.SideMenuDrawer })));
+const FlightsModal = lazy(() => import('./components/FlightsModal').then((module) => ({ default: module.FlightsModal })));
+const WeatherModal = lazy(() => import('./components/WeatherModal').then((module) => ({ default: module.WeatherModal })));
+const AuthFlowModal = lazy(() => import('./components/AuthFlowModal').then((module) => ({ default: module.AuthFlowModal })));
+const OnboardingModal = lazy(() => import('./components/OnboardingModal').then((module) => ({ default: module.OnboardingModal })));
+const AccountProfilePage = lazy(() => import('./components/AccountProfilePage').then((module) => ({ default: module.AccountProfilePage })));
 
 type ActiveTab = 'home' | 'explore' | 'trips' | 'community' | 'account';
 type ExploreView = 'feed' | 'map';
@@ -204,7 +206,7 @@ export default function App() {
     setPlacesLoading(true);
     setPlacesError(null);
     try {
-      const all = await fetchPlaces();
+      const all = await fetchPlaces({ userLat: destination.coordinates[0], userLng: destination.coordinates[1] });
       setPlaces(filterPlacesForTrip(all, destination, userLocation));
     } catch (error) {
       setPlaces([]);
@@ -280,13 +282,25 @@ export default function App() {
     if (tab === 'map') {
       setExploreView('map');
       setActiveTab('explore');
-    } else setActiveTab(tab);
+    } else if (tab === 'explore') {
+      setExploreView('feed');
+      setActiveTab('explore');
+    } else {
+      setActiveTab(tab);
+    }
   };
 
   const topBar = (title: string) => (
     <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
       <button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button>
       <h2 className="text-sm font-black text-slate-900">{title}</h2><div className="w-16" />
+    </div>
+  );
+
+  const loadingFallback = (
+    <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-slate-500">
+      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+      {shellText('Loading…', 'جارٍ التحميل…', 'Chargement…')}
     </div>
   );
 
@@ -319,94 +333,98 @@ export default function App() {
           currentUser={currentUser}
         />}
 
-        {activeTab === 'explore' && <div className="h-full w-full overflow-y-auto">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5"><button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button><h2 className="truncate text-sm font-black text-slate-900">{exploreView === 'feed' ? shellText('Explore', 'استكشف', 'Explorer') : shellText('Map', 'الخريطة', 'Carte')}</h2><button type="button" onClick={() => setExploreView((current) => current === 'feed' ? 'map' : 'feed')} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{exploreView === 'feed' ? shellText('Map', 'الخريطة', 'Carte') : shellText('List', 'القائمة', 'Liste')}</button></div>
-          {exploreView === 'feed' ? <ExploreFeed
-            initialQuery={exploreQuery}
-            onSelectPlace={setSelectedPlace}
-            onStartRoute={setActiveNavDestination}
-            onOpenAddModal={() => setIsAddPlaceOpen(true)}
-            onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
-            savedPlaceIds={savedPlaceIds}
-            onToggleSave={handleToggleSave}
+        <Suspense fallback={loadingFallback}>
+          {activeTab === 'explore' && <div className="h-full w-full overflow-y-auto">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5"><button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button><h2 className="truncate text-sm font-black text-slate-900">{exploreView === 'feed' ? shellText('Explore', 'استكشف', 'Explorer') : shellText('Map', 'الخريطة', 'Carte')}</h2><button type="button" onClick={() => setExploreView((current) => current === 'feed' ? 'map' : 'feed')} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{exploreView === 'feed' ? shellText('Map', 'الخريطة', 'Carte') : shellText('List', 'القائمة', 'Liste')}</button></div>
+            {exploreView === 'feed' ? <ExploreFeed
+              initialQuery={exploreQuery}
+              onSelectPlace={setSelectedPlace}
+              onStartRoute={setActiveNavDestination}
+              onOpenAddModal={() => setIsAddPlaceOpen(true)}
+              onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
+              savedPlaceIds={savedPlaceIds}
+              onToggleSave={handleToggleSave}
+              language={language}
+              currency={currency}
+              userLocation={userLocation}
+              tripDestination={tripDestination}
+              onPlacesLoaded={setPlaces}
+            /> : <ContextMapView
+              places={places}
+              initialQuery={exploreQuery}
+              initialCategory={exploreCategory}
+              onSelectPlace={setSelectedPlace}
+              onStartRoute={setActiveNavDestination}
+              language={language}
+              userLocation={userLocation}
+            />}
+          </div>}
+
+          {activeTab === 'trips' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('My Trips', 'رحلاتي', 'Mes voyages'))}<TripsPlanner language={language} authStatus={authStatus} onOpenAuth={() => handleOpenAuth('welcome')} onTripCreated={(destination) => void handleTripCreated(destination)} initialDestinationQuery={tripInitialQuery} /></div>}
+
+          {activeTab === 'community' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('Community', 'المجتمع', 'Communauté'))}<CommunityHub onOpenAddModal={() => setIsAddPlaceOpen(true)} onOpenPassiveModal={() => setIsPassiveModalOpen(true)} isPassiveOptedIn={isPassiveOptedIn} language={language} /></div>}
+
+          {activeTab === 'account' && <div className="h-full w-full overflow-y-auto"><AccountProfilePage
             language={language}
-            currency={currency}
+            onLanguageChange={setLanguage}
+            authStatus={authStatus}
+            authUser={authUser}
             userLocation={userLocation}
-            tripDestination={tripDestination}
-            onPlacesLoaded={setPlaces}
-          /> : <ContextMapView
-            places={places}
-            initialQuery={exploreQuery}
-            initialCategory={exploreCategory}
-            onSelectPlace={setSelectedPlace}
-            onStartRoute={setActiveNavDestination}
-            language={language}
-            userLocation={userLocation}
-          />}
-        </div>}
-
-        {activeTab === 'trips' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('My Trips', 'رحلاتي', 'Mes voyages'))}<TripsPlanner language={language} authStatus={authStatus} onOpenAuth={() => handleOpenAuth('welcome')} onTripCreated={(destination) => void handleTripCreated(destination)} initialDestinationQuery={tripInitialQuery} /></div>}
-
-        {activeTab === 'community' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('Community', 'المجتمع', 'Communauté'))}<CommunityHub onOpenAddModal={() => setIsAddPlaceOpen(true)} onOpenPassiveModal={() => setIsPassiveModalOpen(true)} isPassiveOptedIn={isPassiveOptedIn} language={language} /></div>}
-
-        {activeTab === 'account' && <div className="h-full w-full overflow-y-auto"><AccountProfilePage
-          language={language}
-          onLanguageChange={setLanguage}
-          authStatus={authStatus}
-          authUser={authUser}
-          userLocation={userLocation}
-          locationPermission={permission}
-          onRequestLocation={requestPermission}
-          isPassiveOptedIn={isPassiveOptedIn}
-          onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
-          savedPlacesCount={savedPlaceIds.length}
-          canInstall={canInstall}
-          onInstall={() => { void promptInstall(); }}
-          onOpenAuth={() => handleOpenAuth('welcome')}
-          onSignOut={async () => { await signOut(); setActiveTab('home'); }}
-          onBack={() => setActiveTab('home')}
-        /></div>}
+            locationPermission={permission}
+            onRequestLocation={requestPermission}
+            isPassiveOptedIn={isPassiveOptedIn}
+            onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
+            savedPlacesCount={savedPlaceIds.length}
+            canInstall={canInstall}
+            onInstall={() => { void promptInstall(); }}
+            onOpenAuth={() => handleOpenAuth('welcome')}
+            onSignOut={async () => { await signOut(); setActiveTab('home'); }}
+            onBack={() => setActiveTab('home')}
+          /></div>}
+        </Suspense>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-2 shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-xl">
         <div className="relative mx-auto flex max-w-md items-end justify-between px-2">
           <BottomTab id="tab-home" active={activeTab === 'home'} label={shellText('Home', 'الرئيسية', 'Accueil')} icon={<HomeIcon className="h-5 w-5" />} onClick={() => setActiveTab('home')} />
-          <BottomTab id="tab-explore" active={activeTab === 'explore'} label={shellText('Explore', 'استكشف', 'Explorer')} icon={<Compass className="h-5 w-5" />} onClick={() => setActiveTab('explore')} />
+          <BottomTab id="tab-explore" active={activeTab === 'explore'} label={shellText('Explore', 'استكشف', 'Explorer')} icon={<Compass className="h-5 w-5" />} onClick={() => { setExploreView('feed'); setActiveTab('explore'); }} />
           <button id="tab-ai-assistant" type="button" onClick={() => setIsAIChatOpen(true)} className="flex flex-col items-center gap-1 px-3 py-0.5 text-blue-600"><AIIcon size={22} variant="badge" /><span className="text-[11px] font-extrabold">AI</span></button>
           <BottomTab id="tab-trips" active={activeTab === 'trips'} label={shellText('Trips', 'رحلاتي', 'Voyages')} icon={<ShoppingBag className="h-5 w-5" />} onClick={() => setActiveTab('trips')} />
           <BottomTab id="tab-profile" active={activeTab === 'account'} label={shellText('Profile', 'حسابي', 'Compte')} icon={<User className="h-5 w-5" />} onClick={() => setActiveTab('account')} />
         </div>
       </nav>
 
-      <SideMenuDrawer
-        isOpen={isSideMenuOpen}
-        onClose={() => setIsSideMenuOpen(false)}
-        onNavigateTab={navigatePrimary}
-        onOpenAccount={() => setActiveTab('account')}
-        onOpenAddPlace={() => setIsAddPlaceOpen(true)}
-        onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
-        language={language}
-        onOpenAuth={handleOpenAuth}
-        authStatus={authStatus}
-        authUser={authUser}
-        canInstall={canInstall}
-        onInstall={() => { void promptInstall(); }}
-        showIosInstallHint={showIosInstallHint}
-        onDismissIosInstallHint={dismissIosInstallHint}
-      />
+      <Suspense fallback={null}>
+        <SideMenuDrawer
+          isOpen={isSideMenuOpen}
+          onClose={() => setIsSideMenuOpen(false)}
+          onNavigateTab={navigatePrimary}
+          onOpenAccount={() => setActiveTab('account')}
+          onOpenAddPlace={() => setIsAddPlaceOpen(true)}
+          onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
+          language={language}
+          onOpenAuth={handleOpenAuth}
+          authStatus={authStatus}
+          authUser={authUser}
+          canInstall={canInstall}
+          onInstall={() => { void promptInstall(); }}
+          showIosInstallHint={showIosInstallHint}
+          onDismissIosInstallHint={dismissIosInstallHint}
+        />
 
-      <AuthFlowModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} initialScreen={authInitialScreen} language={language} onToggleLanguage={setLanguage} onAuthSuccess={() => {}} />
-      {isOnboardingOpen && authStatus === 'authed' && currentUser.id && <OnboardingModal userId={currentUser.id} language={language} onLanguageChange={setLanguage} userLocation={userLocation} permission={permission} requestPermission={requestPermission} onComplete={() => setIsOnboardingOpen(false)} />}
-      <FlightsModal isOpen={isFlightsOpen} onClose={() => setIsFlightsOpen(false)} language={language} />
-      <WeatherModal isOpen={isWeatherOpen} onClose={() => setIsWeatherOpen(false)} language={language} />
+        <AuthFlowModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} initialScreen={authInitialScreen} language={language} onToggleLanguage={setLanguage} onAuthSuccess={() => {}} />
+        {isOnboardingOpen && authStatus === 'authed' && currentUser.id && <OnboardingModal userId={currentUser.id} language={language} onLanguageChange={setLanguage} userLocation={userLocation} permission={permission} requestPermission={requestPermission} onComplete={() => setIsOnboardingOpen(false)} />}
+        <FlightsModal isOpen={isFlightsOpen} onClose={() => setIsFlightsOpen(false)} language={language} />
+        <WeatherModal isOpen={isWeatherOpen} onClose={() => setIsWeatherOpen(false)} language={language} />
 
-      {activeNavDestination && <NavigationFlow destination={activeNavDestination} onClose={() => setActiveNavDestination(null)} onArrivedExplore={(place) => { setActiveNavDestination(null); setSelectedPlace(place); }} onSavePlace={handleToggleSave} isSaved={savedPlaceIds.includes(activeNavDestination.id)} language={language} />}
+        {activeNavDestination && <NavigationFlow destination={activeNavDestination} onClose={() => setActiveNavDestination(null)} onArrivedExplore={(place) => { setActiveNavDestination(null); setSelectedPlace(place); }} onSavePlace={handleToggleSave} isSaved={savedPlaceIds.includes(activeNavDestination.id)} language={language} />}
 
-      <PlaceDetailModal place={selectedPlace} onClose={() => setSelectedPlace(null)} onStartNavigation={(place) => { setSelectedPlace(null); setActiveNavDestination(place); }} onSaveToggle={handleToggleSave} isSaved={selectedPlace ? savedPlaceIds.includes(selectedPlace.id) : false} onPlaceUpdated={(updated) => { setPlaces((current) => current.map((place) => place.id === updated.id ? updated : place)); setSelectedPlace(updated); }} language={language} currency={currency} />
+        <PlaceDetailModal place={selectedPlace} onClose={() => setSelectedPlace(null)} onStartNavigation={(place) => { setSelectedPlace(null); setActiveNavDestination(place); }} onSaveToggle={handleToggleSave} isSaved={selectedPlace ? savedPlaceIds.includes(selectedPlace.id) : false} onPlaceUpdated={(updated) => { setPlaces((current) => current.map((place) => place.id === updated.id ? updated : place)); setSelectedPlace(updated); }} language={language} currency={currency} />
 
-      <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} destination={shellText('Travel and destinations', 'السفر والوجهات', 'Voyages et destinations')} onNavigateApp={handleAppAction} language={language} />
-      <AddPlaceModal isOpen={isAddPlaceOpen} onClose={() => setIsAddPlaceOpen(false)} onPlaceAdded={handlePlaceAdded} language={language} />
-      <PassiveDataModal isOpen={isPassiveModalOpen} onClose={() => setIsPassiveModalOpen(false)} isOptedIn={isPassiveOptedIn} onToggleOptIn={handlePassiveOptInChange} language={language} />
+        <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} destination={shellText('Travel and destinations', 'السفر والوجهات', 'Voyages et destinations')} onNavigateApp={handleAppAction} language={language} />
+        <AddPlaceModal isOpen={isAddPlaceOpen} onClose={() => setIsAddPlaceOpen(false)} onPlaceAdded={handlePlaceAdded} language={language} />
+        <PassiveDataModal isOpen={isPassiveModalOpen} onClose={() => setIsPassiveModalOpen(false)} isOptedIn={isPassiveOptedIn} onToggleOptIn={handlePassiveOptInChange} language={language} />
+      </Suspense>
     </div>
   );
 }
