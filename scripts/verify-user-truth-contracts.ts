@@ -26,6 +26,10 @@ forbid('src/components/PassiveDataModal.tsx', [
   'Math.random(',
   '100% Anonymous',
   'Sample anonymous trace recorded on server',
+  'How the contribution is handled',
+  'Current capability',
+  'background trail learning',
+  'public live crowd heatmap',
 ]);
 
 forbid('src/components/AddPlaceModal.tsx', [
@@ -76,6 +80,11 @@ forbid('src/components/AuthFlowModal.tsx', [
   'redirectTo: window.location.origin',
   'Your data is safe with us',
   'بياناتك في أمان تام',
+  'Travel Connect Belong',
+  'سافر وتواصل وانتم',
+  'Different Ways Same Journey',
+  'طرق مختلفة والرحلة واحدة',
+  "font-['Caveat',cursive]",
 ]);
 
 forbid('src/components/TripsPlanner.tsx', [
@@ -100,6 +109,7 @@ forbid('src/components/ExploreFeed.tsx', [
   'Curated baseline',
   'بيانات تأسيسية منسّقة',
   'organizing community signals',
+  'along your direction of travel',
 ]);
 
 forbid('src/components/HomeScreen.tsx', [
@@ -118,6 +128,14 @@ forbid('src/components/CommunityHub.tsx', [
   'contribution scores are calculated',
   'Community score connected',
   'Site engagement enabled',
+  'Help travelers by adding useful places.',
+]);
+
+forbid('src/components/FlightsModal.tsx', [
+  'live search and fares are not connected yet',
+  'Live flight search is not connected yet',
+  'flight inventory',
+  'seat availability',
 ]);
 
 forbid('src/components/SideMenuDrawer.tsx', [
@@ -153,6 +171,10 @@ requirePattern('src/components/AIChatModal.tsx', [
   'resolveAppNavigationHelp(text, language)',
   'actions?: AppNavigationAction[]',
   'onNavigateApp(action)',
+  'ai-voice-call-btn',
+  'SpeechRecognition',
+  'speechSynthesis',
+  'speakAndContinue',
 ]);
 
 requirePattern('src/components/ExploreFeed.tsx', [
@@ -160,6 +182,32 @@ requirePattern('src/components/ExploreFeed.tsx', [
   'filterNearbyPlaces',
   'filterPlacesForTrip',
   '!query && !userLocation && !tripDestination',
+  '© OpenStreetMap contributors',
+]);
+
+requirePattern('src/services/api.ts', [
+  '/api/nearby-places?lat=',
+  'localDatabaseCount < 6',
+  'mergeUniquePlaces',
+]);
+
+requirePattern('server/placeDiscovery.ts', [
+  'discoverNearbyPlaces',
+  'overpass-api.de/api/interpreter',
+  'EXPANDED_RADIUS_METERS',
+  'prominenceScore',
+]);
+
+requirePattern('src/lib/dayNightTheme.ts', [
+  'DAY_START_HOUR = 7',
+  'NIGHT_START_HOUR = 19',
+  "themeForHour",
+  "root.classList.toggle('dark'",
+  'root.style.colorScheme',
+]);
+
+requirePattern('src/main.tsx', [
+  'startAutomaticDayNightTheme();',
 ]);
 
 requirePattern('src/components/SideMenuDrawer.tsx', [
@@ -185,6 +233,7 @@ requirePattern('src/types.ts', [
   "trustLevel?: 'unverified' | 'community' | 'external' | 'official'",
   'seedRating?: number | null',
   'seedReviewCount?: number',
+  "| 'external';",
 ]);
 
 requirePattern('src/components/NavigationFlow.tsx', [
@@ -226,6 +275,12 @@ requirePattern('src/components/AuthFlowModal.tsx', [
   'preferred_language: language',
   'getPasswordRecoveryRedirectUrl()',
   'disabled={!agreedToTerms || isLoading}',
+  'اكتشف وجهتك وخطّط رحلتك بسهولة.',
+]);
+
+requirePattern('src/components/PassiveDataModal.tsx', [
+  'Your location is sent only when you tap Send.',
+  'Share a location sample',
 ]);
 
 requirePattern('src/components/TripsPlanner.tsx', [
