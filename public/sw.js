@@ -1,10 +1,10 @@
-const CACHE_NAME = 'my-sindbad-shell-v4';
+const CACHE_NAME = 'my-sindbad-shell-v7';
 const PRECACHE_URLS = [
-  '/',
   '/index.html',
-  '/manifest.webmanifest?v=4',
-  '/icons/my-sindbad-app-icon-user-v4-192.jpg',
-  '/icons/my-sindbad-app-icon-user-v4-512.jpg',
+  '/manifest.webmanifest?v=7',
+  '/brand/my-sindbad-logo-v7.png',
+  '/icons/my-sindbad-app-icon-v7-192.jpg',
+  '/icons/my-sindbad-app-icon-v7-512.jpg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -27,28 +27,56 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
+const cacheSuccessfulResponse = async (request, response) => {
+  if (response && response.status === 200 && response.type === 'basic') {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+  return response;
+};
 
-  // API requests must always go to the network and must never be cached.
-  if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
+const networkFirstNavigation = async (request) => {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const response = await fetch(request);
+    if (response && response.status === 200 && response.type === 'basic') {
+      await cache.put('/index.html', response.clone());
+    }
+    return response;
+  } catch (error) {
+    return (await cache.match('/index.html')) || Response.error();
+  }
+};
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const requestUrl = new URL(request.url);
+
+  if (request.method !== 'GET' || requestUrl.origin !== self.location.origin) return;
+
+  if (requestUrl.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
     return;
   }
 
-  if (event.request.method !== 'GET' || requestUrl.origin !== self.location.origin) return;
+  if (request.mode === 'navigate' || requestUrl.pathname === '/' || requestUrl.pathname === '/index.html') {
+    event.respondWith(networkFirstNavigation(request));
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => (
+        cachedResponse || fetch(request).then((networkResponse) => cacheSuccessfulResponse(request, networkResponse))
+      )),
+    );
+    return;
+  }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
-        }
-        const responseToCache = networkResponse.clone();
-        void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        return networkResponse;
-      });
-    }),
+    fetch(request)
+      .then((networkResponse) => cacheSuccessfulResponse(request, networkResponse))
+      .catch(() => caches.match(request)),
   );
 });
