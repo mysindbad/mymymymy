@@ -55,17 +55,10 @@ function normalizeLanguage(language: string) {
 
 async function resolveAreaName(latitude: number, longitude: number, language: string, fetcher: FetchLike) {
   const params = new URLSearchParams({
-    format: 'jsonv2',
-    lat: String(latitude),
-    lon: String(longitude),
-    zoom: '10',
-    addressdetails: '1',
-    'accept-language': normalizeLanguage(language),
+    format: 'jsonv2', lat: String(latitude), lon: String(longitude), zoom: '10', addressdetails: '1', 'accept-language': normalizeLanguage(language),
   });
   try {
-    const data = await fetchJson(`https://nominatim.openstreetmap.org/reverse?${params}`, fetcher, {
-      headers: { Accept: 'application/json' },
-    }, 4500);
+    const data = await fetchJson(`https://nominatim.openstreetmap.org/reverse?${params}`, fetcher, { headers: { Accept: 'application/json', 'User-Agent': 'MySindbad/0.1' } }, 4500);
     const address = data?.address || {};
     const city = cleanText(address.city || address.town || address.village || address.municipality || address.county, 80);
     const region = cleanText(address.state || address.region || address.country, 80);
@@ -91,12 +84,7 @@ function subCategoryFromTags(tags: Record<string, unknown>) {
 }
 
 function addressFromTags(tags: Record<string, unknown>, fallbackArea: string) {
-  const parts = [
-    cleanText(tags['addr:housenumber'], 20),
-    cleanText(tags['addr:street'], 100),
-    cleanText(tags['addr:place'], 100),
-    cleanText(tags['addr:city'], 80),
-  ].filter(Boolean);
+  const parts = [cleanText(tags['addr:housenumber'], 20), cleanText(tags['addr:street'], 100), cleanText(tags['addr:place'], 100), cleanText(tags['addr:city'], 80)].filter(Boolean);
   return parts.join(', ') || fallbackArea;
 }
 
@@ -124,7 +112,6 @@ function osmElementToPlace(element: any, area: { city: string; region: string },
   const description = cleanText(tags.description || tags['description:en'] || tags['description:fr'] || tags['description:ar'], 360);
   const openingHours = cleanText(tags.opening_hours, 120);
   const phone = cleanText(tags.phone || tags['contact:phone'], 80);
-
   return {
     id: `osm-${element.type}-${element.id}`,
     name,
@@ -167,20 +154,12 @@ async function fetchOverpassPlaces(latitude: number, longitude: number, area: { 
     nwr(around:${DISCOVERY_RADIUS_METERS},${latitude},${longitude})["amenity"~"restaurant|cafe"]["wikipedia"]["name"];
   );out center tags 80;`;
   const body = new URLSearchParams({ data: query }).toString();
-  const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-
-  for (const endpoint of endpoints) {
+  for (const endpoint of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
     try {
-      const data = await fetchJson(endpoint, fetcher, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', Accept: 'application/json' },
-        body,
-      }, 7500);
-      return (Array.isArray(data?.elements) ? data.elements : [])
-        .map((element: any) => osmElementToPlace(element, area, [latitude, longitude]))
-        .filter(Boolean) as RankedPlace[];
+      const data = await fetchJson(endpoint, fetcher, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', Accept: 'application/json', 'User-Agent': 'MySindbad/0.1' }, body }, 7500);
+      return (Array.isArray(data?.elements) ? data.elements : []).map((element: any) => osmElementToPlace(element, area, [latitude, longitude])).filter(Boolean) as RankedPlace[];
     } catch {
-      // Try the next public endpoint.
+      // Try another public endpoint.
     }
   }
   return [];
@@ -189,24 +168,10 @@ async function fetchOverpassPlaces(latitude: number, longitude: number, area: { 
 async function fetchWikipediaPlaces(latitude: number, longitude: number, language: string, area: { city: string; region: string }, fetcher: FetchLike) {
   const lang = normalizeLanguage(language);
   const params = new URLSearchParams({
-    action: 'query',
-    format: 'json',
-    origin: '*',
-    generator: 'geosearch',
-    ggsprimary: 'all',
-    ggsnamespace: '0',
-    ggsradius: String(DISCOVERY_RADIUS_METERS),
-    ggslimit: '12',
-    ggscoord: `${latitude}|${longitude}`,
-    prop: 'coordinates|pageimages|extracts',
-    piprop: 'thumbnail',
-    pithumbsize: '900',
-    exintro: '1',
-    explaintext: '1',
-    exsentences: '2',
+    action: 'query', format: 'json', origin: '*', generator: 'geosearch', ggsprimary: 'all', ggsnamespace: '0', ggsradius: String(DISCOVERY_RADIUS_METERS), ggslimit: '12', ggscoord: `${latitude}|${longitude}`, prop: 'coordinates|pageimages|extracts', piprop: 'thumbnail', pithumbsize: '900', exintro: '1', explaintext: '1', exsentences: '2',
   });
   try {
-    const data = await fetchJson(`https://${lang}.wikipedia.org/w/api.php?${params}`, fetcher, { headers: { Accept: 'application/json' } }, 6000);
+    const data = await fetchJson(`https://${lang}.wikipedia.org/w/api.php?${params}`, fetcher, { headers: { Accept: 'application/json', 'User-Agent': 'MySindbad/0.1' } }, 6000);
     return Object.values(data?.query?.pages || {}).map((page: any) => {
       const coordinate = page?.coordinates?.[0];
       const lat = Number(coordinate?.lat);
@@ -263,6 +228,15 @@ function dedupeAndRank(places: RankedPlace[]) {
     .map(({ _score: _ignored, ...place }) => place as Place);
 }
 
+async function discoverThroughAppApi(options: { latitude: number; longitude: number; language: string; category?: string }) {
+  const params = new URLSearchParams({ lat: String(options.latitude), lng: String(options.longitude), lang: options.language });
+  if (options.category && options.category !== 'All') params.set('category', options.category);
+  const response = await fetch(`/api/public-places?${params.toString()}`, { signal: AbortSignal.timeout(9000) });
+  if (!response.ok) throw new Error(`Nearby discovery returned ${response.status}`);
+  const payload = await response.json() as { places?: Place[] };
+  return Array.isArray(payload.places) ? payload.places : [];
+}
+
 export async function discoverNearbyPublicPlaces(options: {
   latitude: number;
   longitude: number;
@@ -273,6 +247,11 @@ export async function discoverNearbyPublicPlaces(options: {
   const { latitude, longitude } = options;
   const language = normalizeLanguage(options.language || 'en');
   const category = options.category && options.category !== 'All' ? options.category : '';
+
+  if (typeof window !== 'undefined' && !options.fetcher) {
+    return discoverThroughAppApi({ latitude, longitude, language, category });
+  }
+
   const fetcher = options.fetcher || fetch;
   const cacheKey = `${latitude.toFixed(2)}:${longitude.toFixed(2)}:${language}:${category}`;
   const cached = cache.get(cacheKey);
