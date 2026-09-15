@@ -2,6 +2,10 @@ process.env.VITE_SUPABASE_URL ||= 'http://127.0.0.1:54321';
 process.env.VITE_SUPABASE_ANON_KEY ||= 'e2e-anon-key';
 process.env.DISABLE_HMR = 'true';
 
+// Production materializes branding before Vite builds. Do the same in E2E so
+// Chromium tests exercise the exact public logo/icon URLs used in production.
+await import('./materialize-brand-assets.mjs');
+
 const { createServer } = await import('vite');
 
 const server = await createServer({
