@@ -1,24 +1,36 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Search,
-  Mic,
-  Sparkles,
-  Plane,
   Bed,
-  MapPin,
-  Utensils,
   CloudSun,
-  ShoppingBag,
   Heart,
-  ChevronRight,
-  ArrowRight,
-  Bell,
-  Menu
+  Loader2,
+  MapPin,
+  Menu,
+  Mic,
+  Plane,
+  Search,
+  Sparkles,
+  Utensils,
 } from 'lucide-react';
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import { BrandLogo } from './BrandLogo';
 import { UserAvatar } from './UserAvatar';
+import type { AssistantNavigationReply, AppNavigationAction } from '../lib/appNavigation';
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  abort?: () => void;
+  onstart: (() => void) | null;
+  onresult: ((event: { results: { [index: number]: { [index: number]: { transcript: string } } } }) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 interface HomeScreenProps {
   onOpenAIChat: () => void;
@@ -27,12 +39,17 @@ interface HomeScreenProps {
   onSelectDestination: (destinationName: string) => void;
   onOpenFlights: () => void;
   onOpenWeather: () => void;
-  onOpenAddPlace: () => void;
   onOpenSideMenu: () => void;
+  onOpenAccount: () => void;
   onSelectPlace: (place: Place) => void;
+  onToggleSave: (placeId: string) => void;
+  onVoiceCommand: (text: string) => Promise<AssistantNavigationReply>;
+  onVoiceAction: (action: AppNavigationAction) => void;
+  onRequestLocation: () => Promise<unknown>;
   places: Place[];
   savedPlaceIds: string[];
-  onToggleSave: (placeId: string) => void;
+  hasLocation: boolean;
+  locationPermission: string;
   language?: SupportedLanguage;
   onOpenAuth?: (screen?: any) => void;
   currentUser?: { name: string; email: string; avatarUrl: string; isLoggedIn?: boolean };
@@ -46,419 +63,204 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenFlights,
   onOpenWeather,
   onOpenSideMenu,
+  onOpenAccount,
   onSelectPlace,
+  onToggleSave,
+  onVoiceCommand,
+  onVoiceAction,
+  onRequestLocation,
   places,
   savedPlaceIds,
-  onToggleSave,
+  hasLocation,
+  locationPermission,
   language = 'en',
   onOpenAuth,
   currentUser,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeRegion, setActiveRegion] = useState<string>('');
   const [isListeningMic, setIsListeningMic] = useState(false);
+  const [voicePending, setVoicePending] = useState(false);
+  const [voiceReply, setVoiceReply] = useState<AssistantNavigationReply | null>(null);
+  const [voiceError, setVoiceError] = useState('');
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const isAr = language === 'ar';
+  const isFr = language === 'fr';
   const localize = (english: string, arabic: string, french: string) =>
-    language === 'ar' ? arabic : language === 'fr' ? french : english;
-
-  const availableRegions = useMemo(() => {
-    return Array.from(new Set(places.map((place) => place.region).filter(Boolean))).slice(0, 5);
-  }, [places]);
+    isAr ? arabic : isFr ? french : english;
 
   const featuredPlaces = useMemo(() => places.slice(0, 5), [places]);
 
-  const handleMicClick = () => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      setIsListeningMic(false);
-      return;
-    }
+  useEffect(() => () => {
+    recognitionRef.current?.abort?.();
+    recognitionRef.current = null;
+  }, []);
+
+  const processVoiceResult = async (transcript: string) => {
+    setSearchQuery(transcript);
+    setVoicePending(true);
+    setVoiceError('');
+    setVoiceReply(null);
     try {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.lang = language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-US';
-      recognition.onstart = () => setIsListeningMic(true);
-      recognition.onend = () => setIsListeningMic(false);
-      recognition.onerror = () => setIsListeningMic(false);
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0]?.[0]?.transcript?.trim();
-        if (!transcript) return;
-        setSearchQuery(transcript);
-        onSelectDestination(transcript);
-      };
-      recognition.start();
+      setVoiceReply(await onVoiceCommand(transcript));
     } catch {
-      setIsListeningMic(false);
+      setVoiceError(localize('Could not process that request.', 'تعذر معالجة الطلب.', 'Impossible de traiter cette demande.'));
+    } finally {
+      setVoicePending(false);
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      onSelectDestination(searchQuery.trim());
+  const handleMicClick = () => {
+    if (isListeningMic) {
+      recognitionRef.current?.stop();
+      return;
     }
+    const browserWindow = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const SpeechRecognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError(localize('Voice input is not supported on this browser.', 'الإدخال الصوتي غير مدعوم في هذا المتصفح.', 'La saisie vocale n’est pas prise en charge par ce navigateur.'));
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = isAr ? 'ar-MA' : isFr ? 'fr-FR' : 'en-US';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.onstart = () => {
+        setVoiceError('');
+        setIsListeningMic(true);
+      };
+      recognition.onresult = (event) => {
+        const transcript = event.results[0]?.[0]?.transcript?.trim();
+        if (transcript) void processVoiceResult(transcript);
+      };
+      recognition.onerror = (event) => {
+        const message = event.error === 'not-allowed'
+          ? localize('Microphone permission is blocked.', 'إذن الميكروفون محظور.', 'L’autorisation du microphone est bloquée.')
+          : event.error === 'no-speech'
+            ? localize('No speech was detected. Try again.', 'لم يتم سماع كلام. حاول مجدداً.', 'Aucune parole détectée. Réessayez.')
+            : localize('Voice input stopped. Try again.', 'توقف الإدخال الصوتي. حاول مجدداً.', 'La saisie vocale s’est arrêtée. Réessayez.');
+        setVoiceError(message);
+      };
+      recognition.onend = () => {
+        recognitionRef.current = null;
+        setIsListeningMic(false);
+      };
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setIsListeningMic(false);
+      setVoiceError(localize('Could not start the microphone.', 'تعذر تشغيل الميكروفون.', 'Impossible de démarrer le microphone.'));
+    }
+  };
+
+  const handleSearchSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (query) onSelectDestination(query);
   };
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 pb-28 select-none text-slate-800" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="relative w-full overflow-hidden bg-gradient-to-b from-sky-400 via-sky-300 to-sky-100 pb-8 sm:pb-12 shadow-md">
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=1600&auto=format&fit=crop&q=85"
-            alt="Mediterranean travel scenery"
-            className="w-full h-full object-cover object-top opacity-85"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-sky-500/30 via-transparent to-white" />
+    <div className="min-h-screen w-full bg-slate-50 pb-28 text-slate-800" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="relative overflow-hidden bg-gradient-to-b from-sky-400 via-sky-300 to-white pb-7 shadow-sm">
+        <div className="absolute inset-0">
+          <img src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=1600&auto=format&fit=crop&q=85" alt="Travel scenery" className="h-full w-full object-cover object-top opacity-75" />
+          <div className="absolute inset-0 bg-gradient-to-b from-sky-500/25 via-white/5 to-white" />
         </div>
 
-        <div className="absolute top-0 left-0 right-0 h-28 pointer-events-none z-10 opacity-75 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-pink-500/25 via-transparent to-transparent" />
-
-        <div className="relative z-20 max-w-md sm:max-w-xl mx-auto px-4 pt-3 flex items-center justify-between">
-          <button
-            id="home-side-menu-btn"
-            onClick={onOpenSideMenu}
-            className="w-9 h-9 rounded-full bg-blue-600/90 hover:bg-blue-700 text-white shadow-md flex items-center justify-center backdrop-blur-md transition active:scale-95"
-            title={localize('Open Menu', 'القائمة', 'Ouvrir le menu')}
-          >
-            <Menu className="w-4 h-4 stroke-[2.5]" />
+        <div className="relative z-10 mx-auto flex max-w-xl items-center justify-between px-4 pt-3">
+          <button id="home-side-menu-btn" type="button" onClick={onOpenSideMenu} className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-md" aria-label={localize('Open menu', 'القائمة', 'Ouvrir le menu')}>
+            <Menu className="h-4 w-4" />
           </button>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => {
-                if (onOpenAuth) onOpenAuth('welcome');
-                else onNavigateTab('community');
-              }}
-              className="px-2.5 sm:px-3 py-1 rounded-full bg-slate-900/85 hover:bg-slate-900 text-white shadow-sm flex items-center gap-1.5 backdrop-blur-md transition active:scale-95 text-xs font-semibold"
-            >
-              <UserAvatar
-                name={currentUser?.name}
-                avatarUrl={currentUser?.avatarUrl}
-                className="h-5 w-5"
-                textClassName="text-[8px]"
-              />
-              <div className="text-left rtl:text-right leading-tight hidden xs:block">
-                <span className="text-[9px] text-slate-300 block">
-                  {currentUser?.isLoggedIn ? localize('Welcome,', 'مرحباً،', 'Bienvenue,') : localize('Hello,', 'أهلاً بك،', 'Bonjour,')}
-                </span>
-                <span className="text-[11px] font-bold text-white max-w-[70px] truncate block">
-                  {currentUser?.name || localize('Traveler!', 'المسافر', 'Voyageur !')}
-                </span>
-              </div>
-              <ChevronRight className="w-3 h-3 text-slate-300 rtl:rotate-180" />
-            </button>
-
-            <button
-              onClick={() => onNavigateTab('community')}
-              className="w-9 h-9 rounded-full bg-blue-600/90 hover:bg-blue-700 text-white shadow-md flex items-center justify-center transition active:scale-95"
-              aria-label={localize('Open account', 'فتح الحساب', 'Ouvrir le compte')}
-            >
-              <Bell className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative z-20 max-w-md mx-auto px-4 pt-2 pb-1">
-          <BrandLogo size="lg" showSlogan={true} language={language} />
-        </div>
-
-        <div className="absolute left-3 rtl:left-auto rtl:right-3 top-24 z-10 hidden sm:flex flex-col items-center">
-          <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md -rotate-3 border border-amber-700">
-            {localize('Good', 'رحلات', 'Bons')}
-          </div>
-          <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md rotate-2 border border-amber-700 -mt-0.5">
-            {localize('Trips', 'سعيدة', 'Voyages')}
-          </div>
-          <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md -rotate-2 border border-amber-700 -mt-0.5">
-            {localize('Brighter', 'وقصص', 'Plus belles')}
-          </div>
-          <div className="px-2.5 py-1 rounded-sm bg-amber-800/90 text-amber-100 text-[10px] font-bold uppercase shadow-md rotate-3 border border-amber-700 -mt-0.5">
-            {localize('Stories ♡', 'ملهمة ♡', 'Histoires ♡')}
-          </div>
-          <div className="w-1.5 h-14 bg-amber-900 shadow-md" />
-        </div>
-
-        <div className="absolute right-4 rtl:right-auto rtl:left-4 top-28 z-10 hidden sm:block text-right rtl:text-left text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-          <div className="text-sm font-serif italic tracking-wide">{localize('Explore', 'استكشف', 'Explorer')}</div>
-          <div className="text-base font-serif italic tracking-wide font-bold">{localize('Discover', 'اكتشف', 'Découvrir')}</div>
-          <div className="text-lg font-serif italic tracking-wide font-black flex items-center justify-end rtl:justify-start gap-1">
-            <span>{localize('Enjoy', 'استمتع', 'Profitez')}</span>
-            <span className="text-xs">✈</span>
-          </div>
-        </div>
-
-        <div className="relative z-30 max-w-md sm:max-w-xl mx-auto px-4 mt-2.5 space-y-2">
-          <form
-            onSubmit={handleSearchSubmit}
-            className="flex items-center gap-2 bg-white rounded-full p-1.5 pl-3.5 rtl:pl-1.5 rtl:pr-3.5 pr-1.5 shadow-lg border border-slate-200/80 transition-all focus-within:ring-2 focus-within:ring-blue-500"
+          <button
+            type="button"
+            onClick={() => currentUser?.isLoggedIn ? onOpenAccount() : onOpenAuth?.('welcome')}
+            className="flex items-center gap-2 rounded-full bg-slate-900/90 px-2.5 py-1.5 text-white shadow-sm"
+            aria-label={localize('Account', 'الحساب', 'Compte')}
           >
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={localize('Search available places or regions', 'ابحث في الأماكن والمناطق المتاحة', 'Rechercher les lieux ou régions disponibles')}
-              className="flex-1 text-xs sm:text-sm text-slate-800 bg-transparent outline-none placeholder:text-slate-400 font-medium"
-            />
-            <button
-              type="button"
-              onClick={handleMicClick}
-              className={`p-1.5 rounded-full transition ${isListeningMic ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-slate-600'}`}
-              title={localize('Voice Search', 'بحث صوتي', 'Recherche vocale')}
-            >
-              <Mic className="w-3.5 h-3.5" />
-            </button>
+            <UserAvatar name={currentUser?.name} avatarUrl={currentUser?.avatarUrl} className="h-6 w-6" textClassName="text-[9px]" />
+            <span className="max-w-24 truncate text-xs font-bold">{currentUser?.name || localize('Traveler', 'مسافر', 'Voyageur')}</span>
+          </button>
+        </div>
 
-            <button
-              id="home-ask-ai-btn"
-              type="button"
-              onClick={onOpenAIChat}
-              className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-bold text-xs shadow-md shadow-blue-500/25 flex items-center gap-1 transition active:scale-95 shrink-0"
-            >
-              <Sparkles className="w-3 h-3 fill-current text-amber-300" />
-              <span>{localize('Ask AI', 'اسأل AI', 'Demander à l’IA')}</span>
+        <div className="relative z-10 mx-auto max-w-md px-4 py-2">
+          <BrandLogo size="lg" showSlogan={false} language={language} />
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-xl space-y-2 px-4">
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1.5 ps-3.5 shadow-lg focus-within:ring-2 focus-within:ring-blue-500">
+            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={localize('Search places', 'ابحث عن مكان', 'Rechercher un lieu')} className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400" />
+            <button type="button" onClick={handleMicClick} aria-pressed={isListeningMic} aria-label={localize('Voice assistant', 'المساعد الصوتي', 'Assistant vocal')} className={`rounded-full p-2 ${isListeningMic ? 'bg-rose-500 text-white animate-pulse' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <Mic className="h-4 w-4" />
+            </button>
+            <button id="home-ask-ai-btn" type="button" onClick={onOpenAIChat} className="flex items-center gap-1 rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white">
+              <Sparkles className="h-3 w-3" />
+              {localize('Ask', 'اسأل', 'Demander')}
             </button>
           </form>
 
-          {availableRegions.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 justify-start sm:justify-center">
-              {availableRegions.map((region) => {
-                const isSelected = activeRegion === region;
-                return (
-                  <button
-                    key={region}
-                    onClick={() => {
-                      setActiveRegion(region);
-                      onSelectDestination(region);
-                    }}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap shadow-2xs backdrop-blur-md transition border flex items-center gap-1 ${
-                      isSelected
-                        ? 'bg-white border-blue-500 text-blue-900 font-bold ring-2 ring-blue-500/20'
-                        : 'bg-white/95 border-slate-200 text-slate-700 hover:bg-white'
-                    }`}
-                  >
-                    <span>📍</span>
-                    <span>{region}</span>
-                  </button>
-                );
-              })}
+          {(voicePending || voiceReply || voiceError) && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" aria-live="polite">
+              {voicePending ? <div className="flex items-center gap-2 text-sm text-slate-600"><Loader2 className="h-4 w-4 animate-spin text-blue-600" />{localize('Processing…', 'جارٍ المعالجة…', 'Traitement…')}</div> : voiceError ? <p className="text-sm font-medium text-rose-700">{voiceError}</p> : voiceReply ? <div className="space-y-2"><p className="text-sm font-medium text-slate-800">{voiceReply.text}</p>{voiceReply.actions.length > 0 && <div className="flex flex-wrap gap-2">{voiceReply.actions.map((action) => <button type="button" key={`${action.target}-${action.label}`} onClick={() => onVoiceAction(action)} className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">{action.label}</button>)}</div>}</div> : null}
             </div>
           )}
         </div>
       </div>
 
-      <div className="max-w-md sm:max-w-2xl mx-auto px-4 -mt-2 sm:-mt-3 relative z-20">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3.5 shadow-sm border border-slate-100/90">
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-2.5">
-            <button
-              id="service-flights-btn"
-              onClick={onOpenFlights}
-              className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
-            >
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-sky-400 via-blue-500 to-blue-600 shadow-sm shadow-blue-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
-                <Plane className="w-5 h-5 -rotate-45 stroke-[2.2]" />
-              </div>
-              <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">{localize('Flights', 'الطيران', 'Vols')}</span>
-              <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">{localize('Route planning', 'تخطيط المسار', 'Préparer le trajet')}</span>
-            </button>
-
-            <button
-              id="service-hotels-btn"
-              onClick={() => {
-                onSelectCategory('accommodation');
-                onNavigateTab('map');
-              }}
-              className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
-            >
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 shadow-sm shadow-emerald-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
-                <Bed className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">{localize('Stays', 'الإقامات', 'Hébergements')}</span>
-              <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">{localize('Browse catalog', 'تصفح الدليل', 'Voir le catalogue')}</span>
-            </button>
-
-            <button
-              id="service-trips-btn"
-              onClick={() => onNavigateTab('trips')}
-              className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
-            >
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 shadow-sm shadow-orange-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
-                <MapPin className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">{localize('Trips', 'الرحلات', 'Voyages')}</span>
-              <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">{localize('Itineraries', 'برامج منظمة', 'Itinéraires')}</span>
-            </button>
-
-            <button
-              id="service-restaurants-btn"
-              onClick={() => {
-                onSelectCategory('restaurant');
-                onNavigateTab('map');
-              }}
-              className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
-            >
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-600 to-purple-700 shadow-sm shadow-purple-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
-                <Utensils className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">{localize('Restaurants', 'المطاعم', 'Restaurants')}</span>
-              <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">{localize('Browse catalog', 'تصفح الدليل', 'Voir le catalogue')}</span>
-            </button>
-
-            <button
-              id="service-weather-btn"
-              onClick={onOpenWeather}
-              className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
-            >
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-cyan-400 via-sky-500 to-blue-500 shadow-sm shadow-cyan-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
-                <CloudSun className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">{localize('Weather', 'الطقس', 'Météo')}</span>
-              <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">{localize('Forecast', 'التوقعات', 'Prévisions')}</span>
-            </button>
-
-            <button
-              id="service-more-btn"
-              onClick={onOpenSideMenu}
-              className="flex flex-col items-center text-center p-1.5 rounded-xl hover:bg-slate-50 transition group active:scale-95"
-            >
-              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-pink-500 via-rose-500 to-red-500 shadow-sm shadow-rose-500/20 flex items-center justify-center text-white transition transform group-hover:scale-105">
-                <ShoppingBag className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <span className="font-bold text-xs text-slate-900 mt-1.5 block leading-tight">{localize('More', 'المزيد', 'Plus')}</span>
-              <span className="text-[9px] text-slate-500 block leading-tight mt-0.5 line-clamp-1">{localize('More tools', 'أدوات إضافية', 'Plus d’outils')}</span>
-            </button>
+      <div className="relative z-20 mx-auto -mt-2 max-w-2xl px-4">
+        <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <HomeAction icon={<Plane className="h-5 w-5" />} label={localize('Flights', 'الطيران', 'Vols')} onClick={onOpenFlights} />
+            <HomeAction icon={<Bed className="h-5 w-5" />} label={localize('Stays', 'الإقامات', 'Hébergements')} onClick={() => { onSelectCategory('accommodation'); onNavigateTab('map'); }} />
+            <HomeAction icon={<MapPin className="h-5 w-5" />} label={localize('Trips', 'الرحلات', 'Voyages')} onClick={() => onNavigateTab('trips')} />
+            <HomeAction icon={<Utensils className="h-5 w-5" />} label={localize('Restaurants', 'المطاعم', 'Restaurants')} onClick={() => { onSelectCategory('restaurant'); onNavigateTab('map'); }} />
+            <HomeAction icon={<CloudSun className="h-5 w-5" />} label={localize('Weather', 'الطقس', 'Météo')} onClick={onOpenWeather} />
+            <HomeAction icon={<Search className="h-5 w-5" />} label={localize('Explore', 'استكشف', 'Explorer')} onClick={() => onNavigateTab('explore')} />
           </div>
         </div>
       </div>
 
-      <div className="max-w-md sm:max-w-2xl mx-auto px-4 mt-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div
-            onClick={() => onNavigateTab('explore')}
-            className="relative h-36 rounded-2xl overflow-hidden shadow-sm cursor-pointer group transition transform hover:-translate-y-0.5"
-          >
-            <img
-              src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80"
-              alt="Travel discovery"
-              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-            <div className="absolute inset-0 p-3.5 flex flex-col justify-between text-white">
-              <div>
-                <span className="text-[10px] font-black tracking-widest uppercase text-sky-200">{localize('DISCOVER', 'استكشف', 'DÉCOUVRIR')}</span>
-                <h3 className="text-base font-bold leading-tight mt-0.5">{localize('Current Sindbad Catalog', 'دليل سندباد الحالي', 'Catalogue Sindbad actuel')}</h3>
-                <p className="text-xs text-slate-200 mt-0.5">{localize('Browse places currently available in the catalog', 'تصفح الأماكن المتاحة حالياً في الدليل', 'Parcourez les lieux actuellement disponibles')}</p>
-              </div>
-              <div>
-                <button className="px-3 py-1 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-sm flex items-center gap-1 transition">
-                  <span>{localize('Explore Now', 'استكشف الآن', 'Explorer maintenant')}</span>
-                  <ArrowRight className="w-3 h-3 rtl:rotate-180" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div
-            onClick={() => onNavigateTab('trips')}
-            className="relative h-36 rounded-2xl overflow-hidden shadow-sm cursor-pointer group transition transform hover:-translate-y-0.5"
-          >
-            <img
-              src="https://images.unsplash.com/photo-1548013146-72479768bada?w=800&auto=format&fit=crop&q=80"
-              alt="Trip planning"
-              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-            <div className="absolute inset-0 p-3.5 flex flex-col justify-between text-white">
-              <div>
-                <span className="text-[10px] font-black tracking-widest uppercase text-amber-200">{localize('PLAN SMARTER', 'تخطيط ذكي', 'PLANIFIER')}</span>
-                <h3 className="text-base font-bold leading-tight mt-0.5">{localize('AI Trip Itineraries', 'برامج رحلات بالذكاء الاصطناعي', 'Itinéraires IA')}</h3>
-                <p className="text-xs text-slate-200 mt-0.5">{localize('Generate an itinerary from an available destination', 'أنشئ برنامجاً انطلاقاً من وجهة متاحة', 'Générez un itinéraire à partir d’une destination disponible')}</p>
-              </div>
-              <div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenAIChat();
-                  }}
-                  className="px-3 py-1 rounded-full bg-white hover:bg-slate-100 text-blue-600 font-bold text-xs shadow-sm flex items-center gap-1 transition"
-                >
-                  <span>{localize('Ask Sindbad', 'اسأل سندباد', 'Demander à Sindbad')}</span>
-                  <Sparkles className="w-3 h-3 text-blue-600 fill-blue-600" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-md sm:max-w-2xl mx-auto px-4 mt-7 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base sm:text-lg font-bold text-slate-900">
-            {localize('Available Places', 'الأماكن المتاحة', 'Lieux disponibles')}
-          </h2>
-          <button
-            onClick={() => onNavigateTab('explore')}
-            className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5"
-          >
-            <span>{localize('See All', 'عرض الكل', 'Tout voir')}</span>
-            <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />
-          </button>
+      <section className="mx-auto mt-6 max-w-2xl px-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-base font-black text-slate-900">{hasLocation ? localize('Nearby places', 'أماكن قريبة', 'Lieux proches') : localize('Nearby places', 'أماكن قريبة', 'Lieux proches')}</h2>
+          {hasLocation && <button type="button" onClick={() => onNavigateTab('explore')} className="text-xs font-bold text-blue-600">{localize('See all', 'عرض الكل', 'Tout voir')}</button>}
         </div>
 
-        {featuredPlaces.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-xs font-bold text-slate-500">
-            {localize('No places are available right now.', 'لا توجد أماكن متاحة حالياً.', 'Aucun lieu disponible pour le moment.')}
+        {!hasLocation ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-center">
+            <MapPin className="mx-auto mb-2 h-6 w-6 text-blue-600" />
+            <p className="text-sm font-bold text-slate-800">{localize('Share your location to see nearby places.', 'شارك موقعك لعرض الأماكن القريبة.', 'Partagez votre localisation pour voir les lieux proches.')}</p>
+            {locationPermission !== 'unsupported' && <button type="button" onClick={() => void onRequestLocation()} className="mt-3 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white">{localize('Use my location', 'استخدم موقعي', 'Utiliser ma localisation')}</button>}
           </div>
+        ) : featuredPlaces.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-500">{localize('No nearby places found.', 'لم يتم العثور على أماكن قريبة.', 'Aucun lieu proche trouvé.')}</div>
         ) : (
-          <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
+          <div className="flex gap-3 overflow-x-auto pb-2">
             {featuredPlaces.map((place) => {
               const isSaved = savedPlaceIds.includes(place.id);
-              const image = place.photos?.[0];
-              return (
-                <div
-                  key={place.id}
-                  onClick={() => onSelectPlace(place)}
-                  className="relative w-40 sm:w-48 h-56 rounded-3xl overflow-hidden shadow-md shrink-0 cursor-pointer group transition transform hover:-translate-y-1 bg-slate-200"
-                >
-                  {image ? (
-                    <img
-                      src={image}
-                      alt={isAr && place.arabicName ? place.arabicName : place.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-slate-300 to-slate-500" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/20" />
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSave(place.id);
-                    }}
-                    className={`absolute top-2.5 right-2.5 rtl:right-auto rtl:left-2.5 w-7 h-7 rounded-full backdrop-blur-md flex items-center justify-center transition ${
-                      isSaved ? 'bg-rose-500 text-white' : 'bg-black/40 hover:bg-black/60 text-white'
-                    }`}
-                    aria-label={isSaved ? localize('Remove from saved', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer le lieu')}
-                  >
-                    <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}`} />
-                  </button>
-
-                  <div className="absolute bottom-3 left-3 right-3 text-white">
-                    <h4 className="font-bold text-sm sm:text-base leading-tight drop-shadow-xs">
-                      {isAr && place.arabicName ? place.arabicName : place.name}
-                    </h4>
-                    <p className="text-[11px] text-slate-300 leading-snug drop-shadow-xs mt-0.5">
-                      {place.area || place.region}
-                    </p>
-                  </div>
-                </div>
-              );
+              return <article key={place.id} onClick={() => onSelectPlace(place)} className="relative h-52 w-40 shrink-0 cursor-pointer overflow-hidden rounded-3xl bg-slate-200 shadow-sm sm:w-48">
+                {place.photos?.[0] ? <img src={place.photos[0]} alt={isAr && place.arabicName ? place.arabicName : place.name} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-slate-300 to-slate-500" />}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/10" />
+                <button type="button" onClick={(event) => { event.stopPropagation(); onToggleSave(place.id); }} aria-label={isSaved ? localize('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer le lieu')} className={`absolute end-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full ${isSaved ? 'bg-rose-500' : 'bg-black/40'} text-white`}><Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} /></button>
+                <div className="absolute inset-x-3 bottom-3 text-white"><h3 className="font-bold leading-tight">{isAr && place.arabicName ? place.arabicName : place.name}</h3><p className="mt-1 text-xs text-slate-200">{place.area || place.region}{typeof place.distanceKm === 'number' ? ` · ${place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km` : ''}</p></div>
+              </article>;
             })}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };
+
+const HomeAction: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void }> = ({ icon, label, onClick }) => (
+  <button type="button" onClick={onClick} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl p-2 text-center text-blue-600 transition hover:bg-slate-50 active:scale-95">
+    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50">{icon}</span>
+    <span className="text-[11px] font-bold text-slate-800">{label}</span>
+  </button>
+);

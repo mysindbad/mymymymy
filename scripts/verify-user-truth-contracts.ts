@@ -46,11 +46,17 @@ forbid('src/components/RatePlaceModal.tsx', [
 forbid('src/components/PlaceDetailModal.tsx', [
   'place.distanceKm || 1.4',
   'Discovered and documented through the collective contributions',
+  'place.seedData',
+  'Curated baseline',
+  'بيانات تأسيسية منسّقة',
+  'curated starting catalog',
 ]);
 
 forbid('src/components/AIChatModal.tsx', [
   'Visit Akchour in the morning for its trails and scenery',
   'جرّب أقشور صباحاً',
+  'Hidden natural spots in Akchour',
+  'Quick Questions',
 ]);
 
 forbid('src/App.tsx', [
@@ -60,6 +66,7 @@ forbid('src/App.tsx', [
   'GPS Active',
   'Explore & AI Memory',
   'Live Interactive Map',
+  'useEffect(() => void loadPlaces(), [])',
 ]);
 
 forbid('src/components/AuthFlowModal.tsx', [
@@ -76,6 +83,9 @@ forbid('src/components/TripsPlanner.tsx', [
   'places currently available in Northern Morocco',
   'أنشئ خطة واقعية لرحلتك في المغرب',
   'الأماكن المتاحة حالياً في شمال المغرب',
+  'Build a realistic plan for your selected destination',
+  'AI Trip Planner',
+  'Promise.allSettled([fetchTrips(), fetchPlaces()])',
 ]);
 
 forbid('server.ts', [
@@ -86,6 +96,10 @@ forbid('src/components/ExploreFeed.tsx', [
   'fetchAiMemoryInsights',
   'AiMemoryInsights',
   'Passive GPS',
+  'place.seedData',
+  'Curated baseline',
+  'بيانات تأسيسية منسّقة',
+  'organizing community signals',
 ]);
 
 forbid('src/components/HomeScreen.tsx', [
@@ -94,12 +108,73 @@ forbid('src/components/HomeScreen.tsx', [
   "name: 'Bali'",
   'Best deals',
   'Chefchaouen & Akchour',
+  'Good Trips Brighter Stories',
+  'Route planning',
+  'Browse catalog',
+]);
+
+forbid('src/components/CommunityHub.tsx', [
+  'XP and levels are not shown yet',
+  'contribution scores are calculated',
+  'Community score connected',
+  'Site engagement enabled',
+]);
+
+forbid('src/components/SideMenuDrawer.tsx', [
+  'onSignOut',
+  '<LogOut',
 ]);
 
 requirePattern('src/components/HomeScreen.tsx', [
-  'const availableRegions = useMemo',
   'const featuredPlaces = useMemo(() => places.slice(0, 5)',
-  'Available Places',
+  'Share your location to see nearby places.',
+  'onVoiceCommand',
+  'recognitionRef',
+  'onVoiceAction',
+]);
+
+requirePattern('src/lib/placeContext.ts', [
+  'filterNearbyPlaces',
+  'filterPlacesForTrip',
+  'distanceToRouteSegmentKm',
+  'TRIP_DESTINATION_RADIUS_KM',
+  'TRIP_CORRIDOR_RADIUS_KM',
+]);
+
+requirePattern('src/lib/appNavigation.ts', [
+  'resolveAppNavigationHelp',
+  'extractDestinationIntent',
+  'destinationVoiceReply',
+  "target: 'trips'",
+  "target: 'explore'",
+]);
+
+requirePattern('src/components/AIChatModal.tsx', [
+  'resolveAppNavigationHelp(text, language)',
+  'actions?: AppNavigationAction[]',
+  'onNavigateApp(action)',
+]);
+
+requirePattern('src/components/ExploreFeed.tsx', [
+  'fetchPlaces({ query })',
+  'filterNearbyPlaces',
+  'filterPlacesForTrip',
+  '!query && !userLocation && !tripDestination',
+]);
+
+requirePattern('src/components/SideMenuDrawer.tsx', [
+  'w-[256px]',
+  "onNavigateTab('home')",
+  'justify-end',
+  'justify-start',
+]);
+
+requirePattern('src/components/AccountProfilePage.tsx', [
+  'Account',
+  'onLanguageChange',
+  'onRequestLocation',
+  'savedPlacesCount',
+  'onSignOut',
 ]);
 
 requirePattern('src/types.ts', [
@@ -110,19 +185,6 @@ requirePattern('src/types.ts', [
   "trustLevel?: 'unverified' | 'community' | 'external' | 'official'",
   'seedRating?: number | null',
   'seedReviewCount?: number',
-]);
-
-requirePattern('src/components/ExploreFeed.tsx', [
-  'place.seedData',
-  'Curated baseline',
-  'بيانات تأسيسية منسّقة',
-]);
-
-requirePattern('src/components/PlaceDetailModal.tsx', [
-  'place.seedData',
-  'Curated baseline',
-  'curated starting catalog',
-  'No live reviews yet',
 ]);
 
 requirePattern('src/components/NavigationFlow.tsx', [
@@ -147,6 +209,10 @@ requirePattern('src/App.tsx', [
   "callbackMode === 'recovery'",
   "setAuthInitialScreen('reset-password')",
   'exchangeCodeForSession(code)',
+  'filterNearbyPlaces(all, userLocation)',
+  'filterPlacesForTrip(all, destination, userLocation)',
+  "activeTab === 'account'",
+  'handleVoiceCommand',
 ]);
 
 requirePattern('src/hooks/useGeolocation.ts', [
@@ -154,7 +220,7 @@ requirePattern('src/hooks/useGeolocation.ts', [
 ]);
 
 requirePattern('src/components/AuthFlowModal.tsx', [
-  'const [country, setCountry] = useState(\'\')',
+  "const [country, setCountry] = useState('')",
   'const [agreedToTerms, setAgreedToTerms] = useState(false)',
   'if (!agreedToTerms)',
   'preferred_language: language',
@@ -163,14 +229,15 @@ requirePattern('src/components/AuthFlowModal.tsx', [
 ]);
 
 requirePattern('src/components/TripsPlanner.tsx', [
-  'const MAX_AI_TRIP_DAYS = 7',
+  'const MAX_PLAN_DAYS = 7',
   'return dateInputValue(date)',
-  'const latestPlanEndDate = addDaysToDateInput(form.startDate, MAX_AI_TRIP_DAYS - 1)',
+  'const latestEndDate = addDays(form.startDate, MAX_PLAN_DAYS - 1)',
   'form.startDate < today',
-  'AI trip plans support up to 7 days.',
+  'Plans support up to 7 days.',
   'min={today}',
-  'max={latestPlanEndDate}',
-  'Build a realistic plan for your selected destination',
+  'max={latestEndDate}',
+  'fetchPlaces({ query })',
+  'Add Trip',
 ]);
 
 requirePattern('server.ts', [
