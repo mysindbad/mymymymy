@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
-  X,
-  Star,
+  CheckCircle2,
+  Clock,
+  Heart,
   MapPin,
   Navigation,
-  Heart,
   Phone,
-  Clock,
-  CheckCircle2,
-  Sparkles,
+  Plus,
   ShieldCheck,
-  Plus
+  Star,
+  X,
 } from 'lucide-react';
 import { Place } from '../types';
 import { submitPlaceCheckIn } from '../services/api';
@@ -49,6 +48,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const isAr = language === 'ar';
   const isFr = language === 'fr';
+  const localize = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
 
   useEffect(() => {
     setIsCheckedIn(false);
@@ -64,315 +64,103 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
     if (isCheckingIn || isCheckedIn) return;
     setIsCheckingIn(true);
     setCheckInError(null);
-
     try {
       const success = await submitPlaceCheckIn(place.id);
-      if (success) {
-        setIsCheckedIn(true);
-      } else {
-        setCheckInError(isAr
-          ? 'تعذر تأكيد تسجيل الوصول. تحقق من تسجيل الدخول والاتصال ثم حاول مجدداً.'
-          : 'Check-in could not be confirmed. Check your sign-in and connection, then try again.');
-      }
+      if (success) setIsCheckedIn(true);
+      else setCheckInError(localize('Check-in could not be confirmed.', 'تعذر تأكيد تسجيل الوصول.', 'Le check-in n’a pas pu être confirmé.'));
     } finally {
       setIsCheckingIn(false);
     }
   };
 
-  const baselineLabel = isAr
-    ? 'بيانات تأسيسية منسّقة'
-    : isFr
-      ? 'Base éditoriale'
-      : 'Curated baseline';
+  const displayName = isAr && place.arabicName ? place.arabicName : place.name;
+  const verifiedRating = formatVerifiedRating(place.rating, place.reviewCount);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in select-none">
-      <div className="bg-white w-full max-w-xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col border border-slate-200 animate-in zoom-in-95">
-        <div className="relative h-64 sm:h-72 w-full bg-slate-900 shrink-0">
-          <img
-            src={place.photos[activePhotoIdx] || place.photos[0]}
-            alt={place.name}
-            className="w-full h-full object-cover transition-all duration-300"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
-
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase text-white bg-black/50 backdrop-blur-md border border-white/20">
-                {place.category === 'accommodation'
-                  ? '🛏️ Stay & Riad'
-                  : place.category === 'tourist_poi'
-                  ? '🏛️ Tourist POI'
-                  : place.category === 'emergency'
-                  ? '🚨 Emergency'
-                  : place.category === 'restaurant'
-                  ? '🍽️ Dining'
-                  : '⛺ Campsite'}
-              </span>
-              {place.seedData && (
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-sky-100/95 text-sky-900 border border-sky-200 shadow-md">
-                  {baselineLabel}
-                </span>
-              )}
-              {place.isUnderDocumentedGem && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase bg-amber-400 text-slate-950 flex items-center gap-1 shadow-md">
-                  <Sparkles className="w-3 h-3 fill-slate-950" />
-                  <span>Hidden Gem</span>
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onSaveToggle(place.id)}
-                className={`p-2.5 rounded-full backdrop-blur-md transition ${
-                  isSaved ? 'bg-rose-500 text-white' : 'bg-black/50 hover:bg-black/70 text-white'
-                }`}
-              >
-                <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2.5 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur-md transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="absolute bottom-4 left-4 right-4 text-white z-10">
-            <h1 className="text-xl sm:text-2xl font-black leading-tight drop-shadow-md">
-              {isAr && place.arabicName ? place.arabicName : place.name}
-            </h1>
-            <p className="text-xs text-slate-200 drop-shadow-sm flex items-center gap-1 mt-1">
-              <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span>{place.address}</span>
-            </p>
-          </div>
-
-          {place.photos.length > 1 && (
-            <div className="absolute bottom-2 right-4 flex gap-1 z-20">
-              {place.photos.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActivePhotoIdx(i)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    activePhotoIdx === i ? 'bg-white w-4' : 'bg-white/50'
-                  }`}
-                />
-              ))}
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-md sm:p-4" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="relative h-64 w-full shrink-0 bg-slate-900 sm:h-72">
+          {place.photos[activePhotoIdx] || place.photos[0] ? (
+            <img src={place.photos[activePhotoIdx] || place.photos[0]} alt={displayName} className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-slate-700 to-slate-900" />
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/35" />
+
+          <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between">
+            <span className="rounded-full border border-white/20 bg-black/45 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
+              {place.category.replace('_', ' ')}
+            </span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onSaveToggle(place.id)} className={`rounded-full p-2.5 text-white backdrop-blur ${isSaved ? 'bg-rose-500' : 'bg-black/45 hover:bg-black/65'}`} aria-label={isSaved ? localize('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer')}>
+                <Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
+              </button>
+              <button type="button" onClick={onClose} className="rounded-full bg-black/45 p-2.5 text-white backdrop-blur hover:bg-black/65" aria-label={localize('Close', 'إغلاق', 'Fermer')}><X className="h-4 w-4" /></button>
+            </div>
+          </div>
+
+          <div className="absolute inset-x-4 bottom-4 z-10 text-white">
+            <h1 className="text-xl font-black leading-tight sm:text-2xl">{displayName}</h1>
+            <p className="mt-1 flex items-center gap-1 text-xs text-slate-200"><MapPin className="h-3.5 w-3.5 shrink-0 text-blue-300" /><span>{place.address}</span></p>
+          </div>
+
+          {place.photos.length > 1 && <div className="absolute bottom-2 end-4 z-20 flex gap-1">{place.photos.map((_, index) => <button key={index} type="button" onClick={() => setActivePhotoIdx(index)} aria-label={`${localize('Photo', 'صورة', 'Photo')} ${index + 1}`} className={`h-2 rounded-full ${activePhotoIdx === index ? 'w-4 bg-white' : 'w-2 bg-white/50'}`} />)}</div>}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-slate-700 text-xs sm:text-sm">
-          {place.seedData && (
-            <div className="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 flex items-start gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
-              <div>
-                <strong>{baselineLabel}.</strong>{' '}
-                <span>
-                  {isAr
-                    ? 'هذا المكان جزء من الدليل التأسيسي المنسّق. التقييمات والمراجعات وتسجيلات الوصول والتحقق من المالك المعروضة كبيانات حية تبدأ فقط من نشاط حي موثوق.'
-                    : isFr
-                      ? 'Ce lieu fait partie de la base éditoriale initiale. Les avis, notes, check-ins et vérifications affichés comme données actives proviennent uniquement d’activité réelle confirmée.'
-                      : 'This place is part of the curated starting catalog. Ratings, reviews, check-ins, and owner verification shown as live data come only from confirmed live activity.'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-center">
+        <div className="flex-1 space-y-4 overflow-y-auto p-5 text-sm text-slate-700">
+          <div className="flex items-center justify-around rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
             <div>
-              {formatVerifiedRating(place.rating, place.reviewCount) ? (
-                <>
-                  <div className="flex items-center justify-center text-amber-500 font-black text-base">
-                    <Star className="w-4 h-4 fill-current mr-0.5" />
-                    <span>{formatVerifiedRating(place.rating, place.reviewCount)}</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                    {liveReviewsLabel(place.reviewCount, language)}
-                  </span>
-                </>
-              ) : (
-                <span className="block max-w-28 text-[10px] font-bold text-slate-500">
-                  {unratedLabel(language)}
-                </span>
-              )}
+              {verifiedRating ? <><div className="flex items-center justify-center gap-1 font-black text-amber-500"><Star className="h-4 w-4 fill-current" />{verifiedRating}</div><span className="text-[10px] font-bold text-slate-500">{liveReviewsLabel(place.reviewCount, language)}</span></> : <span className="block max-w-28 text-[10px] font-bold text-slate-500">{unratedLabel(language)}</span>}
             </div>
-
-            <div className="w-px h-8 bg-slate-200" />
-
-            <div>
-              <div className="text-base font-black text-slate-900">
-                {formatPriceLevel(place.priceLevel, currency)}
-              </div>
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                {isAr ? 'مستوى السعر' : 'Price Level'}
-              </span>
-            </div>
-
-            <div className="w-px h-8 bg-slate-200" />
-
-            <div>
-              <div className="text-base font-black text-blue-600">
-                {typeof place.distanceKm === 'number' ? `${place.distanceKm} km` : '—'}
-              </div>
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                {isAr ? 'المسافة عنك' : 'Distance'}
-              </span>
-            </div>
+            <div className="h-8 w-px bg-slate-200" />
+            <div><div className="font-black text-slate-900">{formatPriceLevel(place.priceLevel, currency)}</div><span className="text-[10px] font-bold text-slate-500">{localize('Price', 'السعر', 'Prix')}</span></div>
+            <div className="h-8 w-px bg-slate-200" />
+            <div><div className="font-black text-blue-600">{typeof place.distanceKm === 'number' ? `${place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km` : '—'}</div><span className="text-[10px] font-bold text-slate-500">{localize('Distance', 'المسافة', 'Distance')}</span></div>
           </div>
 
           {place.ownerVerified && (
-            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-900">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <div>
-                <strong>{isAr ? 'نشاط تجاري موثق' : 'Verified Business Listing'}:</strong>{' '}
-                <span>
-                  {place.businessOwnerName
-                    ? `${place.businessOwnerName} (${isAr ? 'صاحب المنشأة' : 'Owner'})`
-                    : isAr ? 'تم التحقق من الموقع والإدارة المحلية' : 'Confirmed by local operator'}
-                </span>
-              </div>
+            <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+              <span>{localize('Verified business', 'نشاط تجاري موثق', 'Établissement vérifié')}</span>
             </div>
           )}
 
-          <div>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-              {isAr ? 'عن المكان والخدمات' : 'About this Place'}
-            </h3>
-            <p className="text-slate-700 leading-relaxed text-xs sm:text-sm">
-              {place.description}
-            </p>
-          </div>
+          {place.description && <div><h3 className="mb-1 text-xs font-bold text-slate-500">{localize('About', 'عن المكان', 'À propos')}</h3><p className="leading-relaxed">{place.description}</p></div>}
+          {place.formationInfo && <div><h3 className="mb-1 text-xs font-bold text-slate-500">{localize('History', 'التاريخ', 'Histoire')}</h3><p className="leading-relaxed">{place.formationInfo}</p></div>}
 
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>{isAr ? 'التكوين والتاريخ المحلي (Formation & History)' : 'Formation & Historical Context'}</span>
+          {(place.openingHours || place.contactPhone) && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {place.openingHours && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5"><Clock className="h-4 w-4 shrink-0 text-slate-500" /><span className="truncate">{place.openingHours}</span></div>}
+              {place.contactPhone && <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5"><Phone className="h-4 w-4 shrink-0 text-slate-500" /><a href={`tel:${place.contactPhone}`} className="truncate font-bold text-blue-600">{place.contactPhone}</a></div>}
             </div>
-            <p className="text-blue-950 text-xs leading-relaxed">
-              {place.formationInfo || (isAr ? 'لا تتوفر معلومات موثقة عن الخلفية التاريخية لهذا المكان حالياً.' : 'Verified background information is not available for this place yet.')}
-            </p>
-          </div>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            {place.openingHours && (
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                <span className="truncate">{place.openingHours}</span>
-              </div>
-            )}
-            {place.contactPhone && (
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2">
-                <Phone className="w-4 h-4 text-slate-500 shrink-0" />
-                <a href={`tel:${place.contactPhone}`} className="text-blue-600 font-bold underline">
-                  {place.contactPhone}
-                </a>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-slate-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                {isAr ? 'تقييمات المسافرين والمجتمع' : 'Community Reviews & Ratings'}
-              </h3>
-              <button
-                onClick={() => setIsRateModalOpen(true)}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isAr ? 'أضف تقييمك' : 'Write Review'}</span>
-              </button>
+          <div className="space-y-2 border-t border-slate-200 pt-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xs font-bold text-slate-900">{localize('Reviews', 'التقييمات', 'Avis')}</h3>
+              <button type="button" onClick={() => setIsRateModalOpen(true)} className="flex items-center gap-1 text-xs font-bold text-blue-600"><Plus className="h-3.5 w-3.5" />{localize('Write Review', 'أضف تقييمك', 'Ajouter un avis')}</button>
             </div>
 
-            {place.reviews && place.reviews.length > 0 ? (
-              <div className="space-y-2.5">
-                {place.reviews.map((rev) => (
-                  <div key={rev.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-900 text-xs">{rev.authorName}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-sm bg-blue-100 text-blue-800 font-semibold">
-                          {rev.authorRole}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-amber-500 text-xs font-bold">
-                        <Star className="w-3 h-3 fill-current mr-0.5" />
-                        <span>{rev.rating}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">{rev.text}</p>
-                    {rev.tags && rev.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {rev.tags.map((tg) => (
-                          <span key={tg} className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600">
-                            #{tg}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+            {place.reviews?.length ? (
+              <div className="space-y-2.5">{place.reviews.map((review) => <div key={review.id} className="space-y-1 rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between gap-2"><strong className="text-xs text-slate-900">{review.authorName}</strong>{typeof review.rating === 'number' && <span className="flex items-center gap-1 text-xs font-bold text-amber-500"><Star className="h-3 w-3 fill-current" />{review.rating}</span>}</div><p className="text-xs leading-relaxed text-slate-600">{review.text}</p></div>)}</div>
             ) : (
-              <p className="text-xs text-slate-400 italic">
-                {isAr ? 'لا توجد مراجعات حية بعد. كن أول من يضيف مراجعة بعد زيارة فعلية.' : isFr ? 'Aucun avis actif pour le moment. Ajoutez-en un après une visite réelle.' : 'No live reviews yet. Be the first to add one after a real visit.'}
-              </p>
+              <p className="text-xs text-slate-500">{localize('No reviews yet.', 'لا توجد تقييمات بعد.', 'Aucun avis pour le moment.')}</p>
             )}
           </div>
         </div>
 
-        <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-2 shrink-0">
-          {checkInError && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700">
-              {checkInError}
-            </div>
-          )}
+        <div className="shrink-0 space-y-2 border-t border-slate-200 bg-slate-50 p-4">
+          {checkInError && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700">{checkInError}</div>}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => void handleCheckIn()}
-              disabled={isCheckedIn || isCheckingIn}
-              className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition ${
-                isCheckedIn
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-60'
-              }`}
-            >
-              <CheckCircle2 className={`w-4 h-4 ${isCheckedIn ? 'text-emerald-600' : 'text-slate-400'}`} />
-              <span>
-                {isCheckedIn
-                  ? t.checkedIn
-                  : isCheckingIn
-                    ? (isAr ? 'جاري التأكيد...' : 'Confirming...')
-                    : t.checkIn}
-              </span>
+            <button type="button" onClick={() => void handleCheckIn()} disabled={isCheckedIn || isCheckingIn} className={`flex items-center justify-center gap-1.5 rounded-2xl border px-4 py-3 text-xs font-bold ${isCheckedIn ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-white text-slate-700 disabled:opacity-60'}`}>
+              <CheckCircle2 className="h-4 w-4" />{isCheckedIn ? t.checkedIn : isCheckingIn ? localize('Confirming…', 'جارٍ التأكيد…', 'Confirmation…') : t.checkIn}
             </button>
-
-            <button
-              id="modal-start-navigation-btn"
-              onClick={() => onStartNavigation(place)}
-              className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition active:scale-98"
-            >
-              <Navigation className="w-4 h-4 fill-current" />
-              <span>{t.startNavigation}</span>
-            </button>
+            <button id="modal-start-navigation-btn" type="button" onClick={() => onStartNavigation(place)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-md sm:text-sm"><Navigation className="h-4 w-4" />{t.startNavigation}</button>
           </div>
         </div>
       </div>
 
-      <RatePlaceModal
-        isOpen={isRateModalOpen}
-        onClose={() => setIsRateModalOpen(false)}
-        place={place}
-        onReviewSuccess={(updated) => {
-          if (onPlaceUpdated) onPlaceUpdated(updated);
-        }}
-        onUserEarnedXp={() => {}}
-        language={language}
-      />
+      <RatePlaceModal isOpen={isRateModalOpen} onClose={() => setIsRateModalOpen(false)} place={place} onReviewSuccess={(updated) => onPlaceUpdated?.(updated)} onUserEarnedXp={() => {}} language={language} />
     </div>
   );
 };
