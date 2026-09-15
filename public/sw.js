@@ -1,8 +1,7 @@
-const CACHE_NAME = 'my-sindbad-shell-v4';
+const CACHE_NAME = 'my-sindbad-shell-v5';
 const PRECACHE_URLS = [
-  '/',
   '/index.html',
-  '/manifest.webmanifest?v=4',
+  '/manifest.webmanifest?v=5',
   '/icons/my-sindbad-app-icon-user-v4-192.jpg',
   '/icons/my-sindbad-app-icon-user-v4-512.jpg',
 ];
@@ -27,28 +26,62 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const requestUrl = new URL(event.request.url);
+const cacheSuccessfulResponse = async (request, response) => {
+  if (response && response.status === 200 && response.type === 'basic') {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+  return response;
+};
 
-  // API requests must always go to the network and must never be cached.
-  if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
+const networkFirstNavigation = async (request) => {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const response = await fetch(request);
+    if (response && response.status === 200 && response.type === 'basic') {
+      await cache.put('/index.html', response.clone());
+    }
+    return response;
+  } catch (error) {
+    return (await cache.match('/index.html')) || Response.error();
+  }
+};
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const requestUrl = new URL(request.url);
+
+  if (request.method !== 'GET' || requestUrl.origin !== self.location.origin) return;
+
+  // API requests are live data and must never be served from the app-shell cache.
+  if (requestUrl.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
     return;
   }
 
-  if (event.request.method !== 'GET' || requestUrl.origin !== self.location.origin) return;
+  // Always check the network first for the SPA shell so deployments cannot be
+  // pinned to an old HTML/JavaScript bundle by the service worker.
+  if (request.mode === 'navigate' || requestUrl.pathname === '/' || requestUrl.pathname === '/index.html') {
+    event.respondWith(networkFirstNavigation(request));
+    return;
+  }
 
+  // Vite asset filenames are content-hashed, so cache-first is safe for them.
+  if (requestUrl.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => (
+        cachedResponse || fetch(request).then((networkResponse) => cacheSuccessfulResponse(request, networkResponse))
+      )),
+    );
+    return;
+  }
+
+  // Fixed URLs such as manifest and icons should prefer the network so future
+  // branding changes are visible without requiring users to clear site data.
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
-        }
-        const responseToCache = networkResponse.clone();
-        void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-        return networkResponse;
-      });
-    }),
+    fetch(request)
+      .then((networkResponse) => cacheSuccessfulResponse(request, networkResponse))
+      .catch(() => caches.match(request)),
   );
 });
