@@ -164,8 +164,7 @@ html.dark [class~="to-sky-50"] {
   --tw-gradient-to: rgba(12, 74, 110, 0.3) var(--tw-gradient-to-position) !important;
 }
 
-html.dark img[alt="Travel scenery"],
-html.dark img[alt="Santorini coastal backdrop"] {
+html.dark img[alt="Travel scenery"] {
   filter: brightness(0.55) saturate(0.85) contrast(1.05) !important;
 }
 
