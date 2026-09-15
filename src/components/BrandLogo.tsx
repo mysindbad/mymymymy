@@ -1,6 +1,7 @@
 import React from 'react';
-import mySindbadTransparent from '../assets/images/my_sindbad_logo_user_v4.webp';
 import { SupportedLanguage } from '../data/translations';
+
+const MY_SINDBAD_LOGO_URL = '/brand/my-sindbad-logo-v6.webp';
 
 interface BrandLogoProps {
   className?: string;
@@ -35,8 +36,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       aria-label="My Sindbad"
     >
       <img
-        src={mySindbadTransparent}
+        src={MY_SINDBAD_LOGO_URL}
         alt="My Sindbad"
+        loading="eager"
+        decoding="async"
+        fetchPriority="high"
         draggable={false}
         className={`${imageSize} h-auto max-w-full object-contain pointer-events-none drop-shadow-[0_6px_14px_rgba(30,58,138,0.18)]`}
       />
