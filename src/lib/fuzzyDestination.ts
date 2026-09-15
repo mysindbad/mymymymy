@@ -43,7 +43,7 @@ function candidateStrings(place: Place) {
     .filter((value): value is string => Boolean(value?.trim()));
 }
 
-function scoreCandidate(query: string, value: string) {
+export function destinationTextScore(query: string, value: string) {
   const q = fold(query);
   const v = fold(value);
   if (!q || !v) return Number.NEGATIVE_INFINITY;
@@ -63,10 +63,67 @@ export function rankFuzzyDestinations(query: string, places: Place[], limit = 24
   const ranked = places
     .map((place) => ({
       place,
-      score: Math.max(...candidateStrings(place).map((value) => scoreCandidate(query, value))),
+      score: Math.max(...candidateStrings(place).map((value) => destinationTextScore(query, value))),
     }))
     .filter(({ score }) => Number.isFinite(score) && score > Number.NEGATIVE_INFINITY)
     .sort((a, b) => b.score - a.score || a.place.name.localeCompare(b.place.name));
 
   return ranked.slice(0, limit).map(({ place }) => place);
+}
+
+export function buildCityDestination(query: string, places: Place[]): Place | null {
+  const candidates = new Map<string, { label: string; score: number; places: Place[] }>();
+  for (const place of places) {
+    for (const label of [place.area, place.region]) {
+      const clean = label?.trim();
+      if (!clean || /^nearby$/i.test(clean)) continue;
+      const score = destinationTextScore(query, clean);
+      if (!Number.isFinite(score) || score < 48) continue;
+      const key = fold(clean);
+      const current = candidates.get(key);
+      if (current) {
+        current.score = Math.max(current.score, score);
+        current.places.push(place);
+      } else {
+        candidates.set(key, { label: clean, score, places: [place] });
+      }
+    }
+  }
+
+  const best = [...candidates.values()]
+    .sort((a, b) => b.score - a.score || b.places.length - a.places.length)[0];
+  if (!best) return null;
+
+  const coordinatePlaces = best.places.filter((place) =>
+    Array.isArray(place.coordinates)
+    && Number.isFinite(place.coordinates[0])
+    && Number.isFinite(place.coordinates[1]));
+  if (!coordinatePlaces.length) return null;
+  const coordinates: [number, number] = [
+    coordinatePlaces.reduce((sum, place) => sum + place.coordinates[0], 0) / coordinatePlaces.length,
+    coordinatePlaces.reduce((sum, place) => sum + place.coordinates[1], 0) / coordinatePlaces.length,
+  ];
+  const representative = coordinatePlaces[0];
+
+  return {
+    id: `city:${encodeURIComponent(fold(best.label))}`,
+    name: best.label,
+    category: 'tourist_poi',
+    subCategory: 'City',
+    region: representative.region || best.label,
+    area: best.label,
+    coordinates,
+    address: best.label,
+    photos: [],
+    description: `City destination · ${best.label}`,
+    rating: null,
+    reviewCount: 0,
+    reviews: [],
+    source: 'external',
+    ownerVerified: false,
+    checkInsCount: 0,
+    dataSource: 'derived_city_search',
+    ratingProvenance: 'unrated',
+    trustLevel: 'external',
+  };
 }
