@@ -72,10 +72,16 @@ async function getAccessToken(forceRefresh = false): Promise<string | null> {
 
 async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Promise<T> {
   const { requiresAuth = false, body, headers, ...requestOptions } = options;
-  await waitForSessionReady();
-  let token = await getAccessToken();
-  if (requiresAuth && (!token || getAuthSessionSnapshot().status !== 'authed')) {
-    throw new ApiAuthenticationError('SESSION_TOKEN_MISSING', 'SESSION_TOKEN_MISSING');
+  let token: string | null = null;
+
+  // Public discovery/navigation endpoints should not wait for Supabase session restoration.
+  // Auth work is only performed for endpoints that actually require a signed-in user.
+  if (requiresAuth) {
+    await waitForSessionReady();
+    token = await getAccessToken();
+    if (!token || getAuthSessionSnapshot().status !== 'authed') {
+      throw new ApiAuthenticationError('SESSION_TOKEN_MISSING', 'SESSION_TOKEN_MISSING');
+    }
   }
 
   const sendRequest = (requestToken: string | null) => {
@@ -95,7 +101,7 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
 
   let response = await sendRequest(token);
   let payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
-  if (response.status === 401 && payload.code === 'TOKEN_INVALID' && getAuthSessionSnapshot().status === 'authed') {
+  if (requiresAuth && response.status === 401 && payload.code === 'TOKEN_INVALID' && getAuthSessionSnapshot().status === 'authed') {
     try {
       const refreshedToken = await getAccessToken(true);
       if (!refreshedToken) throw new ApiAuthenticationError('TOKEN_INVALID', 'TOKEN_INVALID');
@@ -126,16 +132,37 @@ function mergeUniquePlaces(primary: Place[], additional: Place[]) {
   return merged;
 }
 
+type NearbyCacheEntry = { expiresAt: number; places: Place[] };
+const nearbyCache = new Map<string, NearbyCacheEntry>();
+const nearbyPending = new Map<string, Promise<Place[]>>();
+const NEARBY_CLIENT_CACHE_MS = 20 * 60 * 1000;
+
+function nearbyCacheKey(latitude: number, longitude: number) {
+  return `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
+}
+
 async function fetchNearbyBaseline(latitude: number, longitude: number) {
-  try {
-    const data = await apiRequest<{ places?: Place[] }>(
-      `/api/nearby-places?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`,
-    );
-    return data.places || [];
-  } catch (error) {
+  const key = nearbyCacheKey(latitude, longitude);
+  const cached = nearbyCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.places;
+  const pending = nearbyPending.get(key);
+  if (pending) return pending;
+
+  const request = apiRequest<{ places?: Place[] }>(
+    `/api/nearby-places?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`,
+  ).then((data) => {
+    const places = data.places || [];
+    nearbyCache.set(key, { expiresAt: Date.now() + NEARBY_CLIENT_CACHE_MS, places });
+    return places;
+  }).catch((error) => {
     console.warn('Nearby baseline unavailable:', error);
-    return [];
-  }
+    return cached?.places || [];
+  }).finally(() => {
+    nearbyPending.delete(key);
+  });
+
+  nearbyPending.set(key, request);
+  return request;
 }
 
 export async function fetchPlaces(params?: {
@@ -158,19 +185,21 @@ export async function fetchPlaces(params?: {
     searchParams.set('userLng', params.userLng.toString());
   }
   const queryString = searchParams.toString();
-  const data = await apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
-  const databasePlaces = data.places || [];
+  const databasePromise = apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
 
   if (params?.userLat !== undefined && params.userLng !== undefined && !params.query) {
+    // Database and public nearby discovery are independent. Starting both together removes
+    // the previous DB-then-Overpass waterfall when the local catalog is sparse.
+    const baselinePromise = fetchNearbyBaseline(params.userLat, params.userLng);
+    const [data, discovered] = await Promise.all([databasePromise, baselinePromise]);
+    const databasePlaces = data.places || [];
     const origin: [number, number] = [params.userLat, params.userLng];
     const localDatabaseCount = databasePlaces.filter((place) => haversineDistanceKm(origin, place.coordinates) <= 50).length;
-    if (localDatabaseCount < 6) {
-      const discovered = await fetchNearbyBaseline(params.userLat, params.userLng);
-      return mergeUniquePlaces(databasePlaces, discovered);
-    }
+    return localDatabaseCount < 6 ? mergeUniquePlaces(databasePlaces, discovered) : databasePlaces;
   }
 
-  return databasePlaces;
+  const data = await databasePromise;
+  return data.places || [];
 }
 
 export async function fetchPlaceById(id: string): Promise<Place | null> {
