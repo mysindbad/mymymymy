@@ -1,6 +1,7 @@
 import { Place, PlaceReview, NavigationRouteData, TravelMode } from '../types';
 import { supabase } from '../lib/supabase';
 import { getAuthSessionSnapshot, waitForSessionReady } from '../lib/authSession';
+import { discoverNearbyPublicPlaces } from './publicPlaces';
 
 export class ApiAuthenticationError extends Error {
   status = 401;
@@ -112,6 +113,16 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
   return payload;
 }
 
+function mergePlaceResults(primary: Place[], fallback: Place[]) {
+  const seen = new Set<string>();
+  return [...primary, ...fallback].filter((place) => {
+    const key = place.id || `${place.name.toLocaleLowerCase()}|${place.coordinates[0].toFixed(3)}|${place.coordinates[1].toFixed(3)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function fetchPlaces(params?: {
   category?: string;
   region?: string;
@@ -133,7 +144,31 @@ export async function fetchPlaces(params?: {
   }
   const queryString = searchParams.toString();
   const data = await apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
-  return data.places || [];
+  const serverPlaces = data.places || [];
+
+  const locationScoped = params?.userLat !== undefined
+    && params?.userLng !== undefined
+    && !params.query
+    && !params.region
+    && !params.hiddenGemsOnly
+    && !params.minRating;
+  if (!locationScoped) return serverPlaces;
+
+  const nearbyCount = serverPlaces.filter((place) => typeof place.distanceKm === 'number' && place.distanceKm <= 50).length;
+  if (nearbyCount >= 5) return serverPlaces;
+
+  try {
+    const language = typeof document !== 'undefined' ? document.documentElement.lang || 'en' : 'en';
+    const publicPlaces = await discoverNearbyPublicPlaces({
+      latitude: params.userLat!,
+      longitude: params.userLng!,
+      language,
+      category: params.category,
+    });
+    return mergePlaceResults(serverPlaces, publicPlaces);
+  } catch {
+    return serverPlaces;
+  }
 }
 
 export async function fetchPlaceById(id: string): Promise<Place | null> {
