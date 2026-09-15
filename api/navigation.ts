@@ -46,6 +46,71 @@ function placesClient() {
   return createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OSM_PATTERN = /^osm-(node|way|relation)-(\d+)$/;
+
+function osmCategory(tags: Record<string, string>) {
+  if (['hotel', 'guest_house', 'hostel', 'motel'].includes(tags.tourism || '')) return 'accommodation';
+  if (['restaurant', 'cafe', 'fast_food'].includes(tags.amenity || '')) return 'restaurant';
+  if (['hospital', 'clinic', 'police', 'fire_station'].includes(tags.amenity || '')) return 'emergency';
+  return 'tourist_poi';
+}
+
+async function fetchExternalDestination(destinationId: string) {
+  const match = destinationId.match(OSM_PATTERN);
+  if (!match) return null;
+  const [, osmType, osmId] = match;
+
+  let element: any = null;
+  if (osmType === 'node') {
+    const response = await fetch(`https://api.openstreetmap.org/api/0.6/node/${encodeURIComponent(osmId)}.json`, {
+      headers: { 'User-Agent': 'MySindbad/1.0 (travel navigation)' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.ok) {
+      const payload = await response.json();
+      element = Array.isArray(payload?.elements) ? payload.elements[0] : null;
+    }
+  } else {
+    const query = `[out:json][timeout:8];${osmType}(${osmId});out center tags;`;
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'User-Agent': 'MySindbad/1.0 (travel navigation)',
+      },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.ok) {
+      const payload = await response.json();
+      element = Array.isArray(payload?.elements) ? payload.elements[0] : null;
+    }
+  }
+
+  if (!element) return null;
+  const tags = element.tags || {};
+  const latitude = element.lat ?? element.center?.lat;
+  const longitude = element.lon ?? element.center?.lon;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  const [lat, lng] = coordinates(latitude, longitude);
+  const area = tags['addr:city'] || tags['addr:town'] || tags['addr:village'] || tags['addr:suburb'] || 'Nearby';
+  const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
+  const name = String(tags.name || tags['name:en'] || tags['name:ar'] || 'Selected place').trim().slice(0, 160);
+
+  return {
+    id: destinationId,
+    name,
+    arabic_name: typeof tags['name:ar'] === 'string' ? tags['name:ar'].slice(0, 160) : null,
+    category: osmCategory(tags),
+    region: tags['addr:state'] || tags['addr:province'] || area,
+    area,
+    coordinates: [lat, lng],
+    address: [street, area].filter(Boolean).join(', ') || area,
+    rating: null,
+  };
+}
+
 function modifierText(modifier: unknown, language: string) {
   if (typeof modifier !== 'string' || !modifier.trim()) return '';
   if (language !== 'ar') return ` ${modifier}`;
@@ -112,12 +177,22 @@ export default async function handler(req: any, res: any) {
     }
 
     const [startLatitude, startLongitude] = coordinates(body.startLatitude, body.startLongitude);
-    const { data: destination, error } = await placesClient()
-      .from('places')
-      .select('id,name,arabic_name,category,region,area,coordinates,address,rating')
-      .eq('id', destinationId)
-      .maybeSingle();
-    if (error) throw error;
+    let destination: any = null;
+
+    if (UUID_PATTERN.test(destinationId)) {
+      const { data, error } = await placesClient()
+        .from('places')
+        .select('id,name,arabic_name,category,region,area,coordinates,address,rating')
+        .eq('id', destinationId)
+        .maybeSingle();
+      if (error) throw error;
+      destination = data;
+    } else if (OSM_PATTERN.test(destinationId)) {
+      destination = await fetchExternalDestination(destinationId);
+    } else {
+      return res.status(400).json({ error: 'Unsupported destination identifier' });
+    }
+
     if (!destination) return res.status(404).json({ error: 'Destination not found' });
     if (!Array.isArray(destination.coordinates) || destination.coordinates.length !== 2) throw new Error('Destination coordinates are invalid');
 
