@@ -1,1 +1,182 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  background: #f8fafc;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html.dark {
+  color-scheme: dark;
+  background: #020617;
+}
+
+html.dark body,
+html.dark #root {
+  background: #020617 !important;
+  color: #e2e8f0;
+}
+
+html.dark .bg-white {
+  background-color: #0f172a !important;
+}
+
+html.dark [class~="bg-white/95"],
+html.dark [class~="bg-white/90"],
+html.dark [class~="bg-white/85"],
+html.dark [class~="bg-white/80"],
+html.dark [class~="bg-white/70"],
+html.dark [class~="bg-white/60"] {
+  background-color: rgba(15, 23, 42, 0.96) !important;
+}
+
+html.dark .bg-slate-50,
+html.dark [class~="bg-slate-50/60"],
+html.dark [class~="bg-slate-50/80"] {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+html.dark .bg-slate-200 {
+  background-color: #334155 !important;
+}
+
+html.dark .bg-blue-50,
+html.dark [class~="bg-blue-50/40"] {
+  background-color: rgba(30, 58, 138, 0.24) !important;
+}
+
+html.dark .bg-sky-50 {
+  background-color: rgba(12, 74, 110, 0.25) !important;
+}
+
+html.dark .bg-emerald-50,
+html.dark [class~="bg-emerald-50/80"] {
+  background-color: rgba(6, 78, 59, 0.28) !important;
+}
+
+html.dark .bg-rose-50 {
+  background-color: rgba(136, 19, 55, 0.24) !important;
+}
+
+html.dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.25) !important;
+}
+
+html.dark .text-slate-950,
+html.dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.dark .text-blue-950,
+html.dark .text-blue-900,
+html.dark .text-blue-800 {
+  color: #bfdbfe !important;
+}
+
+html.dark .text-emerald-900,
+html.dark .text-emerald-800 {
+  color: #a7f3d0 !important;
+}
+
+html.dark .text-rose-900,
+html.dark .text-rose-800,
+html.dark .text-rose-700 {
+  color: #fecdd3 !important;
+}
+
+html.dark .text-amber-900,
+html.dark .text-amber-800 {
+  color: #fde68a !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+html.dark .border-blue-100,
+html.dark .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+html.dark .border-emerald-100,
+html.dark .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+html.dark .border-rose-200 {
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+
+html.dark .border-amber-200 {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.dark [class~="to-white"] {
+  --tw-gradient-to: #0f172a var(--tw-gradient-to-position) !important;
+}
+
+html.dark [class~="from-blue-50"] {
+  --tw-gradient-from: rgba(30, 58, 138, 0.32) var(--tw-gradient-from-position) !important;
+}
+
+html.dark [class~="to-sky-50"] {
+  --tw-gradient-to: rgba(12, 74, 110, 0.3) var(--tw-gradient-to-position) !important;
+}
+
+html.dark img[alt="Travel scenery"],
+html.dark img[alt="Santorini coastal backdrop"] {
+  filter: brightness(0.55) saturate(0.85) contrast(1.05) !important;
+}
+
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.45);
+}
+
+html.dark ::selection {
+  background: #2563eb;
+  color: #fff;
+}
