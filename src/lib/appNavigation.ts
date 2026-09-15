@@ -20,9 +20,16 @@ export type AssistantNavigationReply = {
   actions: AppNavigationAction[];
 };
 
-const normalize = (value: string) => value.trim().toLocaleLowerCase();
+const normalize = (value: string) => value
+  .trim()
+  .toLocaleLowerCase()
+  .replace(/[أإآ]/g, 'ا')
+  .replace(/ى/g, 'ي')
+  .replace(/ة/g, 'ه')
+  .replace(/[ًٌٍَُِّْـ]/g, '')
+  .replace(/\s+/g, ' ');
 
-const hasAny = (value: string, terms: string[]) => terms.some((term) => value.includes(term));
+const hasAny = (value: string, terms: string[]) => terms.some((term) => value.includes(normalize(term)));
 
 const labels = (language: string) => ({
   home: language === 'ar' ? 'الرئيسية' : language === 'fr' ? 'Accueil' : 'Home',
@@ -48,10 +55,28 @@ export function resolveAppNavigationHelp(
     actions: [{ target, label }],
   });
 
+  const plainReply = (en: string, ar: string, fr: string): AssistantNavigationReply => ({
+    text: language === 'ar' ? ar : language === 'fr' ? fr : en,
+    actions: [],
+  });
+
+  if (hasAny(text, ['هل تسمعني', 'تسمعني', 'can you hear me', 'do you hear me', 'tu m entends', "tu m'entends"])) {
+    return plainReply('Yes, I can hear you. What do you need?', 'نعم، أسمعك. ماذا تريد؟', 'Oui, je vous entends. Que souhaitez-vous ?');
+  }
+
+  const greetings = new Set([
+    'hi', 'hello', 'hey', 'مرحبا', 'مرحبا بك', 'اهلا', 'اهلا بك', 'السلام عليكم', 'سلام', 'bonjour', 'salut', 'bonsoir',
+  ].map(normalize));
+  if (greetings.has(text)) {
+    return plainReply('Hello. How can I help?', 'مرحباً. كيف أساعدك؟', 'Bonjour. Comment puis-je vous aider ?');
+  }
+
   if (hasAny(text, [
     'add trip', 'add a trip', 'create trip', 'create a trip', 'new trip', 'plan a trip', 'plan trip', 'my trips', 'trip planner',
-    'إضافة رحلة', 'اضافة رحلة', 'انشاء رحلة', 'إنشاء رحلة', 'رحلاتي', 'خطط رحلة',
-    'ajouter un voyage', 'créer un voyage', 'creer un voyage', 'mes voyages',
+    'إضافة رحلة', 'اضافة رحلة', 'انشاء رحلة', 'إنشاء رحلة', 'انشئ رحلة', 'أنشئ رحلة', 'انشأ رحلة', 'أنشأ رحلة',
+    'اريد انشاء رحلة', 'أريد إنشاء رحلة', 'اريد انشئ رحلة', 'أريد أنشئ رحلة', 'اريد انشأ رحلة', 'أريد أنشأ رحلة',
+    'رحلاتي', 'خطط رحلة', 'خطط لي رحلة', 'بغيت ندير رحلة', 'بغيت نخطط رحلة',
+    'ajouter un voyage', 'créer un voyage', 'creer un voyage', 'mes voyages', 'planifier un voyage',
   ])) {
     return response('trips', l.trips, 'Open Trips and choose Add Trip.', 'افتح رحلاتي ثم اختر إضافة رحلة.', 'Ouvrez Mes voyages puis choisissez Ajouter un voyage.');
   }
