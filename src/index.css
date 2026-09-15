@@ -46,6 +46,27 @@ html[data-theme='dark'] [class~='bg-slate-300'] {
   background-color: #263348 !important;
 }
 
+html[data-theme='dark'] [class*='from-blue-50'],
+html[data-theme='dark'] [class*='from-sky-50'],
+html[data-theme='dark'] [class*='from-indigo-50'],
+html[data-theme='dark'] [class*='from-slate-50'],
+html[data-theme='dark'] [class*='from-white'] {
+  background-image: none !important;
+  background-color: #10203a !important;
+}
+
+html[data-theme='dark'] [class*='from-emerald-50'],
+html[data-theme='dark'] [class*='from-teal-50'] {
+  background-image: none !important;
+  background-color: #082d27 !important;
+}
+
+html[data-theme='dark'] [class*='from-amber-50'],
+html[data-theme='dark'] [class*='from-yellow-50'] {
+  background-image: none !important;
+  background-color: #35270b !important;
+}
+
 html[data-theme='dark'] [class~='text-slate-950'],
 html[data-theme='dark'] [class~='text-slate-900'],
 html[data-theme='dark'] [class~='text-slate-800'],
