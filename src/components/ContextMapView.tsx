@@ -15,6 +15,16 @@ interface ContextMapViewProps {
   userLocation?: UserLocation | null;
 }
 
+const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const CARTO_LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const CARTO_DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+function tileAttribution(provider: 'osm' | 'carto') {
+  return provider === 'carto'
+    ? '&copy; OpenStreetMap contributors &copy; CARTO'
+    : '&copy; OpenStreetMap contributors';
+}
+
 export const ContextMapView: React.FC<ContextMapViewProps> = ({
   places,
   onSelectPlace,
@@ -28,6 +38,9 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const tileThemeRef = useRef<'light' | 'dark' | null>(null);
+  const tileGenerationRef = useRef(0);
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState(initialCategory || 'All');
   const [activePlace, setActivePlace] = useState<Place | null>(null);
@@ -51,6 +64,32 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
     });
   }, [places, query, category]);
 
+  const installTileLayer = (map: L.Map, theme: 'light' | 'dark', fallback = false) => {
+    tileGenerationRef.current += 1;
+    const generation = tileGenerationRef.current;
+    tileLayerRef.current?.remove();
+
+    const useCarto = theme === 'dark' ? !fallback : fallback;
+    const url = useCarto ? (theme === 'dark' ? CARTO_DARK_TILES : CARTO_LIGHT_TILES) : OSM_TILES;
+    let errorCount = 0;
+    const layer = L.tileLayer(url, {
+      attribution: tileAttribution(useCarto ? 'carto' : 'osm'),
+      maxZoom: 19,
+      crossOrigin: true,
+      keepBuffer: 4,
+      updateWhenIdle: false,
+      className: theme === 'dark' && fallback ? 'sindbad-dark-osm-tile' : 'sindbad-map-tile',
+    });
+    layer.on('tileerror', () => {
+      errorCount += 1;
+      if (generation !== tileGenerationRef.current || fallback || errorCount < 3) return;
+      installTileLayer(map, theme, true);
+    });
+    layer.addTo(map);
+    tileLayerRef.current = layer;
+    tileThemeRef.current = theme;
+  };
+
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
     const map = L.map(mapContainerRef.current, {
@@ -58,15 +97,30 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
       zoom: 6,
       zoomControl: false,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 18,
-    }).addTo(map);
+    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    installTileLayer(map, theme);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     markerLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     const timer = window.setTimeout(() => map.invalidateSize(), 150);
-    return () => window.clearTimeout(timer);
+
+    const observer = new MutationObserver(() => {
+      const nextTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      if (nextTheme !== tileThemeRef.current) installTileLayer(map, nextTheme);
+      window.setTimeout(() => map.invalidateSize(), 50);
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+      tileGenerationRef.current += 1;
+      tileLayerRef.current = null;
+      markerLayerRef.current = null;
+      userMarkerRef.current = null;
+      mapRef.current = null;
+      map.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -107,13 +161,14 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
       else map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 13 });
     }
     if (activePlace && !visiblePlaces.some((place) => place.id === activePlace.id)) setActivePlace(null);
+    window.setTimeout(() => map.invalidateSize(), 50);
   }, [visiblePlaces, userLocation?.latitude, userLocation?.longitude]);
 
   const categories = useMemo(() => Array.from(new Set(places.map((place) => place.category))), [places]);
 
   return (
     <div className="relative h-[calc(100vh-118px)] w-full overflow-hidden" dir={isAr ? 'rtl' : 'ltr'}>
-      <div ref={mapContainerRef} className="h-full w-full bg-slate-200" />
+      <div ref={mapContainerRef} className="h-full w-full bg-slate-200" data-map-tile-fallback="enabled" />
       <div className="absolute inset-x-3 top-3 z-[500] mx-auto flex max-w-xl gap-2 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur">
         <Search className="ms-1 mt-2 h-4 w-4 shrink-0 text-slate-400" />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Search map', 'ابحث في الخريطة', 'Rechercher sur la carte')} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />

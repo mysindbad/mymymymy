@@ -13,7 +13,7 @@ const makePlace = (id: string, name: string, area: string, coordinates: [number,
   address: name,
   photos: [],
   description: name,
-  rating: 0,
+  rating: null,
   reviewCount: 0,
   reviews: [],
   source: 'community_traveler',
@@ -27,6 +27,14 @@ test('nearby filtering excludes unrelated distant places', () => {
   const result = filterNearbyPlaces([far, near], location, 50);
   assert.deepEqual(result.map((place) => place.id), ['near']);
   assert.ok((result[0].distanceKm ?? 100) < 5);
+});
+
+test('nearby display ranks notable landmarks ahead of generic closer POIs', () => {
+  const location = { latitude: 35.78, longitude: -5.81 };
+  const generic = { ...makePlace('generic', 'Generic Nearby Place', 'Tangier', [35.784, -5.81]), prominenceScore: 1 };
+  const landmark = { ...makePlace('landmark', 'Documented Landmark', 'Tangier', [35.87, -5.81]), prominenceScore: 42, photos: ['https://example.com/landmark.jpg'] };
+  const result = filterNearbyPlaces([generic, landmark], location, 50);
+  assert.deepEqual(result.map((place) => place.id), ['landmark', 'generic']);
 });
 
 test('trip filtering keeps destination-area, nearby, and along-direction places', () => {
