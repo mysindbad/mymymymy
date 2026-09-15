@@ -1,5 +1,3 @@
-import { SupportedLanguage } from '../data/translations';
-
 export type AppNavigationTarget =
   | 'home'
   | 'explore'
@@ -26,7 +24,7 @@ const normalize = (value: string) => value.trim().toLocaleLowerCase();
 
 const hasAny = (value: string, terms: string[]) => terms.some((term) => value.includes(term));
 
-const labels = (language: SupportedLanguage) => ({
+const labels = (language: string) => ({
   home: language === 'ar' ? 'الرئيسية' : language === 'fr' ? 'Accueil' : 'Home',
   explore: language === 'ar' ? 'استكشف' : language === 'fr' ? 'Explorer' : 'Explore',
   map: language === 'ar' ? 'الخريطة' : language === 'fr' ? 'Carte' : 'Map',
@@ -40,7 +38,7 @@ const labels = (language: SupportedLanguage) => ({
 
 export function resolveAppNavigationHelp(
   message: string,
-  language: SupportedLanguage,
+  language: string,
 ): AssistantNavigationReply | null {
   const text = normalize(message);
   const l = labels(language);
@@ -87,7 +85,7 @@ function cleanDestination(value: string) {
     .trim();
 }
 
-export function extractDestinationIntent(message: string, language: SupportedLanguage): string | null {
+export function extractDestinationIntent(message: string, language: string): string | null {
   const trimmed = message.trim();
   const patterns = language === 'ar'
     ? [/(?:أريد|اريد|بغيت|حاب|أرغب).{0,24}(?:إلى|الى|لـ|ل)\s*([^؟.!]+)/i, /(?:اذهب|أذهب|سافر|أسافر)\s+(?:إلى|الى|لـ|ل)?\s*([^؟.!]+)/i]
@@ -104,7 +102,7 @@ export function extractDestinationIntent(message: string, language: SupportedLan
   return null;
 }
 
-export function destinationVoiceReply(destination: string, language: SupportedLanguage): AssistantNavigationReply {
+export function destinationVoiceReply(destination: string, language: string): AssistantNavigationReply {
   const text = language === 'ar'
     ? `${destination}. ماذا تريد أن تفعل؟`
     : language === 'fr'
