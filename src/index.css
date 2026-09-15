@@ -1,1 +1,181 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --app-bg: #f8fafc;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f1f5f9;
+  --app-border: #e2e8f0;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --app-bg: #020617;
+  --app-surface: #0f172a;
+  --app-surface-soft: #172033;
+  --app-border: #293548;
+  --app-text: #f1f5f9;
+  --app-muted: #94a3b8;
+  background: var(--app-bg);
+}
+
+html[data-theme='dark'] body,
+html[data-theme='dark'] #root {
+  background: var(--app-bg) !important;
+  color: var(--app-text);
+}
+
+html[data-theme='dark'] [class~='bg-white'],
+html[data-theme='dark'] [class~='bg-white/95'],
+html[data-theme='dark'] [class~='bg-white/90'],
+html[data-theme='dark'] [class~='bg-white/85'],
+html[data-theme='dark'] [class~='bg-white/80'] {
+  background-color: var(--app-surface) !important;
+}
+
+html[data-theme='dark'] [class~='bg-slate-50'],
+html[data-theme='dark'] [class~='bg-slate-50/60'],
+html[data-theme='dark'] [class~='bg-slate-100'] {
+  background-color: var(--app-surface-soft) !important;
+}
+
+html[data-theme='dark'] [class~='bg-slate-200'],
+html[data-theme='dark'] [class~='bg-slate-300'] {
+  background-color: #263348 !important;
+}
+
+html[data-theme='dark'] [class*='from-blue-50'],
+html[data-theme='dark'] [class*='from-sky-50'],
+html[data-theme='dark'] [class*='from-indigo-50'],
+html[data-theme='dark'] [class*='from-slate-50'],
+html[data-theme='dark'] [class*='from-white'] {
+  background-image: none !important;
+  background-color: #10203a !important;
+}
+
+html[data-theme='dark'] [class*='from-emerald-50'],
+html[data-theme='dark'] [class*='from-teal-50'] {
+  background-image: none !important;
+  background-color: #082d27 !important;
+}
+
+html[data-theme='dark'] [class*='from-amber-50'],
+html[data-theme='dark'] [class*='from-yellow-50'] {
+  background-image: none !important;
+  background-color: #35270b !important;
+}
+
+html[data-theme='dark'] [class~='text-slate-950'],
+html[data-theme='dark'] [class~='text-slate-900'],
+html[data-theme='dark'] [class~='text-slate-800'],
+html[data-theme='dark'] [class~='text-slate-700'] {
+  color: var(--app-text) !important;
+}
+
+html[data-theme='dark'] [class~='text-slate-600'],
+html[data-theme='dark'] [class~='text-slate-500'],
+html[data-theme='dark'] [class~='text-slate-400'] {
+  color: var(--app-muted) !important;
+}
+
+html[data-theme='dark'] [class~='border-slate-100'],
+html[data-theme='dark'] [class~='border-slate-200'],
+html[data-theme='dark'] [class~='border-slate-300'] {
+  border-color: var(--app-border) !important;
+}
+
+html[data-theme='dark'] [class~='bg-blue-50'],
+html[data-theme='dark'] [class~='bg-blue-50/80'] {
+  background-color: #10234a !important;
+}
+
+html[data-theme='dark'] [class~='bg-emerald-50'],
+html[data-theme='dark'] [class~='bg-emerald-50/80'] {
+  background-color: #082d27 !important;
+}
+
+html[data-theme='dark'] [class~='bg-amber-50'],
+html[data-theme='dark'] [class~='bg-amber-50/80'] {
+  background-color: #35270b !important;
+}
+
+html[data-theme='dark'] [class~='bg-rose-50'] {
+  background-color: #35141d !important;
+}
+
+html[data-theme='dark'] [class~='border-blue-100'],
+html[data-theme='dark'] [class~='border-blue-200'] {
+  border-color: #244d83 !important;
+}
+
+html[data-theme='dark'] [class~='border-emerald-100'],
+html[data-theme='dark'] [class~='border-emerald-200'] {
+  border-color: #176453 !important;
+}
+
+html[data-theme='dark'] [class~='border-amber-200'] {
+  border-color: #725719 !important;
+}
+
+html[data-theme='dark'] [class~='border-rose-200'] {
+  border-color: #783247 !important;
+}
+
+html[data-theme='dark'] [class~='text-blue-900'],
+html[data-theme='dark'] [class~='text-blue-950'] {
+  color: #bfdbfe !important;
+}
+
+html[data-theme='dark'] [class~='text-emerald-800'],
+html[data-theme='dark'] [class~='text-emerald-900'] {
+  color: #a7f3d0 !important;
+}
+
+html[data-theme='dark'] [class~='text-amber-800'],
+html[data-theme='dark'] [class~='text-amber-900'] {
+  color: #fde68a !important;
+}
+
+html[data-theme='dark'] [class~='text-rose-700'],
+html[data-theme='dark'] [class~='text-rose-800'] {
+  color: #fda4af !important;
+}
+
+html[data-theme='dark'] input,
+html[data-theme='dark'] textarea,
+html[data-theme='dark'] select {
+  background-color: #111c30 !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+html[data-theme='dark'] input::placeholder,
+html[data-theme='dark'] textarea::placeholder {
+  color: #7f8da3 !important;
+}
+
+html[data-theme='dark'] [class~='shadow-sm'],
+html[data-theme='dark'] [class~='shadow-md'],
+html[data-theme='dark'] [class~='shadow-lg'],
+html[data-theme='dark'] [class~='shadow-xl'],
+html[data-theme='dark'] [class~='shadow-2xl'] {
+  --tw-shadow-color: rgb(0 0 0 / 0.38);
+}
+
+html[data-theme='dark'] .leaflet-container {
+  background: #111827;
+}
+
+html[data-theme='dark'] .leaflet-control-zoom a,
+html[data-theme='dark'] .leaflet-popup-content-wrapper,
+html[data-theme='dark'] .leaflet-popup-tip {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+html[data-theme='dark'] ::selection {
+  background: #2563eb;
+  color: #ffffff;
+}

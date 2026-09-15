@@ -24,6 +24,10 @@
       "use": "@vercel/node"
     },
     {
+      "src": "api/public-places.ts",
+      "use": "@vercel/node"
+    },
+    {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
@@ -36,6 +40,7 @@
   "routes": [
     { "src": "/api/ai/navigation-guidance", "dest": "/api/navigation.ts" },
     { "src": "/api/traces/summary", "dest": "/api/trace-summary.ts" },
+    { "src": "/api/public-places", "dest": "/api/public-places.ts" },
     { "src": "/api/(.*)", "dest": "/api/runtime.ts" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
