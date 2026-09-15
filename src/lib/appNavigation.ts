@@ -48,10 +48,14 @@ export function resolveAppNavigationHelp(
     actions: [{ target, label }],
   });
 
-  if (hasAny(text, ['add trip', 'create trip', 'new trip', 'plan a trip', 'my trips', 'trip planner', 'إضافة رحلة', 'انشاء رحلة', 'إنشاء رحلة', 'رحلاتي', 'خطط رحلة', 'ajouter un voyage', 'créer un voyage', 'mes voyages'])) {
+  if (hasAny(text, [
+    'add trip', 'add a trip', 'create trip', 'create a trip', 'new trip', 'plan a trip', 'plan trip', 'my trips', 'trip planner',
+    'إضافة رحلة', 'اضافة رحلة', 'انشاء رحلة', 'إنشاء رحلة', 'رحلاتي', 'خطط رحلة',
+    'ajouter un voyage', 'créer un voyage', 'creer un voyage', 'mes voyages',
+  ])) {
     return response('trips', l.trips, 'Open Trips and choose Add Trip.', 'افتح رحلاتي ثم اختر إضافة رحلة.', 'Ouvrez Mes voyages puis choisissez Ajouter un voyage.');
   }
-  if (hasAny(text, ['add place', 'new place', 'submit place', 'إضافة مكان', 'اضافة مكان', 'ajouter un lieu'])) {
+  if (hasAny(text, ['add place', 'add a place', 'new place', 'submit place', 'إضافة مكان', 'اضافة مكان', 'ajouter un lieu'])) {
     return response('add-place', l.addPlace, 'You can add a place here.', 'يمكنك إضافة مكان من هنا.', 'Vous pouvez ajouter un lieu ici.');
   }
   if (hasAny(text, ['account', 'profile', 'settings', 'my profile', 'الحساب', 'حسابي', 'الملف الشخصي', 'الإعدادات', 'compte', 'profil', 'paramètres'])) {
