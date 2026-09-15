@@ -3,7 +3,9 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import {startAutomaticDayNightTheme} from './lib/dayNightTheme';
+import {cleanOAuthErrorFromCurrentUrl} from './lib/authUrlRecovery';
 
+cleanOAuthErrorFromCurrentUrl();
 startAutomaticDayNightTheme();
 
 createRoot(document.getElementById('root')!).render(

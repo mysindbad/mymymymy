@@ -72,18 +72,20 @@ async function getAccessToken(forceRefresh = false): Promise<string | null> {
 
 async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Promise<T> {
   const { requiresAuth = false, body, headers, ...requestOptions } = options;
-  await waitForSessionReady();
-  let token = await getAccessToken();
-  if (requiresAuth && (!token || getAuthSessionSnapshot().status !== 'authed')) {
-    throw new ApiAuthenticationError('SESSION_TOKEN_MISSING', 'SESSION_TOKEN_MISSING');
+  let token: string | null = null;
+
+  if (requiresAuth) {
+    await waitForSessionReady();
+    token = await getAccessToken();
+    if (!token || getAuthSessionSnapshot().status !== 'authed') {
+      throw new ApiAuthenticationError('SESSION_TOKEN_MISSING', 'SESSION_TOKEN_MISSING');
+    }
   }
 
   const sendRequest = (requestToken: string | null) => {
     const requestHeaders = new Headers(headers);
     if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
-    if (typeof document !== 'undefined') {
-      requestHeaders.set('Accept-Language', document.documentElement.lang || 'en');
-    }
+    if (typeof document !== 'undefined') requestHeaders.set('Accept-Language', document.documentElement.lang || 'en');
     if (requestToken) requestHeaders.set('Authorization', `Bearer ${requestToken}`);
     return fetch(url, {
       ...requestOptions,
@@ -95,7 +97,7 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
 
   let response = await sendRequest(token);
   let payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
-  if (response.status === 401 && payload.code === 'TOKEN_INVALID' && getAuthSessionSnapshot().status === 'authed') {
+  if (requiresAuth && response.status === 401 && payload.code === 'TOKEN_INVALID' && getAuthSessionSnapshot().status === 'authed') {
     try {
       const refreshedToken = await getAccessToken(true);
       if (!refreshedToken) throw new ApiAuthenticationError('TOKEN_INVALID', 'TOKEN_INVALID');
@@ -106,9 +108,7 @@ async function apiRequest<T>(url: string, options: ApiRequestOptions = {}): Prom
       throw new ApiAuthenticationError('TOKEN_INVALID', 'TOKEN_INVALID');
     }
   }
-  if (response.status === 401) {
-    throw new ApiAuthenticationError(payload.error || payload.en || 'Authentication required', payload.code || 'AUTH_REQUIRED');
-  }
+  if (response.status === 401) throw new ApiAuthenticationError(payload.error || payload.en || 'Authentication required', payload.code || 'AUTH_REQUIRED');
   if (!response.ok) throw new Error(payload.error || payload.en || `Request failed with status ${response.status}`);
   return payload;
 }
@@ -126,16 +126,37 @@ function mergeUniquePlaces(primary: Place[], additional: Place[]) {
   return merged;
 }
 
+type NearbyCacheEntry = { expiresAt: number; places: Place[] };
+const nearbyCache = new Map<string, NearbyCacheEntry>();
+const nearbyPending = new Map<string, Promise<Place[]>>();
+const NEARBY_CLIENT_CACHE_MS = 20 * 60 * 1000;
+
+function nearbyCacheKey(latitude: number, longitude: number) {
+  return `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
+}
+
 async function fetchNearbyBaseline(latitude: number, longitude: number) {
-  try {
-    const data = await apiRequest<{ places?: Place[] }>(
-      `/api/nearby-places?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`,
-    );
-    return data.places || [];
-  } catch (error) {
+  const key = nearbyCacheKey(latitude, longitude);
+  const cached = nearbyCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.places;
+  const pending = nearbyPending.get(key);
+  if (pending) return pending;
+
+  const request = apiRequest<{ places?: Place[] }>(
+    `/api/nearby-places?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`,
+  ).then((data) => {
+    const places = data.places || [];
+    nearbyCache.set(key, { expiresAt: Date.now() + NEARBY_CLIENT_CACHE_MS, places });
+    return places;
+  }).catch((error) => {
     console.warn('Nearby baseline unavailable:', error);
-    return [];
-  }
+    return cached?.places || [];
+  }).finally(() => {
+    nearbyPending.delete(key);
+  });
+
+  nearbyPending.set(key, request);
+  return request;
 }
 
 export async function fetchPlaces(params?: {
@@ -158,19 +179,19 @@ export async function fetchPlaces(params?: {
     searchParams.set('userLng', params.userLng.toString());
   }
   const queryString = searchParams.toString();
-  const data = await apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
-  const databasePlaces = data.places || [];
+  const databasePromise = apiRequest<{ places?: Place[] }>(`/api/places${queryString ? `?${queryString}` : ''}`);
 
   if (params?.userLat !== undefined && params.userLng !== undefined && !params.query) {
+    const baselinePromise = fetchNearbyBaseline(params.userLat, params.userLng);
+    const [data, discovered] = await Promise.all([databasePromise, baselinePromise]);
+    const databasePlaces = data.places || [];
     const origin: [number, number] = [params.userLat, params.userLng];
     const localDatabaseCount = databasePlaces.filter((place) => haversineDistanceKm(origin, place.coordinates) <= 50).length;
-    if (localDatabaseCount < 6) {
-      const discovered = await fetchNearbyBaseline(params.userLat, params.userLng);
-      return mergeUniquePlaces(databasePlaces, discovered);
-    }
+    return localDatabaseCount < 6 ? mergeUniquePlaces(databasePlaces, discovered) : databasePlaces;
   }
 
-  return databasePlaces;
+  const data = await databasePromise;
+  return data.places || [];
 }
 
 export async function fetchPlaceById(id: string): Promise<Place | null> {
@@ -185,11 +206,7 @@ export async function fetchPlaceById(id: string): Promise<Place | null> {
 
 export async function createPlace(placeData: Partial<Place>): Promise<{ success: boolean; place?: Place; error?: string }> {
   try {
-    const data = await apiRequest<{ place?: Place }>('/api/places', {
-      method: 'POST',
-      body: placeData,
-      requiresAuth: true,
-    });
+    const data = await apiRequest<{ place?: Place }>('/api/places', { method: 'POST', body: placeData, requiresAuth: true });
     return { success: true, place: data.place };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create listing';
@@ -198,23 +215,9 @@ export async function createPlace(placeData: Partial<Place>): Promise<{ success:
   }
 }
 
-export async function submitPlaceReview(
-  placeId: string,
-  review: {
-    authorName: string;
-    authorRole?: string;
-    rating: number;
-    text: string;
-    tags: string[];
-    photo?: string;
-  }
-): Promise<{ success: boolean; updatedPlace?: Place; review?: PlaceReview }> {
+export async function submitPlaceReview(placeId: string, review: { authorName: string; authorRole?: string; rating: number; text: string; tags: string[]; photo?: string; }): Promise<{ success: boolean; updatedPlace?: Place; review?: PlaceReview }> {
   try {
-    const data = await apiRequest<{ updatedPlace?: Place; review?: PlaceReview }>(`/api/places/${encodeURIComponent(placeId)}/reviews`, {
-      method: 'POST',
-      body: review,
-      requiresAuth: true,
-    });
+    const data = await apiRequest<{ updatedPlace?: Place; review?: PlaceReview }>(`/api/places/${encodeURIComponent(placeId)}/reviews`, { method: 'POST', body: review, requiresAuth: true });
     return { success: true, updatedPlace: data.updatedPlace, review: data.review };
   } catch (error) {
     console.error('submitPlaceReview error:', error);
@@ -232,14 +235,7 @@ export async function submitPlaceCheckIn(placeId: string): Promise<boolean> {
   }
 }
 
-export async function submitPassiveTrace(trace: {
-  coordinates: [number, number];
-  mode: string;
-  speedKmh?: number;
-  anonymousUserId?: string;
-  nearPlaceId?: string;
-  region?: string;
-}): Promise<boolean> {
+export async function submitPassiveTrace(trace: { coordinates: [number, number]; mode: string; speedKmh?: number; anonymousUserId?: string; nearPlaceId?: string; region?: string; }): Promise<boolean> {
   try {
     await apiRequest('/api/traces/passive', { method: 'POST', body: trace, requiresAuth: true });
     return true;
@@ -253,31 +249,13 @@ export async function fetchTracesSummary(): Promise<TraceSummary> {
   return apiRequest<TraceSummary>('/api/traces/summary');
 }
 
-export async function sendChatMessage(
-  message: string,
-  destination: string,
-  language: string,
-  history: Array<Record<string, unknown>> = []
-): Promise<string> {
-  const data = await apiRequest<{ text: string }>('/api/ai/chat', {
-    method: 'POST',
-    body: { message, destination, language, history },
-    requiresAuth: true,
-  });
+export async function sendChatMessage(message: string, destination: string, language: string, history: Array<Record<string, unknown>> = []): Promise<string> {
+  const data = await apiRequest<{ text: string }>('/api/ai/chat', { method: 'POST', body: { message, destination, language, history }, requiresAuth: true });
   return data.text;
 }
 
-export async function fetchNavigationGuidance(
-  destinationId: string,
-  travelMode: TravelMode = 'driving',
-  language: string = 'en',
-  startLatitude?: number,
-  startLongitude?: number
-): Promise<NavigationRouteData> {
-  return apiRequest<NavigationRouteData>('/api/ai/navigation-guidance', {
-    method: 'POST',
-    body: { destinationId, travelMode, language, startLatitude, startLongitude },
-  });
+export async function fetchNavigationGuidance(destinationId: string, travelMode: TravelMode = 'driving', language: string = 'en', startLatitude?: number, startLongitude?: number): Promise<NavigationRouteData> {
+  return apiRequest<NavigationRouteData>('/api/ai/navigation-guidance', { method: 'POST', body: { destinationId, travelMode, language, startLatitude, startLongitude } });
 }
 
 export async function fetchAiMemoryInsights(): Promise<AiMemoryInsights> {
@@ -309,6 +287,10 @@ export interface TripItinerary {
   totalEstimatedCost: number;
   currency: string;
   tips: string[];
+  destinationName?: string;
+  destinationArea?: string;
+  destinationRegion?: string;
+  destinationCoordinates?: [number, number];
 }
 
 export interface Trip {
@@ -383,21 +365,12 @@ export async function fetchTrips(): Promise<Trip[]> {
 }
 
 export async function createTrip(payload: TripCreatePayload): Promise<Trip> {
-  const data = await apiRequest<{ trip: Trip }>('/api/trips', {
-    method: 'POST',
-    body: payload,
-    requiresAuth: true,
-  });
+  const data = await apiRequest<{ trip: Trip }>('/api/trips', { method: 'POST', body: payload, requiresAuth: true });
   if (!payload.aiItinerary) return data.trip;
-
   try {
     return await updateTrip(data.trip.id, { aiItinerary: payload.aiItinerary });
   } catch (error) {
-    try {
-      await deleteTrip(data.trip.id);
-    } catch {
-      // Best-effort rollback: preserve the original persistence error for the caller.
-    }
+    try { await deleteTrip(data.trip.id); } catch { /* preserve persistence error */ }
     throw error;
   }
 }
@@ -412,7 +385,8 @@ export async function deleteTrip(id: string): Promise<void> {
 }
 
 export async function planTrip(payload: {
-  destinationId: string;
+  destinationId?: string;
+  destination?: Pick<Place, 'name' | 'arabicName' | 'frenchName' | 'region' | 'area' | 'address' | 'coordinates'>;
   startDate: string;
   endDate: string;
   budget: number;
@@ -420,47 +394,21 @@ export async function planTrip(payload: {
   participants: number;
   preferences: string[];
 }): Promise<{ itinerary: TripItinerary; overBudget: boolean; aiGenerated: true }> {
-  return apiRequest('/api/ai/plan-trip', {
-    method: 'POST',
-    body: { ...payload, name: 'AI itinerary request' },
-    requiresAuth: true,
-  });
+  return apiRequest('/api/ai/plan-trip', { method: 'POST', body: { ...payload, name: 'AI itinerary request' }, requiresAuth: true });
 }
 
 export async function fetchTripExpenses(tripId: string): Promise<TripBudget> {
   return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, { requiresAuth: true });
 }
 
-export async function addTripExpense(tripId: string, payload: {
-  category: TripExpenseCategory;
-  amount: number;
-  currency: string;
-  description?: string;
-  expenseDate: string;
-}): Promise<TripBudget> {
-  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, {
-    method: 'POST',
-    body: payload,
-    requiresAuth: true,
-  });
+export async function addTripExpense(tripId: string, payload: { category: TripExpenseCategory; amount: number; currency: string; description?: string; expenseDate: string; }): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses`, { method: 'POST', body: payload, requiresAuth: true });
 }
 
-export async function updateTripExpense(tripId: string, expenseId: string, patch: Partial<{
-  category: TripExpenseCategory;
-  amount: number;
-  description: string | null;
-  expenseDate: string;
-}>): Promise<TripBudget> {
-  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
-    method: 'PATCH',
-    body: patch,
-    requiresAuth: true,
-  });
+export async function updateTripExpense(tripId: string, expenseId: string, patch: Partial<{ category: TripExpenseCategory; amount: number; description: string | null; expenseDate: string; }>): Promise<TripBudget> {
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, { method: 'PATCH', body: patch, requiresAuth: true });
 }
 
 export async function deleteTripExpense(tripId: string, expenseId: string): Promise<TripBudget> {
-  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, {
-    method: 'DELETE',
-    requiresAuth: true,
-  });
+  return apiRequest<TripBudget>(`/api/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}`, { method: 'DELETE', requiresAuth: true });
 }

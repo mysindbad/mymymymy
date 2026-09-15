@@ -217,7 +217,7 @@ test('assistant has app deep links and no static destination chips', async ({ pa
   await openApp(page);
   await page.locator('#tab-ai-assistant').click();
   await expect(page.getByText('Hidden natural spots in Akchour')).toBeHidden();
-  await page.getByPlaceholder('Ask anything about travel or the app').fill("I can't find how to add a trip");
+  await page.getByPlaceholder('Write a message').fill("I can't find how to add a trip");
   await page.locator('#send-ai-chat-btn').click();
   const addTrip = page.getByRole('button', { name: 'Add Trip' });
   await expect(addTrip).toBeVisible();

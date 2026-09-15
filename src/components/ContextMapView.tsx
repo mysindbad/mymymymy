@@ -37,7 +37,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
-  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userMarkerRef = useRef<L.CircleMarker | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const tileThemeRef = useRef<'light' | 'dark' | null>(null);
   const tileGenerationRef = useRef(0);
@@ -135,7 +135,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
       weight: 3,
       fillColor: '#2563eb',
       fillOpacity: 1,
-    }).addTo(map) as unknown as L.Marker;
+    }).addTo(map);
     marker.bindTooltip(t('Your location', 'موقعك', 'Votre position'));
     userMarkerRef.current = marker;
     map.flyTo([userLocation.latitude, userLocation.longitude], 12, { duration: 0.8 });
@@ -149,11 +149,27 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
     const bounds: L.LatLngExpression[] = [];
     visiblePlaces.forEach((place) => {
       bounds.push(place.coordinates);
-      const marker = L.marker(place.coordinates).addTo(layer);
-      marker.bindTooltip(isAr && place.arabicName ? place.arabicName : place.name);
+      const isActive = activePlace?.id === place.id;
+      const marker = L.circleMarker(place.coordinates, {
+        radius: isActive ? 9 : 7,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: isActive ? '#1d4ed8' : '#2563eb',
+        fillOpacity: 0.96,
+      }).addTo(layer);
+      const label = document.createElement('span');
+      label.textContent = isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name;
+      marker.bindTooltip(label, {
+        permanent: visiblePlaces.length <= 20,
+        direction: 'top',
+        offset: [0, -8],
+        opacity: 0.92,
+        className: 'sindbad-place-tooltip',
+      });
       marker.on('click', () => {
         setActivePlace(place);
-        map.panTo(place.coordinates, { animate: true });
+        marker.openTooltip();
+        map.flyTo(place.coordinates, Math.max(map.getZoom(), 14), { duration: 0.45 });
       });
     });
     if (!userLocation && bounds.length > 0) {
@@ -162,7 +178,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
     }
     if (activePlace && !visiblePlaces.some((place) => place.id === activePlace.id)) setActivePlace(null);
     window.setTimeout(() => map.invalidateSize(), 50);
-  }, [visiblePlaces, userLocation?.latitude, userLocation?.longitude]);
+  }, [visiblePlaces, userLocation?.latitude, userLocation?.longitude, activePlace?.id, language]);
 
   const categories = useMemo(() => Array.from(new Set(places.map((place) => place.category))), [places]);
 
@@ -187,7 +203,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
 
       {activePlace && (
         <div className="absolute inset-x-3 bottom-5 z-[500] mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
-          <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => onSelectPlace(activePlace)} className="min-w-0 flex-1 text-start"><strong className="block truncate text-slate-900">{isAr && activePlace.arabicName ? activePlace.arabicName : activePlace.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{activePlace.area} · {activePlace.region}</span></button><button type="button" onClick={() => onStartRoute(activePlace)} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Navigation className="h-4 w-4" />{t('Go', 'اذهب', 'Aller')}</button></div>
+          <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => onSelectPlace(activePlace)} className="min-w-0 flex-1 text-start"><strong className="block truncate text-slate-900">{isAr && activePlace.arabicName ? activePlace.arabicName : isFr && activePlace.frenchName ? activePlace.frenchName : activePlace.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{activePlace.area} · {activePlace.region}</span></button><button type="button" onClick={() => onStartRoute(activePlace)} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Navigation className="h-4 w-4" />{t('Go', 'اذهب', 'Aller')}</button></div>
         </div>
       )}
     </div>

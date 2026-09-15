@@ -25,6 +25,7 @@ import {
 import { Place, TravelMode, NavigationRouteData } from '../types';
 import { fetchNavigationGuidance, submitPlaceCheckIn } from '../services/api';
 import { MascotSindbad } from './MascotSindbad';
+import { PlaceVisual } from './PlaceVisual';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 
 interface NavigationFlowProps {
@@ -247,11 +248,9 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           </div>
 
           <div className="my-4 p-4 rounded-3xl bg-slate-900 border border-slate-800 flex items-center gap-4 shadow-xl">
-            <img
-              src={destination.photos[0]}
-              alt={destination.name}
-              className="w-20 h-20 rounded-2xl object-cover shrink-0"
-            />
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-800">
+              <PlaceVisual place={destination} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
+            </div>
             <div className="flex-1 min-w-0">
               <span className="text-[10px] font-black uppercase text-blue-400 px-2 py-0.5 rounded-full bg-blue-950/80 border border-blue-800">
                 {destination.subCategory || destination.category}
@@ -527,11 +526,11 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
           </div>
 
           <div className="my-4 rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl relative">
-            <img
-              src={photoUploaded || destination.photos[0]}
-              alt={destination.name}
-              className="w-full h-52 object-cover"
-            />
+            {photoUploaded ? (
+              <img src={photoUploaded} alt={destination.name} className="w-full h-52 object-cover" />
+            ) : (
+              <PlaceVisual place={destination} language={language} className="h-52 w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white">
               <div>

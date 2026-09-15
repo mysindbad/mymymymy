@@ -45,7 +45,7 @@ type OsmElement = {
 };
 
 type OverpassResponse = { elements?: OsmElement[] };
-type DiscoveryCacheEntry = { expiresAt: number; places: DiscoveredPlace[] };
+type DiscoveryCacheEntry = { expiresAt: number; staleUntil: number; places: DiscoveredPlace[] };
 
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -55,7 +55,9 @@ const PRIMARY_RADIUS_METERS = 15_000;
 const EXPANDED_RADIUS_METERS = 30_000;
 const MIN_BASELINE_PLACES = 6;
 const DISCOVERY_LIMIT = 18;
-const CACHE_TTL_MS = 20 * 60 * 1000;
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const STALE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const OVERPASS_TIMEOUT_MS = 5_000;
 const discoveryCache = new Map<string, DiscoveryCacheEntry>();
 
 function toRadians(value: number) {
@@ -141,17 +143,18 @@ function featureFlags(tags: Record<string, string>) {
 export function prominenceScore(element: OsmElement) {
   const tags = element.tags || {};
   let score = 0;
-  if (tags.wikipedia) score += 24;
+  const hasReference = Boolean(tags.wikipedia || tags.wikidata);
+  if (tags.wikipedia) score += 26;
   if (tags.wikidata) score += 18;
-  if (tags.image || tags.wikimedia_commons) score += 8;
-  if (tags.tourism === 'attraction' || tags.tourism === 'museum') score += 12;
-  if (tags.historic) score += 10;
-  if (tags.tourism === 'viewpoint') score += 8;
+  if (tags.image || tags.wikimedia_commons) score += 10;
+  if (tags.tourism === 'attraction' || tags.tourism === 'museum') score += 14;
+  if (tags.historic) score += hasReference ? 12 : 4;
+  if (tags.tourism === 'viewpoint') score += 12;
   if (tags.leisure === 'park' || tags.leisure === 'garden') score += 7;
   if (tags.amenity === 'theatre') score += 6;
-  if (tags.amenity === 'place_of_worship') score += tags.wikipedia || tags.wikidata ? 5 : 1;
-  if (tags.tourism === 'hotel' || tags.tourism === 'guest_house') score += 3;
-  if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') score += 2;
+  if (tags.amenity === 'place_of_worship') score += hasReference ? 5 : 1;
+  if (tags.tourism === 'hotel' || tags.tourism === 'guest_house') score += 2;
+  if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') score += 1;
   if (tags.website || tags['contact:website']) score += 1;
   if (tags.phone || tags['contact:phone']) score += 1;
   if (tags.opening_hours) score += 1;
@@ -215,7 +218,7 @@ function cacheKey([lat, lng]: Coordinate) {
 
 function buildOverpassQuery([lat, lng]: Coordinate, radiusMeters: number) {
   const around = `(around:${radiusMeters},${lat},${lng})`;
-  return `[out:json][timeout:15];(`
+  return `[out:json][timeout:12];(`
     + `nwr${around}[name][tourism~\"attraction|museum|gallery|viewpoint|zoo|theme_park|hotel|guest_house|hostel|camp_site|caravan_site\"];`
     + `nwr${around}[name][historic];`
     + `nwr${around}[name][leisure~\"park|garden\"];`
@@ -223,28 +226,28 @@ function buildOverpassQuery([lat, lng]: Coordinate, radiusMeters: number) {
     + `);out center tags 120;`;
 }
 
+async function requestOverpass(endpoint: string, query: string): Promise<OsmElement[]> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'User-Agent': 'MySindbad/1.0 (travel discovery; contact: mysindbad.traveler.ai@gmail.com)',
+    },
+    body: `data=${encodeURIComponent(query)}`,
+    signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`Overpass responded ${response.status}`);
+  const payload = await response.json() as OverpassResponse;
+  return Array.isArray(payload.elements) ? payload.elements : [];
+}
+
 async function queryOverpass(origin: Coordinate, radiusMeters: number): Promise<OsmElement[]> {
   const query = buildOverpassQuery(origin, radiusMeters);
-  let lastError: unknown;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          'User-Agent': 'MySindbad/1.0 (travel discovery; contact: mysindbad.traveler.ai@gmail.com)',
-        },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(7000),
-      });
-      if (!response.ok) throw new Error(`Overpass responded ${response.status}`);
-      const payload = await response.json() as OverpassResponse;
-      return Array.isArray(payload.elements) ? payload.elements : [];
-    } catch (error) {
-      lastError = error;
-    }
+  try {
+    return await Promise.any(OVERPASS_ENDPOINTS.map((endpoint) => requestOverpass(endpoint, query)));
+  } catch (error) {
+    throw error instanceof Error ? error : new Error('Nearby discovery unavailable');
   }
-  throw lastError instanceof Error ? lastError : new Error('Nearby discovery unavailable');
 }
 
 function normalizeAndRank(elements: OsmElement[], origin: Coordinate) {
@@ -271,13 +274,23 @@ export async function discoverNearbyPlaces(origin: Coordinate): Promise<Discover
   const cached = discoveryCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.places;
 
-  let places = normalizeAndRank(await queryOverpass(origin, PRIMARY_RADIUS_METERS), origin);
-  if (places.length < MIN_BASELINE_PLACES) {
-    places = normalizeAndRank(await queryOverpass(origin, EXPANDED_RADIUS_METERS), origin);
-  }
+  try {
+    let places = normalizeAndRank(await queryOverpass(origin, PRIMARY_RADIUS_METERS), origin);
+    if (places.length < MIN_BASELINE_PLACES) {
+      places = normalizeAndRank(await queryOverpass(origin, EXPANDED_RADIUS_METERS), origin);
+    }
 
-  discoveryCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, places });
-  return places;
+    const now = Date.now();
+    discoveryCache.set(key, {
+      expiresAt: now + CACHE_TTL_MS,
+      staleUntil: now + STALE_CACHE_TTL_MS,
+      places,
+    });
+    return places;
+  } catch (error) {
+    if (cached && cached.staleUntil > Date.now() && cached.places.length > 0) return cached.places;
+    throw error;
+  }
 }
 
 export function mergeNearbyPlaces<T extends { id: string; name: string; coordinates: Coordinate }>(

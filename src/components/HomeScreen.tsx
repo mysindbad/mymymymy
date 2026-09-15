@@ -15,6 +15,7 @@ import {
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import { BrandLogo } from './BrandLogo';
+import { PlaceVisual } from './PlaceVisual';
 import { UserAvatar } from './UserAvatar';
 import type { AssistantNavigationReply, AppNavigationAction } from '../lib/appNavigation';
 
@@ -82,6 +83,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [voicePending, setVoicePending] = useState(false);
   const [voiceReply, setVoiceReply] = useState<AssistantNavigationReply | null>(null);
   const [voiceError, setVoiceError] = useState('');
+  const [clock, setClock] = useState(() => new Date());
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const isAr = language === 'ar';
@@ -90,10 +92,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isAr ? arabic : isFr ? french : english;
 
   const featuredPlaces = useMemo(() => places.slice(0, 5), [places]);
+  const hour = clock.getHours();
+  const greeting = hour >= 5 && hour < 12
+    ? localize('Good morning', 'صباح الخير', 'Bonjour')
+    : hour >= 12 && hour < 18
+      ? localize('Good afternoon', 'نهارك سعيد', 'Bon après-midi')
+      : localize('Good evening', 'مساء الخير', 'Bonsoir');
+  const greetingName = currentUser?.isLoggedIn && currentUser.name?.trim() ? `، ${currentUser.name.trim()}` : '';
 
-  useEffect(() => () => {
-    recognitionRef.current?.abort?.();
-    recognitionRef.current = null;
+  useEffect(() => {
+    const refreshClock = () => setClock(new Date());
+    const timer = window.setInterval(refreshClock, 60_000);
+    const onVisibility = () => { if (!document.hidden) refreshClock(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      recognitionRef.current?.abort?.();
+      recognitionRef.current = null;
+    };
   }, []);
 
   const processVoiceResult = async (transcript: string) => {
@@ -169,7 +186,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <div className="min-h-screen w-full bg-slate-50 pb-28 text-slate-800" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="relative overflow-hidden bg-gradient-to-b from-sky-400 via-sky-300 to-white pb-7 shadow-sm">
         <div className="absolute inset-0">
-          <img src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=1600&auto=format&fit=crop&q=85" alt="Travel scenery" className="h-full w-full object-cover object-top opacity-75" />
+          <img src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=1200&auto=format&fit=crop&q=78" alt="Travel scenery" fetchPriority="high" decoding="async" className="h-full w-full object-cover object-top opacity-75" />
           <div className="absolute inset-0 bg-gradient-to-b from-sky-500/25 via-white/5 to-white" />
         </div>
 
@@ -190,6 +207,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <div className="relative z-10 mx-auto max-w-md px-4 py-2">
           <BrandLogo size="lg" showSlogan={false} language={language} />
+          <p className="mt-1 text-center text-sm font-black text-slate-900 drop-shadow-sm" data-home-greeting="true">{greeting}{greetingName}</p>
         </div>
 
         <div className="relative z-10 mx-auto max-w-xl space-y-2 px-4">
@@ -228,8 +246,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       <section className="mx-auto mt-6 max-w-2xl px-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-black text-slate-900">{hasLocation ? localize('Nearby places', 'أماكن قريبة', 'Lieux proches') : localize('Nearby places', 'أماكن قريبة', 'Lieux proches')}</h2>
-          {hasLocation && <button type="button" onClick={() => onNavigateTab('explore')} className="text-xs font-bold text-blue-600">{localize('See all', 'عرض الكل', 'Tout voir')}</button>}
+          <h2 className="text-base font-black text-slate-900">{localize('Nearby places', 'أماكن قريبة', 'Lieux proches')}</h2>
+          {hasLocation && <button id="home-nearby-see-all" type="button" onClick={() => onNavigateTab('explore')} className="text-xs font-bold text-blue-600">{localize('See all', 'عرض الكل', 'Tout voir')}</button>}
         </div>
 
         {!hasLocation ? (
@@ -245,10 +263,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {featuredPlaces.map((place) => {
               const isSaved = savedPlaceIds.includes(place.id);
               return <article key={place.id} onClick={() => onSelectPlace(place)} className="relative h-52 w-40 shrink-0 cursor-pointer overflow-hidden rounded-3xl bg-slate-200 shadow-sm sm:w-48">
-                {place.photos?.[0] ? <img src={place.photos[0]} alt={isAr && place.arabicName ? place.arabicName : place.name} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-gradient-to-br from-slate-300 to-slate-500" />}
+                <PlaceVisual place={place} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/10" />
                 <button type="button" onClick={(event) => { event.stopPropagation(); onToggleSave(place.id); }} aria-label={isSaved ? localize('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer le lieu')} className={`absolute end-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full ${isSaved ? 'bg-rose-500' : 'bg-black/40'} text-white`}><Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} /></button>
-                <div className="absolute inset-x-3 bottom-3 text-white"><h3 className="font-bold leading-tight">{isAr && place.arabicName ? place.arabicName : place.name}</h3><p className="mt-1 text-xs text-slate-200">{place.area || place.region}{typeof place.distanceKm === 'number' ? ` · ${place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km` : ''}</p></div>
+                <div className="absolute inset-x-3 bottom-3 text-white"><h3 className="font-bold leading-tight">{isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name}</h3><p className="mt-1 text-xs text-slate-200">{place.area || place.region}{typeof place.distanceKm === 'number' ? ` · ${place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km` : ''}</p></div>
               </article>;
             })}
           </div>
