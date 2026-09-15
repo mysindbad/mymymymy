@@ -14,6 +14,7 @@ import {
 import { Place } from '../types';
 import { submitPlaceCheckIn } from '../services/api';
 import { RatePlaceModal } from './RatePlaceModal';
+import { PlaceVisual } from './PlaceVisual';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { formatPriceLevel } from '../data/currency';
 import { formatVerifiedRating, liveReviewsLabel, unratedLabel } from '../lib/placeRating';
@@ -73,18 +74,16 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
     }
   };
 
-  const displayName = isAr && place.arabicName ? place.arabicName : place.name;
+  const displayName = isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name;
   const verifiedRating = formatVerifiedRating(place.rating, place.reviewCount);
+  const activePhoto = place.photos[activePhotoIdx] || place.photos[0] || '';
+  const visualPlace = activePhoto ? { ...place, photos: [activePhoto] } : { ...place, photos: [] };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-md sm:p-4" dir={isAr ? 'rtl' : 'ltr'}>
       <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="relative h-64 w-full shrink-0 bg-slate-900 sm:h-72">
-          {place.photos[activePhotoIdx] || place.photos[0] ? (
-            <img src={place.photos[activePhotoIdx] || place.photos[0]} alt={displayName} className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full w-full bg-gradient-to-br from-slate-700 to-slate-900" />
-          )}
+          <PlaceVisual place={visualPlace} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" eager showFallbackLabel={false} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/35" />
 
           <div className="absolute inset-x-4 top-4 z-10 flex items-center justify-between">

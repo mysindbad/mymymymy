@@ -263,7 +263,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {featuredPlaces.map((place) => {
               const isSaved = savedPlaceIds.includes(place.id);
               return <article key={place.id} onClick={() => onSelectPlace(place)} className="relative h-52 w-40 shrink-0 cursor-pointer overflow-hidden rounded-3xl bg-slate-200 shadow-sm sm:w-48">
-                <PlaceVisual place={place} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel />
+                <PlaceVisual place={place} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/10" />
                 <button type="button" onClick={(event) => { event.stopPropagation(); onToggleSave(place.id); }} aria-label={isSaved ? localize('Remove saved place', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer le lieu')} className={`absolute end-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full ${isSaved ? 'bg-rose-500' : 'bg-black/40'} text-white`}><Heart className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} /></button>
                 <div className="absolute inset-x-3 bottom-3 text-white"><h3 className="font-bold leading-tight">{isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name}</h3><p className="mt-1 text-xs text-slate-200">{place.area || place.region}{typeof place.distanceKm === 'number' ? ` · ${place.distanceKm < 10 ? place.distanceKm.toFixed(1) : Math.round(place.distanceKm)} km` : ''}</p></div>
