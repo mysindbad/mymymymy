@@ -44,14 +44,15 @@ type OsmElement = {
 };
 
 type OverpassResponse = { elements?: OsmElement[] };
-
 type DiscoveryCacheEntry = { expiresAt: number; places: DiscoveredPlace[] };
 
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
 ];
-const DISCOVERY_RADIUS_METERS = 15000;
+const PRIMARY_RADIUS_METERS = 15_000;
+const EXPANDED_RADIUS_METERS = 30_000;
+const MIN_BASELINE_PLACES = 6;
 const DISCOVERY_LIMIT = 18;
 const CACHE_TTL_MS = 20 * 60 * 1000;
 const discoveryCache = new Map<string, DiscoveryCacheEntry>();
@@ -80,9 +81,7 @@ function safeHttpUrl(value: string | undefined): string | null {
 }
 
 function titleCase(value: string) {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function placeCategory(tags: Record<string, string>): DiscoveredPlace['category'] {
@@ -96,8 +95,7 @@ function placeCategory(tags: Record<string, string>): DiscoveredPlace['category'
 }
 
 function placeSubtype(tags: Record<string, string>) {
-  const raw = tags.tourism || tags.historic || tags.leisure || tags.amenity || tags.natural || 'place';
-  return titleCase(raw);
+  return titleCase(tags.tourism || tags.historic || tags.leisure || tags.amenity || tags.natural || 'place');
 }
 
 function placeArea(tags: Record<string, string>) {
@@ -116,9 +114,10 @@ function placeRegion(tags: Record<string, string>, area: string) {
 
 function placeAddress(tags: Record<string, string>, area: string) {
   const street = [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' ');
-  const locality = [tags['addr:suburb'], tags['addr:city'] || tags['addr:town'] || tags['addr:village'] || area].filter(Boolean).join(', ');
-  const country = tags['addr:country'];
-  return [street, locality, country].filter(Boolean).join(', ') || area;
+  const locality = [tags['addr:suburb'], tags['addr:city'] || tags['addr:town'] || tags['addr:village'] || area]
+    .filter(Boolean)
+    .join(', ');
+  return [street, locality, tags['addr:country']].filter(Boolean).join(', ') || area;
 }
 
 function featureFlags(tags: Record<string, string>) {
@@ -161,9 +160,7 @@ export function normalizeOsmPlace(element: OsmElement, origin: Coordinate): Disc
   const area = placeArea(tags);
   const subtype = placeSubtype(tags);
   const image = safeHttpUrl(tags.image);
-  const description = tags.description?.trim()
-    || tags['description:en']?.trim()
-    || `${subtype} · ${area}`;
+  const description = tags.description?.trim() || tags['description:en']?.trim() || `${subtype} · ${area}`;
 
   return {
     id: `osm-${element.type}-${element.id}`,
@@ -203,18 +200,18 @@ function cacheKey([lat, lng]: Coordinate) {
   return `${lat.toFixed(2)},${lng.toFixed(2)}`;
 }
 
-function buildOverpassQuery([lat, lng]: Coordinate) {
-  const around = `(around:${DISCOVERY_RADIUS_METERS},${lat},${lng})`;
-  return `[out:json][timeout:15];(\n`
-    + `nwr${around}[name][tourism~\"attraction|museum|gallery|viewpoint|zoo|theme_park|hotel|guest_house|hostel|camp_site|caravan_site\"];\n`
-    + `nwr${around}[name][historic];\n`
-    + `nwr${around}[name][leisure~\"park|garden\"];\n`
-    + `nwr${around}[name][amenity~\"restaurant|cafe|place_of_worship|theatre|hospital|clinic|police\"];\n`
+function buildOverpassQuery([lat, lng]: Coordinate, radiusMeters: number) {
+  const around = `(around:${radiusMeters},${lat},${lng})`;
+  return `[out:json][timeout:15];(`
+    + `nwr${around}[name][tourism~\"attraction|museum|gallery|viewpoint|zoo|theme_park|hotel|guest_house|hostel|camp_site|caravan_site\"];`
+    + `nwr${around}[name][historic];`
+    + `nwr${around}[name][leisure~\"park|garden\"];`
+    + `nwr${around}[name][amenity~\"restaurant|cafe|place_of_worship|theatre|hospital|clinic|police\"];`
     + `);out center tags 120;`;
 }
 
-async function queryOverpass(origin: Coordinate): Promise<OsmElement[]> {
-  const query = buildOverpassQuery(origin);
+async function queryOverpass(origin: Coordinate, radiusMeters: number): Promise<OsmElement[]> {
+  const query = buildOverpassQuery(origin, radiusMeters);
   let lastError: unknown;
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
@@ -237,15 +234,9 @@ async function queryOverpass(origin: Coordinate): Promise<OsmElement[]> {
   throw lastError instanceof Error ? lastError : new Error('Nearby discovery unavailable');
 }
 
-export async function discoverNearbyPlaces(origin: Coordinate): Promise<DiscoveredPlace[]> {
-  const key = cacheKey(origin);
-  const cached = discoveryCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.places;
-
-  const elements = await queryOverpass(origin);
+function normalizeAndRank(elements: OsmElement[], origin: Coordinate) {
   const seenNames = new Set<string>();
-  const places = elements
-    .sort((a, b) => prominenceScore(b) - prominenceScore(a))
+  return elements
     .map((element) => ({ element, place: normalizeOsmPlace(element, origin) }))
     .filter((entry): entry is { element: OsmElement; place: DiscoveredPlace } => Boolean(entry.place))
     .filter(({ place }) => {
@@ -260,6 +251,17 @@ export async function discoverNearbyPlaces(origin: Coordinate): Promise<Discover
     })
     .slice(0, DISCOVERY_LIMIT)
     .map(({ place }) => place);
+}
+
+export async function discoverNearbyPlaces(origin: Coordinate): Promise<DiscoveredPlace[]> {
+  const key = cacheKey(origin);
+  const cached = discoveryCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.places;
+
+  let places = normalizeAndRank(await queryOverpass(origin, PRIMARY_RADIUS_METERS), origin);
+  if (places.length < MIN_BASELINE_PLACES) {
+    places = normalizeAndRank(await queryOverpass(origin, EXPANDED_RADIUS_METERS), origin);
+  }
 
   discoveryCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, places });
   return places;
