@@ -64,6 +64,7 @@ export interface Place {
   lastActivityTimestamp?: string;
   rankText?: string;
   distanceKm?: number;
+  prominenceScore?: number;
   seedData?: boolean;
   seedCheckInsCount?: number;
   photoProvenance?: string | null;
