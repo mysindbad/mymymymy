@@ -12,6 +12,12 @@
   "theme_color": "#2563eb",
   "icons": [
     {
+      "src": "/icons/my-sindbad-app-icon-v8-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
       "src": "/icons/my-sindbad-app-icon-v7-192.jpg",
       "sizes": "192x192",
       "type": "image/jpeg",

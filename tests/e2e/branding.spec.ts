@@ -21,36 +21,36 @@ test('renders and decodes the My Sindbad branding in Chromium', async ({ page })
     })
   ))), [
     '/brand/my-sindbad-logo-v7.png',
-    '/icons/my-sindbad-app-icon-v7-192.jpg',
+    '/icons/my-sindbad-app-icon-v8-maskable.svg',
     '/icons/my-sindbad-app-icon-v7-512.jpg',
   ]);
 
   expect(decoded[0]).toMatchObject({ width: 256, height: 256 });
-  expect(decoded[1]).toMatchObject({ width: 192, height: 192 });
+  expect(decoded[1]).toMatchObject({ width: 512, height: 512 });
   expect(decoded[2]).toMatchObject({ width: 512, height: 512 });
 });
 
-test('serves the exact logo and PWA icons referenced by the app', async ({ request }) => {
-  const logoResponse = await request.get('/brand/my-sindbad-logo-v7.png');
-  expect(logoResponse.ok()).toBeTruthy();
-  expect(logoResponse.headers()['content-type']).toContain('image/png');
-  expect((await logoResponse.body()).byteLength).toBeGreaterThan(1_000);
-
-  const manifestResponse = await request.get('/manifest.webmanifest?v=7');
+test('serves a full-frame adaptive launcher icon referenced by the manifest', async ({ request }) => {
+  const manifestResponse = await request.get('/manifest.webmanifest?v=8');
   expect(manifestResponse.ok()).toBeTruthy();
   const manifest = await manifestResponse.json();
   expect(manifest.icons).toEqual(expect.arrayContaining([
-    expect.objectContaining({ src: '/icons/my-sindbad-app-icon-v7-192.jpg', sizes: '192x192' }),
-    expect.objectContaining({ src: '/icons/my-sindbad-app-icon-v7-512.jpg', sizes: '512x512' }),
+    expect.objectContaining({
+      src: '/icons/my-sindbad-app-icon-v8-maskable.svg',
+      sizes: 'any',
+      type: 'image/svg+xml',
+      purpose: 'maskable',
+    }),
   ]));
 
-  for (const iconPath of [
-    '/icons/my-sindbad-app-icon-v7-192.jpg',
-    '/icons/my-sindbad-app-icon-v7-512.jpg',
-  ]) {
-    const iconResponse = await request.get(iconPath);
-    expect(iconResponse.ok()).toBeTruthy();
-    expect(iconResponse.headers()['content-type']).toContain('image/jpeg');
-    expect((await iconResponse.body()).byteLength).toBeGreaterThan(1_000);
-  }
+  const iconResponse = await request.get('/icons/my-sindbad-app-icon-v8-maskable.svg');
+  expect(iconResponse.ok()).toBeTruthy();
+  expect(iconResponse.headers()['content-type']).toContain('image/svg+xml');
+  const iconBody = await iconResponse.text();
+  expect(iconBody.length).toBeGreaterThan(20_000);
+  expect(iconBody).toContain('data:image/jpeg;base64,');
+  expect(iconBody).toContain('x="-65"');
+  expect(iconBody).toContain('y="-51"');
+  expect(iconBody).toContain('width="642"');
+  expect(iconBody).toContain('height="642"');
 });

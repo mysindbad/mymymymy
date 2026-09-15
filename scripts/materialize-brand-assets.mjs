@@ -54,3 +54,20 @@ for (const asset of assets) {
   writeFileSync(asset.target, bytes);
   console.log(`[brand] materialized ${asset.target} (${bytes.length} bytes, sha256=${sha256})`);
 }
+
+// Android applies an additional safe-area treatment to ordinary PWA icons.
+// Keep the user's official artwork intact, but zoom past its built-in outer
+// blue margin and expose it as a scalable, opaque maskable icon. The crop
+// corresponds to the inner app-frame area of the original official artwork.
+const maskableSource = readFileSync(
+  'brand-assets/my-sindbad-app-icon-user-v4-512.jpg.b64',
+  'utf8',
+).replace(/\s+/g, '');
+const maskableSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#075aa8"/>
+  <image href="data:image/jpeg;base64,${maskableSource}" x="-65" y="-51" width="642" height="642" preserveAspectRatio="xMidYMid slice"/>
+</svg>\n`;
+const maskableTarget = 'public/icons/my-sindbad-app-icon-v8-maskable.svg';
+mkdirSync(dirname(maskableTarget), { recursive: true });
+writeFileSync(maskableTarget, maskableSvg, 'utf8');
+console.log(`[brand] materialized ${maskableTarget} (${Buffer.byteLength(maskableSvg)} bytes)`);
