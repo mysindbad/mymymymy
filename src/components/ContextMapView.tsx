@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
-import { List, MapPin, Navigation } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import type { UserLocation } from '../hooks/useGeolocation';
@@ -20,7 +20,6 @@ interface ContextMapViewProps {
   initialCategory?: string;
   userLocation?: UserLocation | null;
   isLoading?: boolean;
-  onOpenList?: () => void;
 }
 
 const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -42,7 +41,6 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
   initialCategory = 'All',
   userLocation = null,
   isLoading = false,
-  onOpenList,
 }) => {
   const locale = useLocale(language);
   const t = locale.t;
@@ -231,11 +229,6 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
             aria-label={t('Filter places on map', 'تصفية الأماكن على الخريطة', 'Filtrer les lieux sur la carte')}
             className="h-9 min-w-0 flex-1 bg-transparent px-2 text-body font-medium text-ink outline-none placeholder:text-muted"
           />
-          {onOpenList && (
-            <Button size="sm" variant="secondary" onClick={onOpenList} icon={<List className="h-3.5 w-3.5" />}>
-              {t('List', 'القائمة', 'Liste')}
-            </Button>
-          )}
         </div>
         {categories.length > 0 && (
           <div className="sindbad-scroll-x">

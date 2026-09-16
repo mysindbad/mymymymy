@@ -78,6 +78,7 @@ export function PrimaryNav({ activeTab, language = 'en', onSelectTab, onOpenMenu
         <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
           <button
             type="button"
+            aria-label={t('Account', 'الحساب', 'Compte')}
             onClick={() => (isSignedIn ? onSelectTab('account') : onOpenAuth?.())}
             className="flex h-10 items-center gap-2 rounded-full border border-line px-2.5 text-label font-bold text-ink transition-colors hover:bg-surface-muted"
           >

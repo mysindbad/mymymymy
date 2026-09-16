@@ -332,7 +332,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
             </IconButton>
           </header>
 
-          <article className={`relative mt-4 overflow-hidden rounded-3xl ${DARK_PANEL}`}>
+          <div className={`relative mt-4 overflow-hidden rounded-3xl ${DARK_PANEL}`}>
             <div className="h-32 w-full">
               <PlaceVisual
                 place={destination}
@@ -355,7 +355,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
                 <span className="truncate">{destination.address}</span>
               </p>
             </div>
-          </article>
+          </div>
 
           <section className="mt-5" aria-labelledby="nav-mode-heading">
             <h3 id="nav-mode-heading" className="mb-2 text-label font-bold uppercase tracking-wide text-white/55">

@@ -458,7 +458,6 @@ export default function App() {
                   onStartRoute={setActiveNavDestination}
                   language={language}
                   userLocation={userLocation}
-                  onOpenList={() => setExploreView('feed')}
                 />}
               </div>
             )}
