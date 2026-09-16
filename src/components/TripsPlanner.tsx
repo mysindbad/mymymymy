@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   Building2,
   CalendarDays,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
+  Coins,
   MapPin,
   Plus,
+  SlidersHorizontal,
   Trash2,
+  Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import {
@@ -33,6 +33,16 @@ import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import { AuthStatus } from '../lib/authSession';
 import { buildCityDestination, rankFuzzyDestinations } from '../lib/fuzzyDestination';
+import { formatDate, useLocale } from '../lib/i18n';
+import { placeDisplayName } from '../lib/placeView';
+import { ScreenHeader } from '../ui/ScreenHeader';
+import { Button, IconButton } from '../ui/Button';
+import { Chip } from '../ui/Chip';
+import { Alert, EmptyState, ErrorState, SkeletonList } from '../ui/Feedback';
+import { OptionCard, Select, TextInput } from '../ui/Field';
+import { Panel, Divider } from '../ui/Panel';
+import { Sheet } from '../ui/Sheet';
+import { toast } from '../ui/toast';
 
 interface TripsPlannerProps {
   language?: SupportedLanguage;
@@ -74,9 +84,11 @@ function addDays(value: string, offset: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatDate(value: string, language: string) {
-  if (!value) return '—';
-  return new Intl.DateTimeFormat(language === 'ar' ? 'ar-MA' : language, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`));
+function dayCount(start: string, end: string) {
+  const from = Date.parse(`${start}T00:00:00Z`);
+  const to = Date.parse(`${end}T00:00:00Z`);
+  if (Number.isNaN(from) || Number.isNaN(to)) return 1;
+  return Math.max(1, Math.round((to - from) / 86_400_000) + 1);
 }
 
 // Internal error codes/messages that must never reach the user verbatim.
@@ -115,9 +127,8 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   onTripCreated,
   initialDestinationQuery = '',
 }) => {
-  const isAr = language === 'ar';
-  const isFr = language === 'fr';
-  const l = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
+  const locale = useLocale(language);
+  const l = locale.t;
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -129,6 +140,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState('');
   const [placesSearched, setPlacesSearched] = useState(false);
+  const [placesRetryToken, setPlacesRetryToken] = useState(0);
   const searchSequence = useRef(0);
   const [planning, setPlanning] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -164,6 +176,18 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
   const latestEndDate = addDays(form.startDate, MAX_PLAN_DAYS - 1);
   const selectedPlace = places.find((place) => place.id === form.destinationId) || null;
   const selectedIsCity = Boolean(selectedPlace?.id.startsWith('city:'));
+  const tripDays = dayCount(form.startDate, form.endDate);
+  const plannedTotal = Number(itinerary?.totalEstimatedCost ?? 0);
+  const budgetNumber = Number(form.budget) || 0;
+  const isPlanning = !itinerary;
+
+  const STEPS = [
+    { id: 1, label: l('Destination', 'الوجهة', 'Destination'), icon: MapPin },
+    { id: 2, label: l('Dates', 'التواريخ', 'Dates'), icon: CalendarDays },
+    { id: 3, label: l('Budget', 'الميزانية', 'Budget'), icon: Wallet },
+    { id: 4, label: l('Travelers', 'المسافرون', 'Voyageurs'), icon: Users },
+    { id: 5, label: l('Preferences', 'التفضيلات', 'Préférences'), icon: SlidersHorizontal },
+  ];
 
   const resetPlanner = (destinationQuery = '') => {
     setStep(1);
@@ -262,7 +286,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, placesRetryToken]);
 
   const updateForm = (patch: Partial<typeof form>) => setForm((current) => ({ ...current, ...patch }));
   const togglePreference = (value: string) => updateForm({
@@ -334,7 +358,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
         destinationCoordinates: itinerary.destinationCoordinates || selectedPlace.coordinates,
       };
       const trip = await createTrip({
-        name: isAr ? `رحلة إلى ${selectedPlace.arabicName || selectedPlace.name}` : isFr ? `Voyage à ${selectedPlace.frenchName || selectedPlace.name}` : `Trip to ${selectedPlace.name}`,
+        name: locale.isArabic ? `رحلة إلى ${selectedPlace.arabicName || selectedPlace.name}` : locale.isFrench ? `Voyage à ${selectedPlace.frenchName || selectedPlace.name}` : `Trip to ${selectedPlace.name}`,
         destinationId: selectedIsCity ? undefined : selectedPlace.id,
         startDate: form.startDate,
         endDate: form.endDate,
@@ -348,6 +372,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       setTrips((current) => [saved, ...current]);
       const destination = selectedPlace;
       resetPlanner();
+      toast(l('Trip saved', 'تم حفظ الرحلة', 'Voyage enregistré'), { tone: 'success' });
       onTripCreated?.(destination);
     } catch (saveFailure) {
       setPlanError(messageFrom(saveFailure, l('Unable to save the trip.', 'تعذر حفظ الرحلة.', 'Impossible d’enregistrer le voyage.'), language));
@@ -371,6 +396,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       await deleteTrip(trip.id);
       setTrips((current) => current.filter((item) => item.id !== trip.id));
       setExpandedTripId((current) => current === trip.id ? null : current);
+      toast(l('Trip deleted', 'تم حذف الرحلة', 'Voyage supprimé'));
     } catch (deleteError) {
       setError(messageFrom(deleteError, l('Unable to delete trip.', 'تعذر حذف الرحلة.', 'Impossible de supprimer le voyage.'), language));
     }
@@ -418,6 +444,8 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
       });
       applyBudget(expenseModalTripId, updated);
       setExpenseModalTripId(null);
+      setExpenseForm({ category: 'food', amount: '', description: '', expenseDate: dateFromToday(0) });
+      toast(l('Expense added', 'تمت إضافة المصروف', 'Dépense ajoutée'), { tone: 'success' });
     } catch (saveError) {
       setExpenseError(messageFrom(saveError, l('Unable to save expense.', 'تعذر حفظ المصروف.', 'Impossible d’enregistrer la dépense.'), language));
     } finally {
@@ -437,8 +465,6 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     }
   };
 
-  if (authStatus === 'restoring') return <CenteredLoading text={l('Loading…', 'جارٍ التحميل…', 'Chargement…')} />;
-
   const statusLabel = (status: Trip['status']) => ({
     planning: l('Planning', 'قيد التخطيط', 'Planification'),
     active: l('Active', 'نشطة', 'Actif'),
@@ -446,60 +472,610 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
     cancelled: l('Cancelled', 'ملغاة', 'Annulé'),
   })[status];
 
+  const statusTone = (status: Trip['status']): 'brand' | 'positive' | 'neutral' | 'caution' => ({
+    planning: 'brand' as const,
+    active: 'positive' as const,
+    completed: 'neutral' as const,
+    cancelled: 'caution' as const,
+  })[status];
+
+  if (authStatus === 'restoring') {
+    return (
+      <>
+        <ScreenHeader title={l('My Trips', 'رحلاتي', 'Mes voyages')} />
+        <div className="mx-auto w-full max-w-3xl px-3 pt-4 sm:px-5">
+          <SkeletonList rows={3} />
+        </div>
+      </>
+    );
+  }
+
   return (
-    <div dir={isAr ? 'rtl' : 'ltr'} className="mx-auto max-w-5xl space-y-5 p-4 pb-24 sm:p-6">
-      <section className="flex items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div><h1 className="text-xl font-black text-slate-900">{l('My Trips', 'رحلاتي', 'Mes voyages')}</h1><p className="mt-1 text-xs text-slate-500">{trips.length} {l('trips', 'رحلة', 'voyages')}</p></div>
-        <button type="button" onClick={() => resetPlanner()} className="flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white"><Plus className="h-4 w-4" />{l('Add Trip', 'إضافة رحلة', 'Ajouter un voyage')}</button>
-      </section>
+    <div className="min-h-dvh">
+      <ScreenHeader
+        title={l('My Trips', 'رحلاتي', 'Mes voyages')}
+        subtitle={trips.length > 0 ? l(`${trips.length} saved`, `${trips.length} محفوظة`, `${trips.length} enregistrés`) : undefined}
+        actions={isPlanning ? (
+          <Button size="sm" onClick={() => resetPlanner()} icon={<Plus className="h-3.5 w-3.5" />}>
+            {l('Add Trip', 'إضافة رحلة', 'Ajouter un voyage')}
+          </Button>
+        ) : (
+          <Button size="sm" variant="secondary" onClick={() => resetPlanner()}>
+            {l('New trip', 'رحلة جديدة', 'Nouveau voyage')}
+          </Button>
+        )}
+      />
 
-      {error && <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><span>{error}</span><div className="flex gap-2"><button type="button" onClick={() => void loadTrips()} className="font-bold">{l('Retry', 'إعادة المحاولة', 'Réessayer')}</button>{isAuthLoadError && onOpenAuth && <button type="button" onClick={onOpenAuth} className="font-bold underline">{l('Sign in', 'تسجيل الدخول', 'Se connecter')}</button>}</div></div>}
+      <div className="mx-auto w-full max-w-3xl px-3 pb-8 pt-4 sm:px-5">
+        {error && (
+          <Alert
+            tone="error"
+            className="mb-4"
+            action={
+              <>
+                <Button size="sm" variant="secondary" onClick={() => void loadTrips()}>
+                  {l('Retry', 'إعادة المحاولة', 'Réessayer')}
+                </Button>
+                {isAuthLoadError && onOpenAuth && (
+                  <Button size="sm" variant="ghost" onClick={onOpenAuth}>
+                    {l('Sign in', 'تسجيل الدخول', 'Se connecter')}
+                  </Button>
+                )}
+              </>
+            }
+          >
+            {error}
+          </Alert>
+        )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="mb-5 flex items-center justify-between"><h2 className="font-black text-slate-900">{l('Add Trip', 'إضافة رحلة', 'Ajouter un voyage')}</h2><span className="text-xs font-bold text-slate-400">{step}/5</span></div>
-        {step === 1 && <div className="space-y-3">
-          <label htmlFor="trip-destination-search" className="text-sm font-bold text-slate-700">{l('Destination', 'الوجهة', 'Destination')}</label>
-          <input id="trip-destination-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={l('Search a city or place', 'ابحث عن مدينة أو مكان', 'Rechercher une ville ou un lieu')} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500" />
-          {search.trim().length < 2 ? <p className="rounded-2xl bg-slate-50 p-4 text-center text-sm text-slate-500">{l('Type at least 2 characters.', 'اكتب حرفين على الأقل.', 'Saisissez au moins 2 caractères.')}</p>
-            : placesLoading ? <CenteredLoading text={l('Searching…', 'جارٍ البحث…', 'Recherche…')} compact />
-              : placesError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{placesError}</div>
-                : placesSearched && places.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">{l('No destinations found.', 'لم يتم العثور على وجهات.', 'Aucune destination trouvée.')}</div>
-                  : <div className="grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">{places.map((place) => {
-                    const isCity = place.id.startsWith('city:');
-                    return <button key={place.id} type="button" onClick={() => updateForm({ destinationId: place.id })} className={`flex items-center gap-3 rounded-2xl border p-3 text-start ${form.destinationId === place.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 hover:border-blue-300'}`} data-destination-kind={isCity ? 'city' : 'place'}>{isCity ? <Building2 className="h-5 w-5 shrink-0 text-indigo-600" /> : <MapPin className="h-5 w-5 shrink-0 text-blue-600" />}<span className="min-w-0 flex-1"><strong className="block truncate text-sm text-slate-900">{isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name}</strong><small className="block truncate text-slate-500">{isCity ? l('City', 'مدينة', 'Ville') : `${place.area} · ${place.region}`}</small></span>{form.destinationId === place.id && <Check className="h-4 w-4 text-blue-600" />}</button>;
-                  })}</div>}
-        </div>}
-        {step === 2 && <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-bold text-slate-700">{l('Start date', 'تاريخ البداية', 'Date de début')}<input type="date" value={form.startDate} min={today} onChange={(event) => updateForm({ startDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label><label className="text-sm font-bold text-slate-700">{l('End date', 'تاريخ النهاية', 'Date de fin')}<input type="date" value={form.endDate} min={form.startDate} max={latestEndDate} onChange={(event) => updateForm({ endDate: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label></div>}
-        {step === 3 && <div className="grid gap-4 sm:grid-cols-[1fr_140px]"><label className="text-sm font-bold text-slate-700">{l('Budget', 'الميزانية', 'Budget')}<input type="number" min="1" value={form.budget} onChange={(event) => updateForm({ budget: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label><label className="text-sm font-bold text-slate-700">{l('Currency', 'العملة', 'Devise')}<select value={form.currency} onChange={(event) => updateForm({ currency: event.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal"><option>MAD</option><option>EUR</option><option>USD</option></select></label></div>}
-        {step === 4 && <label className="block max-w-sm text-sm font-bold text-slate-700">{l('Travelers', 'المسافرون', 'Voyageurs')}<input type="number" min="1" max="50" value={form.participants} onChange={(event) => updateForm({ participants: Math.max(1, Number(event.target.value) || 1) })} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 font-normal" /></label>}
-        {step === 5 && <div><p className="mb-3 text-sm font-bold text-slate-700">{l('Preferences', 'التفضيلات', 'Préférences')}</p><div className="grid gap-2 sm:grid-cols-2">{preferenceOptions.map((preference) => <label key={preference.value} className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3 ${form.preferences.includes(preference.value) ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`}><input type="checkbox" checked={form.preferences.includes(preference.value)} onChange={() => togglePreference(preference.value)} /><span className="text-sm font-bold text-slate-700">{isAr ? preference.ar : isFr ? preference.fr : preference.en}</span></label>)}</div></div>}
-        {step === 5 && authStatus === 'anonymous' && !planError && <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-800">{l('Sign-in is required to generate and save the plan. Your inputs will stay filled in.', 'يلزم تسجيل الدخول لإنشاء الخطة وحفظها. ستبقى مدخلاتك محفوظة كما هي.', 'La connexion est requise pour générer et enregistrer le plan. Vos informations resteront renseignées.')}</div>}
-        {planError && <div className="mt-4 flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><AlertTriangle className="h-4 w-4" /><span className="flex-1">{planError}</span>{authStatus === 'anonymous' && onOpenAuth && <button type="button" onClick={onOpenAuth} className="font-bold underline">{l('Sign in', 'تسجيل الدخول', 'Se connecter')}</button>}</div>}
-        <div className="mt-6 flex items-center justify-between gap-3"><button type="button" disabled={step === 1} onClick={() => { setPlanError(''); setStep((current) => Math.max(1, current - 1)); }} className="flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 disabled:invisible"><ChevronLeft className="h-4 w-4 rtl:rotate-180" />{l('Back', 'السابق', 'Retour')}</button>{step < 5 ? <button type="button" onClick={nextStep} className="flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white">{l('Next', 'التالي', 'Suivant')}<ChevronRight className="h-4 w-4 rtl:rotate-180" /></button> : <button type="button" onClick={() => void runPlan()} disabled={planning} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{planning && <Loader2 className="h-4 w-4 animate-spin" />}{l('Create Plan', 'إنشاء الخطة', 'Créer le plan')}</button>}</div>
-      </section>
+        {isPlanning ? (
+          <Panel padded="md" className="overflow-hidden">
+            <ol className="flex items-center gap-1.5 border-b border-line px-4 py-3" aria-label={l('Plan steps', 'خطوات التخطيط', 'Étapes du plan')}>
+              {STEPS.map((item, index) => {
+                const done = step > item.id;
+                const current = step === item.id;
+                return (
+                  <li key={item.id} className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { if (done) { setPlanError(''); setStep(item.id); } }}
+                      disabled={!done && !current}
+                      aria-current={current ? 'step' : undefined}
+                      className={`flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors ${done ? 'hover:bg-brand-soft' : ''} disabled:cursor-default`}
+                    >
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-micro font-bold ${
+                          current
+                            ? 'border-brand-600 bg-brand-fill text-on-brand'
+                            : done
+                              ? 'border-brand-600 bg-brand-soft text-brand-accent'
+                              : 'border-line-strong text-muted'
+                        }`}
+                      >
+                        {done ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" /> : item.id}
+                      </span>
+                      <span className={`hidden truncate text-label font-bold sm:block ${current ? 'text-ink' : done ? 'text-brand-accent' : 'text-muted'}`}>
+                        {item.label}
+                      </span>
+                    </button>
+                    {index < STEPS.length - 1 && <span className="h-px min-w-2 flex-1 bg-line" aria-hidden="true" />}
+                  </li>
+                );
+              })}
+            </ol>
 
-      {itinerary && <section className="space-y-4 rounded-3xl border border-blue-100 bg-blue-50/40 p-4 sm:p-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-black text-slate-900">{selectedPlace?.name}</h2><p className="text-xs text-slate-500">{formatDate(form.startDate, language)} – {formatDate(form.endDate, language)}</p></div><strong className="text-lg text-blue-700">{itinerary.totalEstimatedCost.toFixed(2)} {form.currency}</strong></div>{overBudget && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">{l('This plan exceeds the budget.', 'هذه الخطة تتجاوز الميزانية.', 'Ce plan dépasse le budget.')}</div>}<div className="grid gap-3 md:grid-cols-2">{itinerary.days.map((day) => <article key={day.day} className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="mb-2 font-black text-slate-900">{l('Day', 'اليوم', 'Jour')} {day.day} · {day.title}</h3><div className="space-y-2">{day.items.map((item, index) => <div key={`${day.day}-${index}`} className="rounded-xl bg-slate-50 p-3"><div className="flex justify-between gap-2"><strong className="text-sm text-slate-800">{item.activity}</strong><span className="text-xs text-slate-500">{item.time}</span></div><p className="mt-1 text-xs text-slate-500">{item.note}</p></div>)}</div></article>)}</div><button type="button" onClick={() => void saveTrip()} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{l('Save Trip', 'حفظ الرحلة', 'Enregistrer le voyage')}</button></section>}
+            <div className="p-4 sm:p-5">
+              {step === 1 && (
+                <div className="space-y-3">
+                  <TextInput
+                    id="trip-destination-search"
+                    type="search"
+                    label={l('Destination', 'الوجهة', 'Destination')}
+                    value={search}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)}
+                    placeholder={l('Search a city or place', 'ابحث عن مدينة أو مكان', 'Rechercher une ville ou un lieu')}
+                    autoComplete="off"
+                  />
 
-      <section className="space-y-3">
-        {authStatus === 'anonymous' ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><CalendarDays className="mx-auto mb-3 h-8 w-8 text-blue-500" /><p className="font-bold text-slate-700">{l('Sign in to save this plan and see it here later.', 'سجّل الدخول لحفظ هذه الخطة ورؤيتها لاحقًا هنا.', 'Connectez-vous pour enregistrer ce plan et le retrouver ici plus tard.')}</p>{onOpenAuth && <button type="button" onClick={onOpenAuth} className="mt-3 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white">{l('Sign in', 'تسجيل الدخول', 'Se connecter')}</button>}</div>
-          : loading ? <CenteredLoading text={l('Loading trips…', 'جارٍ تحميل الرحلات…', 'Chargement des voyages…')} />
-          : trips.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><CalendarDays className="mx-auto mb-3 h-8 w-8 text-blue-500" /><p className="font-bold text-slate-700">{l('No trips yet.', 'لا توجد رحلات بعد.', 'Aucun voyage pour le moment.')}</p></div>
-            : <div className="grid gap-3 md:grid-cols-2">{trips.map((trip) => {
-              const budget = budgetByTripId[trip.id];
-              const spent = budget?.spentTotal ?? trip.spentTotal ?? 0;
-              const expanded = expandedTripId === trip.id;
-              const destinationName = trip.destinationName || trip.aiItinerary?.destinationName || l('Destination', 'وجهة', 'Destination');
-              return <article key={trip.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><button type="button" onClick={() => toggleTrip(trip.id)} className="min-w-0 flex-1 text-start"><strong className="block truncate text-slate-900">{trip.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{destinationName} · {formatDate(trip.startDate, language)} – {formatDate(trip.endDate, language)}</span></button><div className="flex"><button type="button" onClick={() => toggleTrip(trip.id)} className="rounded-xl p-2 text-slate-400"><ChevronDown className={`h-4 w-4 ${expanded ? 'rotate-180' : ''}`} /></button><button type="button" onClick={() => void removeTrip(trip)} className="rounded-xl p-2 text-slate-400 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div></div><div className="mt-3 flex items-center justify-between"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{statusLabel(trip.status)}</span><select value={trip.status} onChange={(event) => void changeStatus(trip, event.target.value as Trip['status'])} className="rounded-xl border border-slate-200 px-2 py-1 text-xs"><option value="planning">{statusLabel('planning')}</option><option value="active">{statusLabel('active')}</option><option value="completed">{statusLabel('completed')}</option><option value="cancelled">{statusLabel('cancelled')}</option></select></div><div className="mt-3 text-xs text-slate-500">{l('Spent', 'المصروف', 'Dépensé')}: <strong>{spent.toFixed(2)} / {trip.budget.toFixed(2)} {trip.currency}</strong></div>
-                {expanded && <div className="mt-4 border-t border-slate-100 pt-4">{budgetLoadingId === trip.id ? <CenteredLoading text={l('Loading expenses…', 'جارٍ تحميل المصروفات…', 'Chargement des dépenses…')} compact /> : budgetErrorByTripId[trip.id] ? <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">{budgetErrorByTripId[trip.id]} <button type="button" onClick={() => void loadExpenses(trip.id)} className="font-bold underline">{l('Retry', 'إعادة', 'Réessayer')}</button></div> : budget ? <div className="space-y-3"><div className="flex items-center justify-between"><strong className="text-sm text-slate-900">{l('Expenses', 'المصروفات', 'Dépenses')}</strong><button type="button" onClick={() => { setExpenseModalTripId(trip.id); setExpenseError(''); setExpenseForm({ category: 'food', amount: '', description: '', expenseDate: dateFromToday(0) }); }} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" />{l('Add expense', 'إضافة مصروف', 'Ajouter')}</button></div>{budget.expenses.length === 0 ? <p className="rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">{l('No expenses yet.', 'لا توجد مصروفات بعد.', 'Aucune dépense.')}</p> : budget.expenses.map((expense) => <div key={expense.id} className="flex items-center gap-2 rounded-xl border border-slate-100 p-2"><div className="min-w-0 flex-1"><strong className="block truncate text-xs text-slate-800">{expense.description || expense.category}</strong><span className="text-[11px] text-slate-500">{expense.amount.toFixed(2)} {expense.currency}</span></div><button type="button" disabled={deletingExpenseId === expense.id} onClick={() => void removeExpense(trip.id, expense.id)} className="p-2 text-slate-400 hover:text-rose-600">{deletingExpenseId === expense.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div>)}</div> : null}</div>}
-              </article>;
-            })}</div>}
-      </section>
+                  {search.trim().length < 2 ? (
+                    <p className="rounded-lg bg-surface-muted px-3.5 py-4 text-center text-caption text-muted">
+                      {l('Type at least 2 characters.', 'اكتب حرفين على الأقل.', 'Saisissez au moins 2 caractères.')}
+                    </p>
+                  ) : placesLoading ? (
+                    <div aria-busy="true">
+                      <SkeletonList rows={3} className="[&>li]:border-line" />
+                      <p className="sr-only">{l('Searching destinations…', 'جارٍ البحث عن وجهات…', 'Recherche de destinations…')}</p>
+                    </div>
+                  ) : placesError ? (
+                    <ErrorState
+                      title={l('Destination search failed.', 'فشل البحث عن الوجهة.', 'La recherche a échoué.')}
+                      description={placesError}
+                      retryLabel={l('Try again', 'إعادة المحاولة', 'Réessayer')}
+                      onRetry={() => setPlacesRetryToken((token) => token + 1)}
+                    />
+                  ) : placesSearched && places.length === 0 ? (
+                    <EmptyState
+                      icon={<MapPin className="h-5 w-5" aria-hidden="true" />}
+                      title={l('No destinations found.', 'لم يتم العثور على وجهات.', 'Aucune destination trouvée.')}
+                      description={l(
+                        'A city, region or a single place all work as destinations.',
+                        'تصلح المدينة أو الجهة أو مكان واحد كوجهة.',
+                        'Une ville, une région ou un lieu unique font tous office de destination.',
+                      )}
+                    />
+                  ) : (
+                    <ul className="grid max-h-80 gap-2 overflow-y-auto pe-0.5 sm:grid-cols-2">
+                      {places.map((place) => {
+                        const isCity = place.id.startsWith('city:');
+                        const selected = form.destinationId === place.id;
+                        return (
+                          <li key={place.id} data-destination-kind={isCity ? 'city' : 'place'}>
+                            <OptionCard
+                              selected={selected}
+                              onSelect={() => updateForm({ destinationId: place.id })}
+                              label={placeDisplayName(place, locale.language)}
+                              description={isCity ? l('City', 'مدينة', 'Ville') : [place.area, place.region].filter(Boolean).join(' · ')}
+                              icon={isCity ? <Building2 className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                              className="w-full"
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
 
-      {expenseModalTripId && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true"><form onSubmit={submitExpense} className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="font-black text-slate-900">{l('Add expense', 'إضافة مصروف', 'Ajouter une dépense')}</h2><button type="button" onClick={() => setExpenseModalTripId(null)} className="p-2 text-slate-400"><X className="h-5 w-5" /></button></div><div className="space-y-3"><label className="block text-sm font-bold text-slate-700">{l('Category', 'الفئة', 'Catégorie')}<select value={expenseForm.category} onChange={(event) => setExpenseForm((current) => ({ ...current, category: event.target.value as TripExpenseCategory }))} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{expenseCategories.map((category) => <option key={category}>{category}</option>)}</select></label><label className="block text-sm font-bold text-slate-700">{l('Amount', 'المبلغ', 'Montant')}<input aria-label={l('Amount', 'المبلغ', 'Montant')} required type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(event) => setExpenseForm((current) => ({ ...current, amount: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label><label className="block text-sm font-bold text-slate-700">{l('Description', 'الوصف', 'Description')}<input aria-label={l('Description', 'الوصف', 'Description')} value={expenseForm.description} onChange={(event) => setExpenseForm((current) => ({ ...current, description: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label><label className="block text-sm font-bold text-slate-700">{l('Date', 'التاريخ', 'Date')}<input required type="date" value={expenseForm.expenseDate} onChange={(event) => setExpenseForm((current) => ({ ...current, expenseDate: event.target.value }))} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label></div>{expenseError && <div className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{expenseError}</div>}<button type="submit" disabled={expenseSaving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{expenseSaving && <Loader2 className="h-4 w-4 animate-spin" />}{l('Save expense', 'حفظ المصروف', 'Enregistrer')}</button></form></div>}
+              {step === 2 && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <TextInput
+                    id="trip-start-date"
+                    type="date"
+                    label={l('Start date', 'تاريخ البداية', 'Date de début')}
+                    value={form.startDate}
+                    min={today}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                      const startDate = event.target.value;
+                      const patch: Partial<typeof form> = { startDate };
+                      if (form.endDate < startDate) patch.endDate = addDays(startDate, 1) || startDate;
+                      updateForm(patch);
+                    }}
+                  />
+                  <TextInput
+                    id="trip-end-date"
+                    type="date"
+                    label={l('End date', 'تاريخ النهاية', 'Date de fin')}
+                    hint={l(`${tripDays} ${tripDays === 1 ? 'day' : 'days'}`, `${tripDays} يوم`, `${tripDays} ${tripDays === 1 ? 'jour' : 'jours'}`)}
+                    value={form.endDate}
+                    min={form.startDate}
+                    max={latestEndDate}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateForm({ endDate: event.target.value })}
+                  />
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
+                  <TextInput
+                    id="trip-budget"
+                    type="number"
+                    min="1"
+                    inputMode="decimal"
+                    label={l('Budget', 'الميزانية', 'Budget')}
+                    hint={l(`About ${(budgetNumber / Math.max(1, tripDays)).toFixed(0)} ${form.currency} a day`, `حوالي ${(budgetNumber / Math.max(1, tripDays)).toFixed(0)} ${form.currency} يومياً`, `Environ ${(budgetNumber / Math.max(1, tripDays)).toFixed(0)} ${form.currency} par jour`)}
+                    value={form.budget}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateForm({ budget: event.target.value })}
+                  />
+                  <Select
+                    id="trip-currency"
+                    label={l('Currency', 'العملة', 'Devise')}
+                    value={form.currency}
+                    onChange={(event: React.ChangeEvent<HTMLSelectElement>) => updateForm({ currency: event.target.value })}
+                  >
+                    <option value="MAD">MAD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                  </Select>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <TextInput
+                    id="trip-participants"
+                    type="number"
+                    min="1"
+                    max="50"
+                    inputMode="numeric"
+                    className="w-32"
+                    label={l('Travelers', 'المسافرون', 'Voyageurs')}
+                    value={form.participants}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateForm({ participants: Math.max(1, Number(event.target.value) || 1) })}
+                  />
+                  <p className="pb-3 text-caption text-muted">
+                    {l('Costs in the plan are totals for the group.', 'التكاليف في الخطة إجماعية للمجموعة.', 'Les coûts du plan sont des totaux pour le groupe.')}
+                  </p>
+                </div>
+              )}
+
+              {step === 5 && (
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {preferenceOptions.map((preference) => (
+                      <OptionCard
+                        key={preference.value}
+                        selected={form.preferences.includes(preference.value)}
+                        onSelect={() => togglePreference(preference.value)}
+                        label={locale.isArabic ? preference.ar : locale.isFrench ? preference.fr : preference.en}
+                        className="w-full"
+                      />
+                    ))}
+                  </div>
+                  <div className="rounded-lg bg-surface-muted p-3">
+                    <p className="text-caption font-bold text-ink">{selectedPlace ? placeDisplayName(selectedPlace, locale.language) : l('No destination', 'بدون وجهة', 'Aucune destination')}</p>
+                    <p className="mt-0.5 text-micro text-muted">
+                      {[
+                        `${formatDate(form.startDate, language)} – ${formatDate(form.endDate, language)}`,
+                        `${tripDays} ${l('days', 'أيام', 'jours')}`,
+                        `${form.budget} ${form.currency}`,
+                        `${form.participants} ${l('travelers', 'مسافر', 'voyageurs')}`,
+                      ].join(' · ')}
+                    </p>
+                  </div>
+                  {authStatus === 'anonymous' && !planError && (
+                    <Alert tone="info">
+                      {l(
+                        'Sign-in is required to generate and save the plan. Your inputs will stay filled in.',
+                        'يلزم تسجيل الدخول لإنشاء الخطة وحفظها. ستبقى مدخلاتك محفوظة كما هي.',
+                        'La connexion est requise pour générer et enregistrer le plan. Vos informations resteront renseignées.',
+                      )}
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              {planError && (
+                <div className="mt-4">
+                  <Alert
+                    tone="error"
+                    action={authStatus === 'anonymous' && onOpenAuth ? (
+                      <Button size="sm" variant="secondary" onClick={onOpenAuth}>
+                        {l('Sign in', 'تسجيل الدخول', 'Se connecter')}
+                      </Button>
+                    ) : undefined}
+                  >
+                    {planError}
+                  </Alert>
+                </div>
+              )}
+
+              <Divider className="my-4" />
+
+              <div className="flex items-center justify-between gap-3">
+                <Button variant="ghost" onClick={() => { setPlanError(''); setStep((current) => Math.max(1, current - 1)); }} disabled={step === 1}>
+                  {l('Back', 'السابق', 'Retour')}
+                </Button>
+                {step < 5 ? (
+                  <Button onClick={nextStep}>
+                    {l('Next', 'التالي', 'Suivant')}
+                  </Button>
+                ) : (
+                  <Button onClick={() => void runPlan()} loading={planning}>
+                    {l('Create Plan', 'إنشاء الخطة', 'Créer le plan')}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Panel>
+        ) : (
+          <Panel padded="none" className="overflow-hidden">
+            <div className="flex items-start justify-between gap-3 border-b border-line p-4 sm:p-5">
+              <div className="min-w-0">
+                <h2 className="truncate text-h2 font-bold tracking-tight text-ink">
+                  {itinerary.destinationName || (selectedPlace ? placeDisplayName(selectedPlace, locale.language) : l('Your plan', 'خطتك', 'Votre plan'))}
+                </h2>
+                <p className="mt-0.5 truncate text-micro text-muted">
+                  {[selectedPlace?.area || selectedPlace?.region, `${formatDate(form.startDate, language)} – ${formatDate(form.endDate, language)}`].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+              <div className="shrink-0 text-end">
+                <p className="text-title font-extrabold text-ink tabular-nums">{plannedTotal.toFixed(2)} {form.currency}</p>
+                <p className={`text-micro font-semibold ${overBudget ? 'text-caution' : 'text-muted'}`}>
+                  {overBudget
+                    ? l(`${(plannedTotal - budgetNumber).toFixed(0)} over`, `أعلى بـ ${(plannedTotal - budgetNumber).toFixed(0)}`, `${(plannedTotal - budgetNumber).toFixed(0)} en dessus`)
+                    : l(`of ${budgetNumber.toFixed(0)} budget`, `من ميزانية ${budgetNumber.toFixed(0)}`, `sur un budget de ${budgetNumber.toFixed(0)}`)}
+                </p>
+              </div>
+            </div>
+
+            <div className="h-1 w-full bg-surface-sunken" role="img" aria-label={l('Budget used', 'الميزانية المستعملة', 'Budget utilisé')}>
+              <div
+                className={`h-full transition-[width] duration-300 ${overBudget ? 'bg-caution' : 'bg-positive-fill'}`}
+                style={{ width: `${budgetNumber > 0 ? Math.min(100, (plannedTotal / budgetNumber) * 100) : 0}%` }}
+              />
+            </div>
+
+            {overBudget && (
+              <div className="px-4 pt-4 sm:px-5">
+                <Alert tone="warning">
+                  {l('This plan exceeds the budget.', 'هذه الخطة تتجاوز الميزانية.', 'Ce plan dépasse le budget.')}
+                </Alert>
+              </div>
+            )}
+
+            <ol className="space-y-0 p-4 sm:p-5">
+              {itinerary.days.map((day) => (
+                <li key={day.day} className="relative ps-7">
+                  <span className="absolute start-[0.4375rem] top-6 bottom-0 w-px bg-line" aria-hidden="true" />
+                  <span className="absolute start-0 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-brand-500 bg-surface" aria-hidden="true" />
+                  <h3 className="text-body font-bold text-ink">
+                    {l('Day', 'اليوم', 'Jour')} {day.day}
+                    <span className="ms-2 font-medium text-muted">{day.title}</span>
+                  </h3>
+                  {typeof day.dailyCost === 'number' && (
+                    <p className="mt-0.5 flex items-center gap-1 text-micro text-muted tabular-nums">
+                      <Coins className="h-3 w-3" aria-hidden="true" />
+                      {day.dailyCost.toFixed(2)} {itinerary.currency || form.currency}
+                    </p>
+                  )}
+                  <ul className="mt-2 space-y-2.5 pb-4">
+                    {day.items.map((item, index) => (
+                      <li key={`${day.day}-${index}`} className="flex gap-3">
+                        <span className="w-12 shrink-0 pt-px text-micro font-bold text-brand-accent tabular-nums">{item.time}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-caption font-semibold text-ink">{item.activity}</span>
+                          {item.note && <span className="mt-0.5 block text-micro leading-relaxed text-muted">{item.note}</span>}
+                          {typeof item.estimatedCost === 'number' && item.estimatedCost > 0 && (
+                            <span className="mt-0.5 block text-micro text-muted tabular-nums">
+                              {item.estimatedCost.toFixed(2)} {itinerary.currency || form.currency}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+
+            {Array.isArray(itinerary.tips) && itinerary.tips.length > 0 && (
+              <div className="border-t border-line px-4 py-3 sm:px-5">
+                <ul className="space-y-1.5">
+                  {itinerary.tips.map((tip) => (
+                    <li key={tip} className="flex gap-2 text-micro leading-relaxed text-muted">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-line-strong" aria-hidden="true" />
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 border-t border-line bg-surface-muted p-3 sm:px-5">
+              <Button variant="secondary" onClick={() => resetPlanner()} className="shrink-0">
+                {l('Discard', 'تجاهل', 'Annuler')}
+              </Button>
+              <Button className="min-w-0 flex-1" onClick={() => void saveTrip()} loading={saving} icon={<Check className="h-4 w-4" />}>
+                {l('Save Trip', 'حفظ الرحلة', 'Enregistrer le voyage')}
+              </Button>
+            </div>
+
+            {planError && (
+              <div className="px-4 pb-4 sm:px-5">
+                <Alert tone="error">{planError}</Alert>
+              </div>
+            )}
+          </Panel>
+        )}
+
+        <section className="mt-6" aria-labelledby="trips-saved-heading">
+          <h2 id="trips-saved-heading" className="mb-2 text-title font-bold tracking-tight text-ink">
+            {l('Saved trips', 'الرحلات المحفوظة', 'Voyages enregistrés')}
+          </h2>
+
+          {authStatus === 'anonymous' ? (
+            <EmptyState
+              tone="dashed"
+              icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
+              title={l('Sign in to keep your trips', 'سجّل الدخول للاحتفاظ برحلاتك', 'Connectez-vous pour conserver vos voyages')}
+              description={l(
+                'Plans you save appear here with their expenses, on every device you use.',
+                'تظهر الخطط المحفوظة هنا مع مصروفاتها على كل جهاز تستخدمه.',
+                'Les plans enregistrés apparaissent ici avec leurs dépenses, sur chaque appareil.',
+              )}
+              action={onOpenAuth ? <Button size="sm" onClick={onOpenAuth}>{l('Sign in', 'تسجيل الدخول', 'Se connecter')}</Button> : undefined}
+            />
+          ) : loading ? (
+            <SkeletonList rows={2} />
+          ) : trips.length === 0 ? (
+            <EmptyState
+              icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
+              title={l('No trips yet.', 'لا توجد رحلات بعد.', 'Aucun voyage pour le moment.')}
+              description={isPlanning
+                ? l('Build a plan above and save it to see it here.', 'أنشئ خطة أعلاه واحفظها لتظهر هنا.', 'Créez un plan ci-dessus puis enregistrez-le.')
+                : l('Your saved plan will show up here.', 'ستظهر خطتك المحفوظة هنا.', 'Votre plan enregistré apparaîtra ici.')}
+            />
+          ) : (
+            <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+              {trips.map((trip) => {
+                const budget = budgetByTripId[trip.id];
+                const spent = budget?.spentTotal ?? trip.spentTotal ?? 0;
+                const expanded = expandedTripId === trip.id;
+                const destinationName = trip.destinationName || trip.aiItinerary?.destinationName || l('Destination', 'وجهة', 'Destination');
+                const share = trip.budget > 0 ? Math.min(100, (spent / trip.budget) * 100) : 0;
+                return (
+                  <li key={trip.id}>
+                    <div className="flex items-start gap-3 p-3.5">
+                      <button type="button" onClick={() => toggleTrip(trip.id)} aria-expanded={expanded} className="min-w-0 flex-1 text-start">
+                        <span className="flex items-center gap-2">
+                          <span className="min-w-0 truncate text-body font-bold text-ink">{trip.name}</span>
+                          <Chip tone={statusTone(trip.status)}>{statusLabel(trip.status)}</Chip>
+                        </span>
+                        <span className="mt-0.5 block truncate text-micro text-muted">
+                          {destinationName} · {formatDate(trip.startDate, language)} – {formatDate(trip.endDate, language)}
+                        </span>
+                        <span className="mt-2 flex items-center gap-2">
+                          <span className="h-1 min-w-14 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+                            <span className={`block h-full rounded-full ${spent > trip.budget ? 'bg-caution' : 'bg-positive-fill'}`} style={{ width: `${share}%` }} />
+                          </span>
+                          <span className="shrink-0 text-micro font-semibold text-muted tabular-nums">
+                            {spent.toFixed(0)} / {trip.budget.toFixed(0)} {trip.currency}
+                          </span>
+                        </span>
+                      </button>
+                      <div className="flex shrink-0 items-center">
+                        <Select
+                          id={`trip-status-${trip.id}`}
+                          className="me-1 hidden w-32 sm:block"
+                          value={trip.status}
+                          onChange={(event: React.ChangeEvent<HTMLSelectElement>) => void changeStatus(trip, event.target.value as Trip['status'])}
+                        >
+                          <option value="planning">{statusLabel('planning')}</option>
+                          <option value="active">{statusLabel('active')}</option>
+                          <option value="completed">{statusLabel('completed')}</option>
+                          <option value="cancelled">{statusLabel('cancelled')}</option>
+                        </Select>
+                        <IconButton label={l('Delete trip', 'حذف الرحلة', 'Supprimer le voyage')} size="sm" variant="ghost" onClick={() => void removeTrip(trip)}>
+                          <Trash2 className="h-4 w-4" />
+                        </IconButton>
+                        <IconButton label={expanded ? l('Collapse', 'طيّ', 'Replier') : l('Expenses', 'المصروفات', 'Dépenses')} size="sm" variant="ghost" onClick={() => toggleTrip(trip.id)}>
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+                        </IconButton>
+                      </div>
+                    </div>
+
+                    {expanded && (
+                      <div className="border-t border-line bg-surface-muted px-3.5 py-3.5">
+                        {budgetLoadingId === trip.id ? (
+                          <div className="space-y-2" aria-busy="true">
+                            <span className="sindbad-skeleton block h-4 w-32 rounded" />
+                            <span className="sindbad-skeleton block h-4 w-full rounded" />
+                            <span className="sr-only">{l('Loading expenses…', 'جارٍ تحميل المصروفات…', 'Chargement des dépenses…')}</span>
+                          </div>
+                        ) : budgetErrorByTripId[trip.id] ? (
+                          <Alert tone="error" action={
+                            <Button size="sm" variant="secondary" onClick={() => void loadExpenses(trip.id)}>
+                              {l('Retry', 'إعادة المحاولة', 'Réessayer')}
+                            </Button>
+                          }>
+                            {budgetErrorByTripId[trip.id]}
+                          </Alert>
+                        ) : budget ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-label font-bold uppercase tracking-wide text-muted">
+                                {l('Expenses', 'المصروفات', 'Dépenses')}
+                                <span className="ms-1.5 tabular-nums">{budget.expenses.length}</span>
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={<Plus className="h-3.5 w-3.5" />}
+                                onClick={() => {
+                                  setExpenseModalTripId(trip.id);
+                                  setExpenseError('');
+                                  setExpenseForm({ category: 'food', amount: '', description: '', expenseDate: dateFromToday(0) });
+                                }}
+                              >
+                                {l('Add expense', 'إضافة مصروف', 'Ajouter une dépense')}
+                              </Button>
+                            </div>
+                            {budget.expenses.length === 0 ? (
+                              <p className="rounded-lg border border-dashed border-line-strong px-3 py-4 text-center text-micro text-muted">
+                                {l('No expenses yet.', 'لا توجد مصروفات بعد.', 'Aucune dépense.')}
+                              </p>
+                            ) : (
+                              <ul className="divide-y divide-line">
+                                {budget.expenses.map((expense) => (
+                                  <li key={expense.id} className="flex items-center gap-3 py-2">
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-caption font-bold text-ink">{expense.description || expense.category}</span>
+                                      <span className="block text-micro text-muted">{formatDate(expense.expenseDate, language)}</span>
+                                    </span>
+                                    <span className="shrink-0 text-caption font-bold text-ink tabular-nums">{expense.amount.toFixed(2)} {expense.currency}</span>
+                                    <button
+                                      type="button"
+                                      disabled={deletingExpenseId === expense.id}
+                                      onClick={() => void removeExpense(trip.id, expense.id)}
+                                      aria-label={l('Delete expense', 'حذف المصروف', 'Supprimer la dépense')}
+                                      className="sindbad-hit-expand shrink-0 rounded-md p-1.5 text-muted transition-colors hover:text-negative disabled:opacity-50"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            <div className="flex items-center justify-between border-t border-line pt-2.5 text-caption">
+                              <span className="font-semibold text-muted">{l('Left to spend', 'المتبقي', 'Restant')}</span>
+                              <span className={`font-bold tabular-nums ${trip.budget - budget.spentTotal < 0 ? 'text-caution' : 'text-ink'}`}>
+                                {(trip.budget - budget.spentTotal).toFixed(2)} {trip.currency}
+                              </span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <Sheet
+        open={Boolean(expenseModalTripId)}
+        onClose={() => setExpenseModalTripId(null)}
+        title={l('Add expense', 'إضافة مصروف', 'Ajouter une dépense')}
+        size="sm"
+        language={language}
+        footer={
+          <Button className="w-full" type="submit" form="expense-form" loading={expenseSaving} disabled={expenseSaving}>
+            {l('Save expense', 'حفظ المصروف', 'Enregistrer la dépense')}
+          </Button>
+        }
+      >
+        <form id="expense-form" onSubmit={submitExpense} className="space-y-3.5 px-4 pb-6 pt-3 sm:px-5">
+          <Select
+            id="expense-category"
+            label={l('Category', 'الفئة', 'Catégorie')}
+            value={expenseForm.category}
+            onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setExpenseForm((current) => ({ ...current, category: event.target.value as TripExpenseCategory }))}
+          >
+            {expenseCategories.map((category) => (
+              <option key={category} value={category}>{category.replace('_', ' ')}</option>
+            ))}
+          </Select>
+          <TextInput
+            id="expense-amount"
+            type="number"
+            inputMode="decimal"
+            min="0.01"
+            step="0.01"
+            required
+            label={l('Amount', 'المبلغ', 'Montant')}
+            value={expenseForm.amount}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setExpenseForm((current) => ({ ...current, amount: event.target.value }))}
+          />
+          <TextInput
+            id="expense-description"
+            label={l('Description', 'الوصف', 'Description')}
+            hint={l('Optional', 'اختياري', 'Facultatif')}
+            value={expenseForm.description}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setExpenseForm((current) => ({ ...current, description: event.target.value }))}
+          />
+          <TextInput
+            id="expense-date"
+            type="date"
+            required
+            label={l('Date', 'التاريخ', 'Date')}
+            value={expenseForm.expenseDate}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setExpenseForm((current) => ({ ...current, expenseDate: event.target.value }))}
+          />
+          {expenseError && <Alert tone="error">{expenseError}</Alert>}
+        </form>
+      </Sheet>
     </div>
   );
 };
-
-const CenteredLoading: React.FC<{ text: string; compact?: boolean }> = ({ text, compact = false }) => (
-  <div className={`flex items-center justify-center gap-2 text-sm text-slate-500 ${compact ? 'py-5' : 'rounded-2xl bg-white p-8'}`}><Loader2 className="h-4 w-4 animate-spin text-blue-600" />{text}</div>
-);

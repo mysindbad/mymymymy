@@ -75,12 +75,12 @@ test('night hours switch the complete interface to dark mode', async ({ page }) 
   await expect(page.locator('html')).toHaveClass(/dark/);
   const bodyBackground = await page.locator('body').evaluate((element) => getComputedStyle(element).backgroundColor);
   expect(bodyBackground).toBe('rgb(2, 6, 23)');
-  const surface = page.locator('.bg-white').first();
+  const surface = page.locator('[data-surface="card"]').first();
   await expect(surface).toBeVisible();
   expect(await surface.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(15, 23, 42)');
 
   await page.locator('#tab-profile').click();
-  const accountSurface = page.locator('.bg-white').first();
+  const accountSurface = page.locator('[data-surface="card"]').first();
   await expect(accountSurface).toBeVisible();
   expect(await accountSurface.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgb(15, 23, 42)');
 });

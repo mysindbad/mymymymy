@@ -2,30 +2,60 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Sindbad - AI Travel Discovery & Navigation</title>
-    <meta name="description" content="AI-driven community travel discovery, turn-by-turn navigation, and persistent crowdsourced place learning with deep local depth." />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>My Sindbad — Travel discovery for Morocco</title>
+    <meta name="description" content="Find places worth visiting in Morocco, plan a trip, and navigate with local knowledge from travelers who have been there." />
+    <meta name="theme-color" content="#f4f6fa" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="My Sindbad" />
     <link rel="manifest" href="/manifest.webmanifest?v=8" />
     <link rel="icon" type="image/svg+xml" sizes="any" href="/icons/my-sindbad-app-icon-v8-maskable.svg" />
     <link rel="shortcut icon" type="image/jpeg" href="/icons/my-sindbad-app-icon-v7-192.jpg" />
     <link rel="apple-touch-icon" href="/icons/my-sindbad-app-icon-v7-192.jpg" />
-    <meta property="og:title" content="My Sindbad - AI Travel Discovery & Navigation" />
-    <meta property="og:description" content="AI-driven community travel discovery, turn-by-turn navigation, and persistent crowdsourced place learning with deep local depth." />
+    <meta property="og:title" content="My Sindbad" />
+    <meta property="og:description" content="Travel discovery, trip planning and navigation for Morocco, built from real traveler data." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/icons/my-sindbad-app-icon-v7-512.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/icons/my-sindbad-app-icon-v7-512.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Kaushan+Script&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+      /* Painted before the bundle runs so the first frame is already the right theme. */
+      html { background: #f4f6fa; }
+      html.theme-dark { background: #020617; }
+      #root:empty { min-height: 100dvh; }
+    </style>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('sindbad_theme_preference');
+          var hour = new Date().getHours();
+          var dark = stored === 'dark'
+            || ((stored === 'system' || stored === null || stored === 'undefined' || stored === 'auto')
+              && (stored === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : (hour < 7 || hour >= 19)));
+          if (dark) {
+            document.documentElement.classList.add('dark', 'theme-dark');
+            document.documentElement.style.colorScheme = 'dark';
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.content = '#020617';
+          }
+          document.documentElement.dataset.themePreference = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'auto';
+          var lang = localStorage.getItem('sindbad_language');
+          if (lang === 'ar') {
+            document.documentElement.lang = 'ar';
+            document.documentElement.dir = 'rtl';
+          }
+        } catch (error) { /* first paint falls back to the light theme */ }
+      })();
+    </script>
   </head>
-  <body class="bg-slate-900 text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
+  <body class="antialiased selection:bg-brand-fill selection:text-on-brand">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

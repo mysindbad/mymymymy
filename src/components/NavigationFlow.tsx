@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import confetti from 'canvas-confetti';
 import {
@@ -6,6 +6,7 @@ import {
   ArrowRight,
   ArrowLeft,
   ArrowUp,
+  ArrowDown,
   MapPin,
   Car,
   Footprints,
@@ -13,20 +14,22 @@ import {
   Volume2,
   VolumeX,
   Camera,
-  Heart,
-  Share2,
   CheckCircle2,
   ChevronUp,
   ChevronDown,
-  Sparkles,
   Loader2,
-  ShieldCheck
+  List,
+  X,
 } from 'lucide-react';
+import { useReducedMotion } from 'motion/react';
 import { Place, TravelMode, NavigationRouteData } from '../types';
 import { fetchNavigationGuidance, submitPlaceCheckIn } from '../services/api';
-import { MascotSindbad } from './MascotSindbad';
 import { PlaceVisual } from './PlaceVisual';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
+import { useLocale } from '../lib/i18n';
+import { Button, IconButton } from '../ui/Button';
+import { Chip } from '../ui/Chip';
+import { toast } from '../ui/toast';
 
 interface NavigationFlowProps {
   destination: Place;
@@ -39,6 +42,31 @@ interface NavigationFlowProps {
 
 type NavStepState = 'route_selection' | 'active_nav' | 'arrived';
 
+const MODE_ICONS: Record<TravelMode, React.ComponentType<{ className?: string }>> = {
+  driving: Car,
+  walking: Footprints,
+  transit: Bus,
+  taxi: Car,
+};
+
+const MODE_ORDER: Array<{ mode: TravelMode }> = [
+  { mode: 'driving' },
+  { mode: 'walking' },
+  { mode: 'transit' },
+  { mode: 'taxi' },
+];
+
+function turnIcon(iconType: string) {
+  if (iconType === 'left') return ArrowLeft;
+  if (iconType === 'right') return ArrowRight;
+  if (iconType === 'arrive') return MapPin;
+  return ArrowUp;
+}
+
+/** Dark, glanceable surfaces only: this screen is read while walking. */
+const DARK_PANEL = 'rounded-xl border border-white/10 bg-white/[0.045]';
+const DARK_MUTED = 'text-white/55';
+
 export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   destination,
   onClose,
@@ -47,6 +75,12 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   isSaved = false,
   language = 'en',
 }) => {
+  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const locale = useLocale(language);
+  const localize = locale.t;
+  const isAr = locale.isArabic;
+  const reducedMotion = useReducedMotion();
+
   const [navState, setNavState] = useState<NavStepState>('route_selection');
   const [travelMode, setTravelMode] = useState<TravelMode>('driving');
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
@@ -54,7 +88,6 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const [routeData, setRouteData] = useState<NavigationRouteData | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
-  const [speed, setSpeed] = useState<number | null>(null);
   const [showTurnList, setShowTurnList] = useState(false);
   const [photoUploaded, setPhotoUploaded] = useState<string | null>(null);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
@@ -63,12 +96,21 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isLocating, setIsLocating] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const routeMapRef = React.useRef<HTMLDivElement | null>(null);
-  const routeMapInstanceRef = React.useRef<L.Map | null>(null);
-  const routePolylineRef = React.useRef<L.Polyline | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  const routeMapRef = useRef<HTMLDivElement | null>(null);
+  const routeMapInstanceRef = useRef<L.Map | null>(null);
+  const routePolylineRef = useRef<L.Polyline | null>(null);
+  const photoUrlRef = useRef<string | null>(null);
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-  const isAr = language === 'ar';
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => () => {
+    if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
+  }, []);
 
   const requestCurrentLocation = () => {
     setIsLocating(true);
@@ -78,7 +120,11 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
     setRouteError(null);
 
     if (!navigator.geolocation) {
-      setLocationError(isAr ? 'الموقع الجغرافي غير مدعوم في هذا المتصفح.' : 'Geolocation is not supported by this browser.');
+      setLocationError(localize(
+        'This browser cannot share a location.',
+        'هذا المتصفح لا يشارك الموقع.',
+        'Ce navigateur ne peut pas partager de position.',
+      ));
       setIsLocating(false);
       return;
     }
@@ -86,15 +132,15 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setUserLocation([coords.latitude, coords.longitude]);
-        setSpeed(coords.speed === null ? null : Math.round(coords.speed * 3.6));
         setIsLocating(false);
       },
       () => {
         setUserLocation(null);
-        setSpeed(null);
-        setLocationError(isAr
-          ? 'تعذر الحصول على موقعك الحالي. اسمح بالوصول إلى الموقع ثم حاول مجدداً.'
-          : 'Could not get your current location. Allow location access and try again.');
+        setLocationError(localize(
+          'Your current location is unavailable. Allow location access and try again.',
+          'موقعك الحالي غير متاح. اسمح بالوصول إلى الموقع ثم أعد المحاولة.',
+          'Votre position est indisponible. Autorisez l’accès à la position puis réessayez.',
+        ));
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
@@ -108,12 +154,20 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   const loadRoute = async (mode: TravelMode) => {
     if (mode === 'transit') {
       setRouteData(null);
-      setRouteError(isAr ? 'التوجيه عبر النقل العام غير متاح حالياً.' : 'Public-transit routing is not available yet.');
+      setRouteError(localize(
+        'Public-transit routing is not available yet.',
+        'التوجيه عبر النقل العام غير متاح حالياً.',
+        'Le calcul d’itinéraire en transports en commun n’est pas encore disponible.',
+      ));
       return;
     }
     if (!userLocation) {
       setRouteData(null);
-      setRouteError(isAr ? 'يلزم موقعك الحالي لحساب المسار.' : 'Your current location is required to calculate a route.');
+      setRouteError(localize(
+        'Your current location is required to calculate a route.',
+        'يلزم موقعك الحالي لحساب المسار.',
+        'Votre position est nécessaire pour calculer un itinéraire.',
+      ));
       return;
     }
 
@@ -125,7 +179,11 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       setRouteData(data);
     } catch {
       setRouteData(null);
-      setRouteError(isAr ? 'خدمة حساب المسار غير متاحة مؤقتاً' : 'Route service temporarily unavailable');
+      setRouteError(localize(
+        'The route service is temporarily unavailable.',
+        'خدمة حساب المسار غير متاحة مؤقتاً.',
+        'Le service d’itinéraire est temporairement indisponible.',
+      ));
     } finally {
       setIsLoadingRoute(false);
     }
@@ -136,10 +194,9 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
   }, [destination, travelMode, language, userLocation]);
 
   useEffect(() => {
-    const geometry = (routeData as NavigationRouteData & {
+    const coordinates = (routeData as NavigationRouteData & {
       geometry?: { coordinates?: Array<[number, number]> };
-    } | null)?.geometry;
-    const coordinates = geometry?.coordinates;
+    } | null)?.geometry?.coordinates;
     if (!routeMapRef.current || !coordinates?.length) return;
 
     if (!routeMapInstanceRef.current) {
@@ -153,7 +210,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
 
     routePolylineRef.current?.remove();
     const leafletCoordinates = coordinates.map(([longitude, latitude]) => [latitude, longitude] as [number, number]);
-    routePolylineRef.current = L.polyline(leafletCoordinates, { color: '#3b82f6', weight: 6, opacity: 0.9 }).addTo(routeMapInstanceRef.current);
+    routePolylineRef.current = L.polyline(leafletCoordinates, { color: '#5b88f5', weight: 6, opacity: 0.95 }).addTo(routeMapInstanceRef.current);
     routeMapInstanceRef.current.fitBounds(routePolylineRef.current.getBounds(), { padding: [24, 24] });
     routeMapInstanceRef.current.invalidateSize();
   }, [routeData, navState]);
@@ -171,9 +228,7 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      if (language === 'ar') utterance.lang = 'ar-SA';
-      else if (language === 'fr') utterance.lang = 'fr-FR';
-      else utterance.lang = 'en-US';
+      utterance.lang = isAr ? 'ar-SA' : locale.isFrench ? 'fr-FR' : 'en-US';
       utterance.rate = 1.0;
       window.speechSynthesis.speak(utterance);
     } catch {
@@ -183,6 +238,16 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
 
   const steps = routeData?.steps || [];
   const currentStep = steps[currentStepIndex] || steps[0];
+  const remainingMeters = useMemo(
+    () => steps.slice(currentStepIndex).reduce((total, step) => total + (Number(step.distanceMeters) || 0), 0),
+    [steps, currentStepIndex],
+  );
+  const arrivalLabel = useMemo(() => {
+    const minutes = Number(routeData?.durationMinutes ?? 0);
+    const remaining = navState === 'active_nav' ? Math.round(minutes * (remainingMeters / Math.max(1, steps.reduce((sum, step) => sum + (Number(step.distanceMeters) || 0), 0)))) : minutes;
+    const arrival = new Date(now.getTime() + Math.max(0, remaining) * 60_000);
+    return arrival.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }, [routeData, navState, remainingMeters, steps, now]);
 
   useEffect(() => {
     if (navState === 'active_nav' && currentStep) speakInstruction(currentStep.instruction);
@@ -202,10 +267,12 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       return;
     }
     setNavState('arrived');
-    try {
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    } catch {
-      // Celebration is optional.
+    if (!reducedMotion) {
+      try {
+        confetti({ particleCount: 90, spread: 68, origin: { y: 0.62 } });
+      } catch {
+        // Celebration is optional.
+      }
     }
   };
 
@@ -217,168 +284,198 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       const success = await submitPlaceCheckIn(destination.id);
       if (success) {
         setIsCheckedIn(true);
+        toast(localize('Arrival recorded', 'تم تسجيل الوصول', 'Arrivée enregistrée'), { tone: 'success' });
       } else {
-        setCheckInError(isAr
-          ? 'تعذر تأكيد تسجيل الوصول. تحقق من تسجيل الدخول والاتصال.'
-          : 'Check-in could not be confirmed. Check your sign-in and connection.');
+        setCheckInError(localize(
+          'Check-in could not be confirmed. Check your sign-in and connection.',
+          'تعذر تأكيد تسجيل الوصول. تحقق من تسجيل الدخول والاتصال.',
+          'Le check-in n’a pas pu être confirmé. Vérifiez votre connexion et votre session.',
+        ));
       }
+    } catch {
+      setCheckInError(localize(
+        'Check-in needs a connection. Try again.',
+        'تسجيل الوصول يتطلب اتصالاً. أعد المحاولة.',
+        'Le check-in nécessite une connexion. Réessayez.',
+      ));
     } finally {
       setIsCheckingIn(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col text-white animate-in fade-in select-none">
-      {navState === 'route_selection' && (
-        <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={isAr ? 'إغلاق' : 'Close'}
-                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition"
-              >
-                <ArrowLeft className="w-5 h-5 rtl:rotate-180" />
-              </button>
-              <div>
-                <h1 className="text-lg font-bold">{t.routePreview}</h1>
-                <p className="text-xs text-slate-400 truncate max-w-[220px]">{destination.name}</p>
-              </div>
-            </div>
-            <MascotSindbad size="sm" mood="navigating" />
-          </div>
+  const attachPhoto = (file: File | undefined) => {
+    if (!file) return;
+    if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
+    const url = URL.createObjectURL(file);
+    photoUrlRef.current = url;
+    setPhotoUploaded(url);
+  };
 
-          <div className="my-4 p-4 rounded-3xl bg-slate-900 border border-slate-800 flex items-center gap-4 shadow-xl">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-800">
-              <PlaceVisual place={destination} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
+  const destinationName = isAr && destination.arabicName ? destination.arabicName : destination.name;
+  const progress = steps.length > 0 ? ((currentStepIndex + 1) / steps.length) * 100 : 0;
+  const TurnIcon = currentStep ? turnIcon(currentStep.iconType) : MapPin;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none" dir={locale.direction}>
+      {navState === 'route_selection' && (
+        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col overflow-y-auto px-4 pb-5 pt-3 sm:px-6">
+          <header className="flex items-center gap-3 border-b border-white/10 pb-3">
+            <IconButton label={localize('Back', 'رجوع', 'Retour')} onClick={onClose} size="sm" variant="onPhoto">
+              <ArrowLeft className={`h-4 w-4 ${isAr ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </IconButton>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-title font-bold tracking-tight">{t.routePreview}</h1>
+              <p className="truncate text-micro text-white/55">{destinationName}</p>
             </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-black uppercase text-blue-400 px-2 py-0.5 rounded-full bg-blue-950/80 border border-blue-800">
-                {destination.subCategory || destination.category}
+            <IconButton label={localize('Close', 'إغلاق', 'Fermer')} onClick={onClose} size="sm" variant="onPhoto">
+              <X className="h-4 w-4" aria-hidden="true" />
+            </IconButton>
+          </header>
+
+          <article className={`relative mt-4 overflow-hidden rounded-3xl ${DARK_PANEL}`}>
+            <div className="h-32 w-full">
+              <PlaceVisual
+                place={destination}
+                language={language}
+                className="h-full w-full"
+                imageClassName="h-full w-full object-cover"
+                showFallbackLabel={false}
+                eager
+              />
+            </div>
+            <div className="sindbad-photo-scrim absolute inset-x-0 bottom-0 h-3/4" aria-hidden="true" />
+            <div className="absolute inset-x-3.5 bottom-3">
+              <span className="flex items-center gap-2">
+                <Chip tone="onPhoto">{destination.subCategory || destination.category}</Chip>
+                {destination.rankText && <Chip tone="onPhoto">{destination.rankText}</Chip>}
               </span>
-              <h2 className="text-base font-bold text-white truncate mt-1">
-                {isAr && destination.arabicName ? destination.arabicName : destination.name}
-              </h2>
-              <p className="text-xs text-slate-400 truncate mt-0.5 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span>{destination.address}</span>
+              <h2 className="mt-1.5 text-h2 font-extrabold leading-tight tracking-tight text-white">{destinationName}</h2>
+              <p className="mt-1 flex items-center gap-1.5 text-micro text-white/80">
+                <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{destination.address}</span>
               </p>
             </div>
-          </div>
+          </article>
 
-          <div className="mb-4">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+          <section className="mt-5" aria-labelledby="nav-mode-heading">
+            <h3 id="nav-mode-heading" className="mb-2 text-label font-bold uppercase tracking-wide text-white/55">
               {t.travelMode}
-            </label>
+            </h3>
             <div className="grid grid-cols-4 gap-2">
-              {[
-                { mode: 'driving' as const, label: t.modes.driving, icon: Car },
-                { mode: 'walking' as const, label: t.modes.walking, icon: Footprints },
-                { mode: 'transit' as const, label: t.modes.transit, icon: Bus },
-                { mode: 'taxi' as const, label: t.modes.taxi, icon: Car },
-              ].map((item) => {
-                const isSelected = travelMode === item.mode;
+              {MODE_ORDER.map((item) => {
+                const mode = item.mode;
+                const Icon = MODE_ICONS[mode];
+                const isSelected = travelMode === mode;
                 const isUnavailable = item.mode === 'transit';
-                const Icon = item.icon;
                 return (
                   <button
-                    key={item.mode}
+                    key={mode}
+                    type="button"
                     disabled={isUnavailable}
-                    onClick={() => {
-                      if (!isUnavailable) setTravelMode(item.mode);
-                    }}
-                    className={`p-2.5 rounded-2xl border flex flex-col items-center gap-1 transition ${
+                    onClick={() => setTravelMode(mode)}
+                    aria-pressed={isSelected}
+                    className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-2.5 transition-colors duration-150 ${
                       isUnavailable
-                        ? 'bg-slate-950 border-slate-800 text-slate-600 cursor-not-allowed opacity-70'
+                        ? 'border-white/5 bg-white/[0.02] text-white/25'
                         : isSelected
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-500 text-white font-bold shadow-lg shadow-blue-500/25'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          ? 'border-brand-400 bg-brand-fill text-on-brand'
+                          : 'border-white/10 bg-white/[0.045] text-white/70 hover:bg-white/[0.08] hover:text-white'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[11px] whitespace-nowrap">{item.label}</span>
-                    <span className="text-[10px] text-slate-300 font-normal">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    <span className="text-micro font-bold">{t.modes[mode]}</span>
+                    <span className={`text-micro tabular-nums ${isSelected ? 'text-on-brand/80' : 'text-white/40'}`}>
                       {isUnavailable
-                        ? (isAr ? 'غير متاح' : 'Unavailable')
-                        : isSelected && routeData?.travelMode === item.mode
-                          ? (isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`)
+                        ? localize('Soon', 'قريباً', 'Bientôt')
+                        : isSelected && routeData?.travelMode === mode
+                          ? localize(`${routeData.durationMinutes} min`, `${routeData.durationMinutes} دقيقة`, `${routeData.durationMinutes} min`)
                           : '—'}
                     </span>
                   </button>
                 );
               })}
             </div>
-            <p className="mt-2 text-[11px] text-slate-500">
-              {isAr ? 'التوجيه الحقيقي عبر النقل العام سيظهر هنا عند ربط مزود نقل يدعمه.' : 'Public-transit routing will be enabled here when a supported transit provider is connected.'}
+            <p className={`mt-2 text-micro leading-snug ${DARK_MUTED}`}>
+              {localize(
+                'Public-transit routing will be enabled here when a supported transit provider is connected.',
+                'التوجيه الحقيقي عبر النقل العام سيظهر هنا عند ربط مزود نقل يدعمه.',
+                'Le calcul en transports en commun apparaîtra ici lorsqu’un fournisseur compatible sera connecté.',
+              )}
             </p>
-          </div>
+          </section>
 
-          {isLocating ? (
-            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center gap-2 text-slate-400 text-xs">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-              <span>{isAr ? 'جاري الحصول على موقعك الحالي...' : 'Getting your current location...'}</span>
-            </div>
-          ) : locationError ? (
-            <div className="p-5 rounded-2xl bg-amber-950/60 border border-amber-800 space-y-3 text-xs text-amber-100">
-              <p>{locationError}</p>
-              <button onClick={requestCurrentLocation} className="rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white">
-                {isAr ? 'طلب الموقع مجدداً' : 'Request location again'}
-              </button>
-            </div>
-          ) : isLoadingRoute ? (
-            <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center gap-2 text-slate-400 text-xs">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-              <span>{isAr ? 'جاري حساب المسار...' : 'Calculating route...'}</span>
-            </div>
-          ) : routeError ? (
-            <div className="p-5 rounded-2xl bg-rose-950/60 border border-rose-800 flex items-center justify-between gap-3 text-xs text-rose-200">
-              <span>{routeError}</span>
-              <button onClick={() => void loadRoute(travelMode)} className="rounded-lg bg-rose-600 px-3 py-1.5 font-bold text-white">
-                {isAr ? 'إعادة المحاولة' : 'Retry'}
-              </button>
-            </div>
-          ) : routeData ? (
-            <div className="mb-4 p-4 rounded-3xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-2xl font-black text-white">{isAr ? `${routeData.durationMinutes} دقيقة` : `${routeData.durationMinutes} min`}</span>
-                  <span className="text-xs text-slate-400 ml-2">({routeData.totalDistanceKm} km)</span>
+          <section className="mt-5 flex-1" aria-live="polite">
+            {isLocating ? (
+              <div className={`flex items-center gap-2.5 p-4 text-caption ${DARK_PANEL} ${DARK_MUTED}`}>
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <span>{localize('Getting your current location…', 'جارٍ تحديد موقعك الحالي…', 'Obtention de votre position…')}</span>
+              </div>
+            ) : locationError ? (
+              <div className={`space-y-3 ${DARK_PANEL}`}>
+                <p className="text-caption leading-snug text-white/85">{locationError}</p>
+                <Button size="sm" variant="onPhoto" onClick={requestCurrentLocation}>
+                  {localize('Request location again', 'طلب الموقع مجدداً', 'Demander à nouveau la position')}
+                </Button>
+              </div>
+            ) : isLoadingRoute ? (
+              <div className={`space-y-2.5 p-4 ${DARK_PANEL}`} aria-busy="true">
+                <span className="block h-6 w-28 animate-pulse rounded bg-white/10" />
+                <span className="block h-4 w-full animate-pulse rounded bg-white/[0.07]" />
+                <span className="block h-4 w-2/3 animate-pulse rounded bg-white/[0.07]" />
+                <p className={`pt-1 text-micro ${DARK_MUTED}`}>{localize('Calculating route…', 'جارٍ حساب المسار…', 'Calcul de l’itinéraire…')}</p>
+              </div>
+            ) : routeError ? (
+              <div className={`flex items-start justify-between gap-3 p-3.5 ${DARK_PANEL}`}>
+                <p className="text-caption leading-snug text-white/85">{routeError}</p>
+                {userLocation && (
+                  <Button size="sm" variant="onPhoto" onClick={() => void loadRoute(travelMode)}>
+                    {localize('Retry', 'إعادة المحاولة', 'Réessayer')}
+                  </Button>
+                )}
+              </div>
+            ) : routeData ? (
+              <div className={`p-4 ${DARK_PANEL}`}>
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-display font-extrabold leading-none tabular-nums">
+                      {routeData.durationMinutes}
+                      <span className="ms-1 text-title font-bold text-white/70">{localize('min', 'دقيقة', 'min')}</span>
+                    </p>
+                    <p className={`mt-1.5 text-caption tabular-nums ${DARK_MUTED}`}>
+                      {routeData.totalDistanceKm} km · {localize('arrive', 'الوصول', 'arrivée')} {arrivalLabel}
+                    </p>
+                  </div>
+                  {routeData.trafficCondition && <Chip tone="onPhoto">{routeData.trafficCondition}</Chip>}
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-bold border border-slate-700">
-                  {routeData.trafficCondition}
-                </span>
+                {routeData.aiSummary && (
+                  <p className="mt-3.5 border-s-2 border-brand-400 ps-3 text-caption leading-relaxed text-white/85">
+                    {routeData.aiSummary}
+                  </p>
+                )}
               </div>
-
-              <div className="p-3 rounded-2xl bg-blue-950/60 border border-blue-800/60 flex items-start gap-2.5 text-xs text-blue-200">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <p className="leading-relaxed">{routeData.aiSummary}</p>
+            ) : (
+              <div className={`p-4 text-caption ${DARK_PANEL} ${DARK_MUTED}`}>
+                {localize('No route to show yet.', 'لا يوجد مسار لعرضه بعد.', 'Aucun itinéraire à afficher pour le moment.')}
               </div>
+            )}
+          </section>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>{isAr ? 'تم استلام هندسة المسار من خدمة الملاحة' : 'Route geometry received from the navigation service'}</span>
-                </span>
-                <span className="text-[11px] font-bold text-blue-300">ROUTE DATA</span>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="space-y-2 pt-2">
-            <button
+          <div className="mt-5 space-y-2">
+            <Button
               id="start-turn-by-turn-btn"
+              full
+              size="lg"
               onClick={handleStartNav}
               disabled={isLoadingRoute || isLocating || !routeData || steps.length === 0}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white font-bold text-base shadow-xl shadow-blue-500/30 flex items-center justify-center gap-2 transition active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+              icon={<Navigation className="h-4 w-4" aria-hidden="true" />}
+              trailingIcon={<ArrowRight className={`h-4 w-4 ${isAr ? 'rotate-180' : ''}`} aria-hidden="true" />}
             >
-              <Navigation className="w-5 h-5 fill-current" />
-              <span>{isAr ? 'بدء إرشادات المسار' : 'Start Route Guidance'}</span>
-              <ArrowRight className="w-5 h-5 ml-1 rtl:rotate-180" />
-            </button>
+              {localize('Start Route Guidance', 'بدء إرشادات المسار', 'Démarrer le guidage')}
+            </Button>
             <button
+              type="button"
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-semibold transition"
+              className={`h-10 w-full rounded-lg text-caption font-semibold ${DARK_MUTED} transition-colors hover:bg-white/[0.06] hover:text-white`}
             >
               {t.closeNav}
             </button>
@@ -387,245 +484,237 @@ export const NavigationFlow: React.FC<NavigationFlowProps> = ({
       )}
 
       {navState === 'active_nav' && currentStep && (
-        <div className="relative flex-1 flex flex-col">
-          <div className="z-30 p-4 bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 shadow-2xl border-b border-emerald-600">
-            <div className="max-w-xl mx-auto flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="w-13 h-13 rounded-2xl bg-emerald-900/90 flex items-center justify-center text-white shrink-0 border border-emerald-400/40 shadow-inner">
-                  {currentStep.iconType === 'right' && <ArrowRight className="w-8 h-8 rtl:rotate-180" />}
-                  {currentStep.iconType === 'left' && <ArrowLeft className="w-8 h-8 rtl:rotate-180" />}
-                  {currentStep.iconType === 'straight' && <ArrowUp className="w-8 h-8" />}
-                  {currentStep.iconType === 'arrive' && <MapPin className="w-8 h-8 text-amber-300" />}
-                </div>
-                <div>
-                  <div className="text-xs text-emerald-200 font-bold tracking-wide">
-                    {t.inMeters} {currentStep.distanceMeters}m
-                  </div>
-                  <h2 className="text-base sm:text-lg font-black tracking-tight text-white leading-snug">
-                    {currentStep.instruction}
-                  </h2>
-                  <span className="text-xs text-emerald-200/90 font-medium">{currentStep.roadName}</span>
-                </div>
+        <div className="relative flex flex-1 flex-col overflow-hidden">
+          <header className="shrink-0 border-b border-white/10 bg-slate-900/95 px-4 py-3.5 backdrop-blur">
+            <div className="mx-auto flex max-w-xl items-center gap-3.5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-fill text-on-brand">
+                <TurnIcon className={`h-6 w-6 ${isAr && (currentStep.iconType === 'left' || currentStep.iconType === 'right') ? '-scale-x-100' : ''}`} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-caption font-bold tabular-nums text-brand-300">
+                  {t.inMeters} {currentStep.distanceMeters}m
+                </p>
+                <h2 className="text-title font-bold leading-snug tracking-tight text-white">{currentStep.instruction}</h2>
+                {currentStep.roadName && <p className={`truncate text-micro ${DARK_MUTED}`}>{currentStep.roadName}</p>}
               </div>
-
-              <button
+              <IconButton
+                label={isVoiceEnabled ? localize('Mute voice', 'كتم الصوت', 'Couper la voix') : localize('Unmute voice', 'تشغيل الصوت', 'Activer la voix')}
                 onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
-                className="p-3 rounded-full bg-emerald-900/80 hover:bg-emerald-900 text-white transition shrink-0 shadow-xs"
-                title={isVoiceEnabled ? 'Mute' : 'Unmute Voice'}
+                size="sm"
+                variant="onPhoto"
               >
-                {isVoiceEnabled ? <Volume2 className="w-5 h-5 text-white" /> : <VolumeX className="w-5 h-5 text-emerald-300" />}
-              </button>
+                {isVoiceEnabled ? <Volume2 className="h-4 w-4" aria-hidden="true" /> : <VolumeX className="h-4 w-4" aria-hidden="true" />}
+              </IconButton>
             </div>
-
-            <div className="max-w-xl mx-auto mt-2.5 pt-2 border-t border-emerald-600/60 text-[11px] text-emerald-100 font-medium">
-              {isAr
-                ? 'إرشادات يدوية للخطوات: الموقع لا يُتتبّع باستمرار. استخدم «التالي» لمراجعة خطوات المسار.'
-                : 'Manual step guidance: your position is not continuously tracked. Use Next to review route steps.'}
-            </div>
-
             {currentStep.aiTip && (
-              <div className="max-w-xl mx-auto mt-2.5 pt-2 border-t border-emerald-600/60 flex items-center gap-2 text-xs text-emerald-100">
-                <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
-                <span className="font-semibold">{currentStep.aiTip}</span>
-              </div>
+              <p className={`mx-auto mt-2.5 max-w-xl border-s-2 border-sand-400 ps-2.5 text-micro leading-snug text-white/75`}>
+                {currentStep.aiTip}
+              </p>
             )}
+            <div className="mx-auto mt-3 h-1 max-w-xl overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full rounded-full bg-brand-400 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+            </div>
+          </header>
+
+          <div ref={routeMapRef} className="relative flex-1 overflow-hidden bg-slate-950">
+            <div className={`absolute start-3 top-3 z-20 flex items-center gap-2.5 rounded-xl px-3 py-2 ${DARK_PANEL} backdrop-blur`}>
+              <span className="text-body font-extrabold tabular-nums">{arrivalLabel}</span>
+              <span className={`text-micro ${DARK_MUTED}`}>
+                {remainingMeters >= 1000
+                  ? localize(`${(remainingMeters / 1000).toFixed(1)} km left`, `${(remainingMeters / 1000).toFixed(1)} كم متبقٍ`, `${(remainingMeters / 1000).toFixed(1)} km restants`)
+                  : localize(`${remainingMeters} m left`, `${remainingMeters} م متبقية`, `${remainingMeters} m restants`)}
+              </span>
+            </div>
+            <span className={`absolute end-3 top-3 z-20 rounded-xl px-2.5 py-1.5 text-micro font-semibold ${DARK_PANEL} ${DARK_MUTED} backdrop-blur`}>
+              {localize('Advance manually', 'التقدّم يدوياً', 'Avancement manuel')}
+            </span>
           </div>
 
-          <div ref={routeMapRef} className="relative flex-1 bg-slate-950 overflow-hidden">
-            <div className="absolute top-4 left-4 rtl:left-auto rtl:right-4 z-20 flex flex-col items-center bg-slate-900/90 backdrop-blur-md rounded-2xl p-2.5 border border-slate-800 shadow-xl">
-              <div className="text-2xl font-black text-white">{speed === null ? '—' : speed}</div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase">{isAr ? 'عينة سرعة GPS كم/س' : 'GPS speed sample km/h'}</div>
-            </div>
-
-            <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 z-20 max-w-[230px]">
-              <div className="p-2.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800 shadow-xl flex items-center gap-2">
-                <MascotSindbad size="sm" mood="navigating" />
-                <p className="text-[11px] text-slate-200 font-medium leading-tight">
-                  {isAr
-                    ? 'هذه هندسة المسار المحسوبة من نقطة موقعك عند بدء الطلب.'
-                    : 'This route geometry was calculated from your location sample when the route was requested.'}
+          <footer className="shrink-0 border-t border-white/10 bg-slate-900/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+            <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-body font-bold tabular-nums">
+                  {localize(`Step ${currentStepIndex + 1} of ${steps.length}`, `الخطوة ${currentStepIndex + 1} من ${steps.length}`, `Étape ${currentStepIndex + 1} sur ${steps.length}`)}
+                </p>
+                <p className={`truncate text-micro tabular-nums ${DARK_MUTED}`}>
+                  {routeData ? `${routeData.totalDistanceKm} km · ${routeData.durationMinutes} ${localize('min', 'دقيقة', 'min')}` : destinationName}
                 </p>
               </div>
-            </div>
-          </div>
-
-          <div className="z-30 bg-slate-900 border-t border-slate-800 p-4 shadow-2xl">
-            <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xl font-black text-white tracking-tight">
-                  {isAr ? `تقدير المسار: ${routeData?.durationMinutes} دقيقة` : `Route estimate: ${routeData?.durationMinutes} min`}
-                </div>
-                <div className="text-xs text-slate-400 font-medium flex items-center gap-2">
-                  <span>{routeData?.totalDistanceKm} km total</span>
-                  <span>•</span>
-                  <span>Step {currentStepIndex + 1} of {steps.length}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
+              <div className="flex shrink-0 items-center gap-2">
+                <IconButton
+                  label={showTurnList ? localize('Hide steps', 'إخفاء الخطوات', 'Masquer les étapes') : localize('All steps', 'كل الخطوات', 'Toutes les étapes')}
                   onClick={() => setShowTurnList(!showTurnList)}
-                  className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-                  title="View route steps"
+                  variant="onPhoto"
+                  active={showTurnList}
                 >
-                  {showTurnList ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-                </button>
-                <button
-                  onClick={handleAdvanceStep}
-                  className="py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition active:scale-95"
-                >
+                  {showTurnList ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <List className="h-4 w-4" aria-hidden="true" />}
+                </IconButton>
+                <Button size="sm" variant="onPhoto" onClick={() => setNavState('route_selection')}>
+                  {localize('End', 'إنهاء', 'Terminer')}
+                </Button>
+                <Button size="sm" onClick={handleAdvanceStep} trailingIcon={currentStepIndex < steps.length - 1 && <ArrowRight className={`h-3.5 w-3.5 ${isAr ? 'rotate-180' : ''}`} aria-hidden="true" />}>
                   {currentStepIndex < steps.length - 1
-                    ? (isAr ? 'التالي' : 'Next')
-                    : (isAr ? 'إنهاء الإرشادات' : 'Finish Guidance')}
-                </button>
-                <button
-                  onClick={() => setNavState('route_selection')}
-                  className="py-3 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md transition active:scale-95"
-                >
-                  {isAr ? 'إنهاء' : 'End'}
-                </button>
+                    ? localize('Next', 'التالي', 'Suivant')
+                    : localize('Finish', 'إنهاء الإرشادات', 'Terminer')}
+                </Button>
               </div>
             </div>
 
             {showTurnList && (
-              <div className="max-w-xl mx-auto mt-3 pt-3 border-t border-slate-800 space-y-2 max-h-48 overflow-y-auto">
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  {isAr ? 'خطوات المسار' : 'Route Steps'}
-                </div>
-                {steps.map((step, idx) => (
-                  <div
-                    key={step.id}
-                    className={`flex items-center justify-between text-xs p-2.5 rounded-xl ${
-                      idx === currentStepIndex
-                        ? 'bg-blue-950/80 border border-blue-800 text-blue-200 font-bold'
-                        : 'text-slate-400 bg-slate-800/40'
-                    }`}
-                  >
-                    <span>{step.instruction}</span>
-                    <span className="font-mono text-[11px] shrink-0">{step.distanceMeters}m</span>
-                  </div>
-                ))}
-              </div>
+              <ul className="mx-auto mt-3 max-h-44 max-w-xl space-y-1 overflow-y-auto border-t border-white/10 pt-2.5">
+                {steps.map((step, index) => {
+                  const Icon = turnIcon(step.iconType);
+                  return (
+                    <li
+                      key={step.id}
+                      className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-caption ${
+                        index === currentStepIndex ? 'bg-brand-soft text-brand-300' : index < currentStepIndex ? 'text-white/35' : 'text-white/70'
+                      }`}
+                    >
+                      <Icon className={`h-3.5 w-3.5 shrink-0 ${isAr && (step.iconType === 'left' || step.iconType === 'right') ? '-scale-x-100' : ''}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{step.instruction}</span>
+                      <span className="shrink-0 tabular-nums">{step.distanceMeters}m</span>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </div>
+          </footer>
         </div>
       )}
 
       {navState === 'arrived' && (
-        <div className="flex-1 flex flex-col justify-between max-w-xl mx-auto w-full p-4 sm:p-6 overflow-y-auto animate-in zoom-in-95">
-          <div className="text-center pt-2">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 mb-3">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h1 className="text-2xl font-black text-white">
-              {isAr ? 'اكتملت إرشادات المسار' : 'Route Guidance Complete'}
+        <div className="mx-auto flex w-full max-w-xl flex-1 flex-col overflow-y-auto px-4 pb-6 pt-8 sm:px-6">
+          <div className="text-center">
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-positive/15 text-positive ring-1 ring-positive/30">
+              <CheckCircle2 className="h-7 w-7" aria-hidden="true" />
+            </span>
+            <h1 className="mt-3 text-h1 font-extrabold tracking-tight">
+              {localize('Guidance complete', 'اكتملت الإرشادات', 'Guidage terminé')}
             </h1>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              {isAr
-                ? 'هذا لا يؤكد وصولك الفعلي. سجّل الوصول فقط إذا كنت في المكان.'
-                : 'This does not confirm physical arrival. Check in only if you are actually at the place.'}
+            <p className={`mx-auto mt-1.5 max-w-sm text-caption leading-relaxed ${DARK_MUTED}`}>
+              {localize(
+                'This does not confirm physical arrival. Check in only if you are at the place.',
+                'هذا لا يؤكد وصولك الفعلي. سجّل الوصول فقط إذا كنت في المكان.',
+                'Ceci ne confirme pas votre arrivée physique. Enregistrez-vous uniquement si vous êtes sur place.',
+              )}
             </p>
           </div>
 
-          <div className="my-4 rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl relative">
-            {photoUploaded ? (
-              <img src={photoUploaded} alt={destination.name} className="w-full h-52 object-cover" />
-            ) : (
-              <PlaceVisual place={destination} language={language} className="h-52 w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white">
-              <div>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-600">
-                  {destination.rankText || destination.category}
-                </span>
-                <h3 className="text-lg font-bold mt-1">{destination.name}</h3>
-                <p className="text-xs text-slate-300">{destination.area}</p>
+          <article className={`relative mt-5 overflow-hidden rounded-3xl ${DARK_PANEL}`}>
+            <div className="h-40 w-full">
+              {photoUploaded ? (
+                <img src={photoUploaded} alt={destinationName} className="h-full w-full object-cover" />
+              ) : (
+                <PlaceVisual place={destination} language={language} className="h-full w-full" imageClassName="h-full w-full object-cover" showFallbackLabel={false} />
+              )}
+            </div>
+            <div className="sindbad-photo-scrim absolute inset-x-0 bottom-0 h-2/3" aria-hidden="true" />
+            <div className="absolute inset-x-3.5 bottom-3 flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                {destination.rankText && <Chip tone="onPhoto" className="mb-1">{destination.rankText}</Chip>}
+                <h2 className="truncate text-title font-bold text-white">{destinationName}</h2>
+                <p className={`truncate text-micro ${DARK_MUTED}`}>{destination.area}</p>
               </div>
               <button
+                type="button"
                 onClick={() => onSavePlace(destination.id)}
-                className={`p-3 rounded-full backdrop-blur-md transition ${
-                  isSaved ? 'bg-rose-500 text-white' : 'bg-black/50 hover:bg-black/70 text-white'
+                aria-pressed={isSaved}
+                aria-label={isSaved ? localize('Remove from saved', 'إزالة من المحفوظات', 'Retirer des favoris') : localize('Save place', 'حفظ المكان', 'Enregistrer le lieu')}
+                className={`sindbad-hit-expand flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 backdrop-blur transition-colors ${
+                  isSaved ? 'bg-negative-fill text-negative-ink' : 'bg-scrim/55 text-white hover:bg-scrim/75'
                 }`}
               >
-                <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
+                <svg viewBox="0 0 24 24" className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`} stroke="currentColor" strokeWidth="2" fill="none" aria-hidden="true">
+                  <path d="M12 20s-7-4.6-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5C19 15.4 12 20 12 20z" />
+                </svg>
               </button>
             </div>
-          </div>
+          </article>
 
           {checkInError && (
-            <div className="mb-3 rounded-2xl border border-rose-800 bg-rose-950/60 px-3 py-2 text-xs font-bold text-rose-200">
+            <p className="mt-3 rounded-lg border border-negative-line/30 bg-negative-line/10 px-3 py-2 text-caption font-semibold text-negative-line" role="alert">
               {checkInError}
-            </div>
+            </p>
           )}
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="mt-4 grid grid-cols-3 gap-2">
             <button
+              type="button"
               onClick={() => void handleCheckIn()}
               disabled={isCheckedIn || isCheckingIn}
-              className={`p-3 rounded-2xl border flex flex-col items-center gap-1 transition text-center ${
+              className={`flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-3 text-center transition-colors ${
                 isCheckedIn
-                  ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
-                  : 'bg-slate-900/80 hover:bg-slate-800 border-slate-800 text-slate-200 disabled:opacity-60'
+                  ? 'border-positive/40 bg-positive/12 text-positive'
+                  : 'border-white/10 bg-white/[0.045] text-white/85 hover:bg-white/[0.08]'
               }`}
             >
-              <CheckCircle2 className={`w-5 h-5 ${isCheckedIn ? 'text-emerald-400' : 'text-blue-400'}`} />
-              <span className="text-xs font-semibold">
-                {isCheckedIn ? t.checkedIn : isCheckingIn ? (isAr ? 'جاري التأكيد...' : 'Confirming...') : t.checkIn}
+              {isCheckingIn ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
+              <span className="text-micro font-bold leading-tight">
+                {isCheckedIn ? t.checkedIn : isCheckingIn ? localize('Confirming…', 'جارٍ التأكيد…', 'Confirmation…') : t.checkIn}
               </span>
             </button>
 
-            <label className="p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 flex flex-col items-center gap-1 cursor-pointer transition text-center">
-              <Camera className="w-5 h-5 text-blue-400" />
-              <span className="text-xs font-semibold text-slate-200">{isAr ? 'معاينة صورة' : 'Preview Photo'}</span>
+            <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.045] px-2 py-3 text-center text-white/85 transition-colors hover:bg-white/[0.08]">
+              <Camera className="h-5 w-5" aria-hidden="true" />
+              <span className="text-micro font-bold leading-tight">{localize('Add photo', 'أضف صورة', 'Ajouter une photo')}</span>
               <input
                 type="file"
                 accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                  if (event.target.files?.[0]) {
-                    const url = URL.createObjectURL(event.target.files[0]);
-                    setPhotoUploaded(url);
-                  }
-                }}
+                className="sr-only"
+                onChange={(event) => attachPhoto(event.target.files?.[0])}
               />
             </label>
 
             <button
+              type="button"
               onClick={() => {
-                if (navigator.share) {
-                  void navigator.share({
-                    title: destination.name,
-                    text: `Route guidance for ${destination.name} in My Sindbad.`,
-                  });
-                }
+                if (!canShare) return;
+                void navigator.share({
+                  title: destinationName,
+                  text: localize(
+                    `Route guidance for ${destinationName} in My Sindbad.`,
+                    `إرشادات الوصول إلى ${destinationName} في My Sindbad.`,
+                    `Itinéraire vers ${destinationName} sur My Sindbad.`,
+                  ),
+                });
               }}
-              className="p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 flex flex-col items-center gap-1 transition text-center"
+              disabled={!canShare}
+              title={canShare ? undefined : localize('Sharing is not available in this browser.', 'المشاركة غير متاحة في هذا المتصفح.', 'Le partage n’est pas disponible dans ce navigateur.')}
+              className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.045] px-2 py-3 text-center text-white/85 transition-colors hover:bg-white/[0.08] disabled:opacity-40"
             >
-              <Share2 className="w-5 h-5 text-sky-400" />
-              <span className="text-xs font-semibold text-slate-200">Share</span>
+              <ArrowDown className="h-5 w-5 rotate-180" aria-hidden="true" />
+              <span className="text-micro font-bold leading-tight">{localize('Share', 'مشاركة', 'Partager')}</span>
             </button>
           </div>
 
-          <div className="mb-4 p-3.5 rounded-2xl bg-blue-950/60 border border-blue-800/60 flex items-center gap-3">
-            <MascotSindbad size="sm" mood="celebrating" />
-            <p className="text-xs text-blue-200 leading-relaxed">
-              <strong>{isAr ? 'معلومة عن المكان:' : 'Place note:'}</strong>{' '}
-              {destination.formationInfo || destination.description}
-            </p>
-          </div>
+          {(destination.description || destination.formationInfo) && (
+            <div className={`mt-4 p-3.5 ${DARK_PANEL}`}>
+              <h3 className="text-label font-bold uppercase tracking-wide text-white/55">
+                {localize('About this place', 'عن هذا المكان', 'À propos de ce lieu')}
+              </h3>
+              <p className="mt-1 text-caption leading-relaxed text-white/85">
+                {isAr && destination.formationInfoAr
+                  ? destination.formationInfoAr
+                  : destination.formationInfo || destination.description}
+              </p>
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <button
+          <div className="mt-5 space-y-2">
+            <Button
               id="arrived-explore-btn"
+              full
+              size="lg"
               onClick={() => onArrivedExplore(destination)}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md transition active:scale-98"
+              trailingIcon={<ChevronUp className={`h-4 w-4 -rotate-90 ${isAr ? 'rotate-90' : ''}`} aria-hidden="true" />}
             >
-              {isAr ? 'فتح تفاصيل المكان' : 'Open Place Details'}
-            </button>
+              {localize('Open place details', 'فتح تفاصيل المكان', 'Voir le détail du lieu')}
+            </Button>
             <button
+              type="button"
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-semibold transition"
+              className={`h-10 w-full rounded-lg text-caption font-semibold ${DARK_MUTED} transition-colors hover:bg-white/[0.06] hover:text-white`}
             >
               {t.closeNav}
             </button>

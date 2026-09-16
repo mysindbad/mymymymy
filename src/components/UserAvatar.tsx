@@ -5,6 +5,8 @@ interface UserAvatarProps {
   avatarUrl?: string | null;
   className?: string;
   textClassName?: string;
+  /** `onDark` keeps initials legible above photo or night surfaces. */
+  tone?: 'surface' | 'onDark';
 }
 
 function isHttpUrl(value: string | null | undefined): value is string {
@@ -21,6 +23,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   avatarUrl,
   className = 'h-10 w-10',
   textClassName = 'text-sm',
+  tone = 'surface',
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -29,14 +32,21 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       <img
         src={avatarUrl}
         alt={name ? `${name} avatar` : 'Traveler avatar'}
-        className={`${className} rounded-full object-cover`}
+        loading="lazy"
+        decoding="async"
+        className={`${className} shrink-0 rounded-full bg-surface-sunken object-cover`}
         onError={() => setImageFailed(true)}
       />
     );
   }
 
   return (
-    <div className={`${className} rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white font-bold ${textClassName}`}>
+    <div
+      aria-hidden="true"
+      className={`${className} flex shrink-0 items-center justify-center overflow-hidden rounded-full ${
+        tone === 'onDark' ? 'bg-white/15 text-white' : 'bg-brand-soft text-brand-accent'
+      } font-bold ${textClassName}`}
+    >
       {getInitials(name)}
     </div>
   );

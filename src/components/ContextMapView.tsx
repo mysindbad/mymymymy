@@ -1,9 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapPin, Navigation, Search } from 'lucide-react';
+import { List, MapPin, Navigation } from 'lucide-react';
 import { Place } from '../types';
 import { SupportedLanguage } from '../data/translations';
 import type { UserLocation } from '../hooks/useGeolocation';
+import { useLocale } from '../lib/i18n';
+import { placeDisplayName, placeSubtitle, categoryLabel } from '../lib/placeView';
+import { PlaceVisual } from './PlaceVisual';
+import { Button, IconButton } from '../ui/Button';
+import { FilterChip } from '../ui/Chip';
+import { EmptyState } from '../ui/Feedback';
 
 interface ContextMapViewProps {
   places: Place[];
@@ -13,6 +19,8 @@ interface ContextMapViewProps {
   initialQuery?: string;
   initialCategory?: string;
   userLocation?: UserLocation | null;
+  isLoading?: boolean;
+  onOpenList?: () => void;
 }
 
 const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -33,7 +41,11 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
   initialQuery = '',
   initialCategory = 'All',
   userLocation = null,
+  isLoading = false,
+  onOpenList,
 }) => {
+  const locale = useLocale(language);
+  const t = locale.t;
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
@@ -44,9 +56,6 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState(initialCategory || 'All');
   const [activePlace, setActivePlace] = useState<Place | null>(null);
-  const isAr = language === 'ar';
-  const isFr = language === 'fr';
-  const t = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
 
   useEffect(() => {
     setQuery(initialQuery);
@@ -133,7 +142,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
       radius: 8,
       color: '#ffffff',
       weight: 3,
-      fillColor: '#2563eb',
+      fillColor: '#1d47cf',
       fillOpacity: 1,
     }).addTo(map);
     marker.bindTooltip(t('Your location', 'موقعك', 'Votre position'));
@@ -154,11 +163,11 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
         radius: isActive ? 9 : 7,
         color: '#ffffff',
         weight: 2,
-        fillColor: isActive ? '#1d4ed8' : '#2563eb',
+        fillColor: isActive ? '#1d47cf' : '#3462e8',
         fillOpacity: 0.96,
       }).addTo(layer);
       const label = document.createElement('span');
-      label.textContent = isAr && place.arabicName ? place.arabicName : isFr && place.frenchName ? place.frenchName : place.name;
+      label.textContent = placeDisplayName(place, locale.language);
       marker.bindTooltip(label, {
         permanent: visiblePlaces.length <= 20,
         direction: 'top',
@@ -183,27 +192,96 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
   const categories = useMemo(() => Array.from(new Set(places.map((place) => place.category))), [places]);
 
   return (
-    <div className="relative h-[calc(100vh-118px)] w-full overflow-hidden" dir={isAr ? 'rtl' : 'ltr'}>
-      <div ref={mapContainerRef} className="h-full w-full bg-slate-200" data-map-tile-fallback="enabled" />
-      <div className="absolute inset-x-3 top-3 z-[500] mx-auto flex max-w-xl gap-2 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur">
-        <Search className="ms-1 mt-2 h-4 w-4 shrink-0 text-slate-400" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Search map', 'ابحث في الخريطة', 'Rechercher sur la carte')} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-        <select value={category} onChange={(event) => setCategory(event.target.value)} className="max-w-32 rounded-xl border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 outline-none">
-          <option value="All">{t('All', 'الكل', 'Tous')}</option>
-          {categories.map((value) => <option key={value} value={value}>{value.replace('_', ' ')}</option>)}
-        </select>
-      </div>
+    <div
+      className="relative h-[calc(100dvh-var(--sindbad-chrome-h)-var(--sindbad-header-h))] w-full overflow-hidden bg-surface-sunken"
+      dir="ltr"
+    >
+      <div ref={mapContainerRef} className="h-full w-full" data-map-tile-fallback="enabled" />
 
-      {!userLocation && places.length === 0 && (
-        <div className="absolute inset-x-4 top-24 z-[500] mx-auto max-w-sm rounded-2xl border border-slate-200 bg-white/95 p-4 text-center text-sm font-bold text-slate-600 shadow-lg">
-          <MapPin className="mx-auto mb-2 h-5 w-5 text-blue-600" />
-          {t('Share your location or search for a destination first.', 'شارك موقعك أو ابحث عن وجهة أولاً.', 'Partagez votre localisation ou recherchez d’abord une destination.')}
+      {(isLoading || (places.length === 0 && !activePlace)) && (
+        <div className="pointer-events-none absolute inset-x-0 top-24 z-[500] flex justify-center px-3">
+          {isLoading ? (
+            <p className="sindbad-safe-top pointer-events-auto flex items-center gap-2 rounded-lg border border-line bg-surface/95 px-3 py-2 text-caption font-semibold text-muted shadow-md backdrop-blur">
+              <span className="sindbad-skeleton h-3.5 w-3.5 rounded-full" aria-hidden="true" />
+              {t('Loading places on the map…', 'جارٍ تحميل الأماكن على الخريطة…', 'Chargement des lieux sur la carte…')}
+            </p>
+          ) : (
+            <div className="pointer-events-auto w-full max-w-sm">
+              <EmptyState
+                tone="dashed"
+                icon={<MapPin className="h-5 w-5" aria-hidden="true" />}
+                title={t('Nothing to plot yet', 'لا توجد أماكن لعرضها', 'Rien à afficher pour le moment')}
+                description={t(
+                  'Share your location or search for a destination first.',
+                  'شارك موقعك أو ابحث عن وجهة أولاً.',
+                  'Partagez votre position ou recherchez d’abord une destination.',
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 
+      <div className="absolute inset-x-3 top-3 z-[500] mx-auto max-w-xl space-y-2">
+        <div className="flex items-center gap-1.5 rounded-xl border border-line bg-surface/95 p-1.5 shadow-md backdrop-blur">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('Filter on the map', 'تصفية على الخريطة', 'Filtrer sur la carte')}
+            aria-label={t('Filter places on map', 'تصفية الأماكن على الخريطة', 'Filtrer les lieux sur la carte')}
+            className="h-9 min-w-0 flex-1 bg-transparent px-2 text-body font-medium text-ink outline-none placeholder:text-muted"
+          />
+          {onOpenList && (
+            <Button size="sm" variant="secondary" onClick={onOpenList} icon={<List className="h-3.5 w-3.5" />}>
+              {t('List', 'القائمة', 'Liste')}
+            </Button>
+          )}
+        </div>
+        {categories.length > 0 && (
+          <div className="sindbad-scroll-x">
+            <FilterChip selected={category === 'All'} onClick={() => setCategory('All')}>
+              {t('All', 'الكل', 'Tous')}
+            </FilterChip>
+            {categories.map((value) => (
+              <FilterChip key={value} selected={category === value} onClick={() => setCategory(value)}>
+                {categoryLabel(value, locale.language)}
+              </FilterChip>
+            ))}
+          </div>
+        )}
+      </div>
+
       {activePlace && (
-        <div className="absolute inset-x-3 bottom-5 z-[500] mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl">
-          <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => onSelectPlace(activePlace)} className="min-w-0 flex-1 text-start"><strong className="block truncate text-slate-900">{isAr && activePlace.arabicName ? activePlace.arabicName : isFr && activePlace.frenchName ? activePlace.frenchName : activePlace.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{activePlace.area} · {activePlace.region}</span></button><button type="button" onClick={() => onStartRoute(activePlace)} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"><Navigation className="h-4 w-4" />{t('Go', 'اذهب', 'Aller')}</button></div>
+        <div className="absolute inset-x-3 bottom-3 z-[500] mx-auto max-w-md">
+          <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-2.5 shadow-lg">
+            <button
+              type="button"
+              onClick={() => onSelectPlace(activePlace)}
+              className="flex min-w-0 flex-1 items-center gap-3 text-start"
+              aria-label={t(`Open ${placeDisplayName(activePlace, locale.language)}`, `فتح ${placeDisplayName(activePlace, locale.language)}`, `Ouvrir ${placeDisplayName(activePlace, locale.language)}`)}
+            >
+              <PlaceVisual
+                place={activePlace}
+                language={locale.language}
+                className="h-14 w-14 shrink-0 overflow-hidden rounded-lg"
+                imageClassName="object-cover"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-body font-bold text-ink">{placeDisplayName(activePlace, locale.language)}</span>
+                <span className="block truncate text-micro text-muted">{placeSubtitle(activePlace) || categoryLabel(activePlace.category, locale.language)}</span>
+              </span>
+            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <IconButton label={t('Close preview', 'إغلاق المعاينة', 'Fermer l’aperçu')} size="sm" variant="ghost" onClick={() => setActivePlace(null)}>
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </IconButton>
+              <Button size="sm" onClick={() => onStartRoute(activePlace)} icon={<Navigation className="h-3.5 w-3.5" />}>
+                {t('Go', 'اذهب', 'Aller')}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

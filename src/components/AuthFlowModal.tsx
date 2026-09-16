@@ -1,13 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   CheckCircle2,
   ChevronLeft,
   Eye,
   EyeOff,
-  Lock,
   Mail,
-  User,
   X,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
@@ -15,6 +13,10 @@ import moroccoAuthBg from '../assets/images/morocco_auth_bg.jpg';
 import { SupportedLanguage } from '../data/translations';
 import { LanguageFlagSelector } from './LanguageFlagSelector';
 import { getAuthRedirectUrl, getPasswordRecoveryRedirectUrl, isSupabaseConfigured, supabase } from '../lib/supabase';
+import { useLocale } from '../lib/i18n';
+import { Button, IconButton } from '../ui/Button';
+import { Alert } from '../ui/Feedback';
+import { CheckboxRow, TextInput } from '../ui/Field';
 
 export type AuthScreenType =
   | 'welcome'
@@ -23,6 +25,8 @@ export type AuthScreenType =
   | 'create-account'
   | 'forgot-password'
   | 'reset-password';
+
+type StatusKind = 'error' | 'success' | 'info';
 
 interface AuthFlowModalProps {
   isOpen: boolean;
@@ -41,6 +45,8 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   language = 'en',
   onToggleLanguage,
 }) => {
+  const locale = useLocale(language);
+  const localize = locale.t;
   const [currentScreen, setCurrentScreen] = useState<AuthScreenType>(initialScreen);
   const [screenHistory, setScreenHistory] = useState<AuthScreenType[]>([]);
   const [email, setEmail] = useState('');
@@ -52,12 +58,9 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusKind, setStatusKind] = useState<StatusKind>('error');
   const [isLoading, setIsLoading] = useState(false);
-
-  const isAr = language === 'ar';
-  const isFr = language === 'fr';
-  const localize = (english: string, arabic: string, french: string) =>
-    isAr ? arabic : isFr ? french : english;
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,7 +69,31 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     setStatusMessage(null);
   }, [isOpen, initialScreen]);
 
+  // Escape closes the overlay and focus starts inside the dialog.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const previous = document.activeElement as HTMLElement | null;
+    const timer = window.setTimeout(() => {
+      const target = panelRef.current?.querySelector<HTMLElement>('[data-autofocus]');
+      target?.focus({ preventScroll: true });
+    }, 40);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('keydown', handleKeyDown);
+      previous?.focus?.({ preventScroll: true });
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
+  const setStatus = (message: string | null, kind: StatusKind = 'error') => {
+    setStatusKind(kind);
+    setStatusMessage(message);
+  };
 
   const localizeAuthError = (message: string) => {
     const normalized = message.trim().toLowerCase();
@@ -132,14 +159,14 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     });
     if (error) {
       setIsLoading(false);
-      setStatusMessage(localizeAuthError(error.message));
+      setStatus(localizeAuthError(error.message));
     }
   };
 
   const handleEmailSignIn = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!email || !password) {
-      setStatusMessage(localize('Enter your email and password.', 'أدخل البريد الإلكتروني وكلمة المرور.', 'Saisissez votre e-mail et votre mot de passe.'));
+      setStatus(localize('Enter your email and password.', 'أدخل البريد الإلكتروني وكلمة المرور.', 'Saisissez votre e-mail et votre mot de passe.'));
       return;
     }
     setIsLoading(true);
@@ -147,7 +174,7 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(localizeAuthError(error.message));
+      setStatus(localizeAuthError(error.message));
       return;
     }
     if (data.user) completeAuth(data.user);
@@ -156,19 +183,19 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
   const handleCreateAccount = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!email || !password || !fullName || !country) {
-      setStatusMessage(localize('Complete all required fields.', 'أكمل الحقول المطلوبة.', 'Complétez les champs obligatoires.'));
+      setStatus(localize('Complete all required fields.', 'أكمل الحقول المطلوبة.', 'Complétez les champs obligatoires.'));
       return;
     }
     if (!agreedToTerms) {
-      setStatusMessage(localize('Accept the Terms and Privacy Policy to continue.', 'وافق على الشروط وسياسة الخصوصية للمتابعة.', 'Acceptez les conditions et la politique de confidentialité.'));
+      setStatus(localize('Accept the Terms and Privacy Policy to continue.', 'وافق على الشروط وسياسة الخصوصية للمتابعة.', 'Acceptez les conditions et la politique de confidentialité.'));
       return;
     }
     if (password.length < 6) {
-      setStatusMessage(localize('Password must be at least 6 characters.', 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.', 'Le mot de passe doit comporter au moins 6 caractères.'));
+      setStatus(localize('Password must be at least 6 characters.', 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.', 'Le mot de passe doit comporter au moins 6 caractères.'));
       return;
     }
     if (password !== confirmPassword) {
-      setStatusMessage(localize('Passwords do not match.', 'كلمتا المرور غير متطابقتين.', 'Les mots de passe ne correspondent pas.'));
+      setStatus(localize('Passwords do not match.', 'كلمتا المرور غير متطابقتين.', 'Les mots de passe ne correspondent pas.'));
       return;
     }
 
@@ -181,39 +208,42 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(localizeAuthError(error.message));
+      setStatus(localizeAuthError(error.message));
       return;
     }
     if (data.user && data.session) {
       completeAuth(data.user);
       return;
     }
-    setStatusMessage(localize('Account created. Check your email to confirm it.', 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.', 'Compte créé. Vérifiez votre e-mail pour le confirmer.'));
+    setStatus(localize('Account created. Check your email to confirm it.', 'تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتفعيله.', 'Compte créé. Vérifiez votre e-mail pour le confirmer.'), 'success');
   };
 
   const handleSendResetLink = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!email) {
-      setStatusMessage(localize('Enter your email address.', 'أدخل بريدك الإلكتروني.', 'Saisissez votre adresse e-mail.'));
+      setStatus(localize('Enter your email address.', 'أدخل بريدك الإلكتروني.', 'Saisissez votre adresse e-mail.'));
       return;
     }
     setIsLoading(true);
     setStatusMessage(null);
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: getPasswordRecoveryRedirectUrl() });
     setIsLoading(false);
-    setStatusMessage(error
-      ? localizeAuthError(error.message)
-      : localize('Reset link sent.', 'تم إرسال رابط إعادة التعيين.', 'Lien de réinitialisation envoyé.'));
+    setStatus(
+      error
+        ? localizeAuthError(error.message)
+        : localize('Reset link sent.', 'تم إرسال رابط إعادة التعيين.', 'Lien de réinitialisation envoyé.'),
+      error ? 'error' : 'success',
+    );
   };
 
   const handleUpdatePassword = async (event: React.FormEvent) => {
     event.preventDefault();
     if (password.length < 6) {
-      setStatusMessage(localize('Password must be at least 6 characters.', 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.', 'Le mot de passe doit comporter au moins 6 caractères.'));
+      setStatus(localize('Password must be at least 6 characters.', 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.', 'Le mot de passe doit comporter au moins 6 caractères.'));
       return;
     }
     if (password !== confirmPassword) {
-      setStatusMessage(localize('Passwords do not match.', 'كلمتا المرور غير متطابقتين.', 'Les mots de passe ne correspondent pas.'));
+      setStatus(localize('Passwords do not match.', 'كلمتا المرور غير متطابقتين.', 'Les mots de passe ne correspondent pas.'));
       return;
     }
     setIsLoading(true);
@@ -221,10 +251,10 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
     const { error } = await supabase.auth.updateUser({ password });
     setIsLoading(false);
     if (error) {
-      setStatusMessage(localizeAuthError(error.message));
+      setStatus(localizeAuthError(error.message));
       return;
     }
-    setStatusMessage(localize('Password updated.', 'تم تحديث كلمة المرور.', 'Mot de passe mis à jour.'));
+    setStatus(localize('Password updated.', 'تم تحديث كلمة المرور.', 'Mot de passe mis à jour.'), 'success');
     navigateTo('sign-in-email');
   };
 
@@ -240,178 +270,324 @@ export const AuthFlowModal: React.FC<AuthFlowModalProps> = ({
             ? localize('New Password', 'كلمة مرور جديدة', 'Nouveau mot de passe')
             : '';
 
+  const fields = (
+    <>
+      {currentScreen === 'sign-in-method' && (
+        <div className="space-y-2.5">
+          <Button
+            full
+            variant="secondary"
+            disabled={isLoading}
+            onClick={() => void handleGoogleAuth()}
+            icon={<span className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-sunken text-micro font-black text-brand-accent">G</span>}
+          >
+            {localize('Continue with Google', 'المتابعة عبر Google', 'Continuer avec Google')}
+          </Button>
+          <Button full onClick={() => navigateTo('sign-in-email')} icon={<Mail className="h-4 w-4" />}>
+            {localize('Continue with email', 'المتابعة بالبريد الإلكتروني', 'Continuer par e-mail')}
+          </Button>
+          <Button full variant="quiet" onClick={() => navigateTo('create-account')}>
+            {localize('Create an account', 'إنشاء حساب', 'Créer un compte')}
+          </Button>
+        </div>
+      )}
+
+      {currentScreen === 'sign-in-email' && (
+        <form onSubmit={handleEmailSignIn} className="space-y-3">
+          <TextInput
+            id="auth-signin-email"
+            label={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')}
+            type="email"
+            autoComplete="email"
+            placeholder={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')}
+            value={email}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEmail(event.target.value)}
+          />
+          <PasswordTextInput
+            id="auth-signin-password"
+            label={localize('Password', 'كلمة المرور', 'Mot de passe')}
+            placeholder={localize('Password', 'كلمة المرور', 'Mot de passe')}
+            autoComplete="current-password"
+            value={password}
+            visible={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            onChange={(value: string) => setPassword(value)}
+          />
+          <div className="flex items-center justify-between gap-3 pt-0.5">
+            <button
+              type="button"
+              onClick={() => navigateTo('forgot-password')}
+              className="min-h-11 text-caption font-bold text-brand-accent"
+            >
+              {localize('Forgot password?', 'نسيت كلمة المرور؟', 'Mot de passe oublié ?')}
+            </button>
+            <Button type="submit" data-autofocus disabled={isLoading} loading={isLoading}>
+              {localize('Sign In', 'تسجيل الدخول', 'Se connecter')}
+            </Button>
+          </div>
+          <Button full variant="quiet" onClick={() => navigateTo('create-account')}>
+            {localize('Create an account', 'إنشاء حساب', 'Créer un compte')}
+          </Button>
+        </form>
+      )}
+
+      {currentScreen === 'create-account' && (
+        <form onSubmit={handleCreateAccount} className="space-y-3">
+          <TextInput
+            id="auth-signup-name"
+            label={localize('Full name', 'الاسم الكامل', 'Nom complet')}
+            autoComplete="name"
+            placeholder={localize('Full name', 'الاسم الكامل', 'Nom complet')}
+            value={fullName}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFullName(event.target.value)}
+          />
+          <TextInput
+            id="auth-signup-email"
+            label={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')}
+            type="email"
+            autoComplete="email"
+            placeholder={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')}
+            value={email}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEmail(event.target.value)}
+          />
+          <TextInput
+            id="auth-signup-country"
+            label={localize('Country', 'البلد', 'Pays')}
+            autoComplete="country-name"
+            placeholder={localize('Country', 'البلد', 'Pays')}
+            value={country}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setCountry(event.target.value)}
+          />
+          <PasswordTextInput
+            id="auth-signup-password"
+            label={localize('Password', 'كلمة المرور', 'Mot de passe')}
+            placeholder={localize('Password', 'كلمة المرور', 'Mot de passe')}
+            autoComplete="new-password"
+            hint={localize('At least 6 characters', '6 أحرف على الأقل', 'Au moins 6 caractères')}
+            value={password}
+            visible={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            onChange={(value: string) => setPassword(value)}
+          />
+          <PasswordTextInput
+            id="auth-signup-confirm"
+            label={localize('Confirm password', 'تأكيد كلمة المرور', 'Confirmer le mot de passe')}
+            placeholder={localize('Confirm password', 'تأكيد كلمة المرور', 'Confirmer le mot de passe')}
+            autoComplete="new-password"
+            value={confirmPassword}
+            visible={showConfirmPassword}
+            onToggle={() => setShowConfirmPassword((value) => !value)}
+            onChange={(value: string) => setConfirmPassword(value)}
+          />
+          <CheckboxRow
+            id="auth-signup-terms"
+            checked={agreedToTerms}
+            onChange={setAgreedToTerms}
+            label={localize('I accept the Terms of Service and Privacy Policy.', 'أوافق على شروط الخدمة وسياسة الخصوصية.', 'J’accepte les conditions d’utilisation et la politique de confidentialité.')}
+          />
+          <Button type="submit" full disabled={!agreedToTerms || isLoading} loading={isLoading}>
+            {localize('Create Account', 'إنشاء الحساب', 'Créer le compte')}
+          </Button>
+        </form>
+      )}
+
+      {currentScreen === 'forgot-password' && (
+        <form onSubmit={handleSendResetLink} className="space-y-3">
+          <p className="text-caption leading-relaxed text-muted">
+            {localize(
+              'We email a link to set a new password.',
+              'نرسل لك بالبريد رابطاً لتعيين كلمة مرور جديدة.',
+              'Nous envoyons un lien pour définir un nouveau mot de passe.',
+            )}
+          </p>
+          <TextInput
+            id="auth-forgot-email"
+            label={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')}
+            type="email"
+            autoComplete="email"
+            data-autofocus
+            placeholder={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')}
+            value={email}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setEmail(event.target.value)}
+          />
+          <Button type="submit" full disabled={isLoading} loading={isLoading}>
+            {localize('Send reset link', 'إرسال رابط إعادة التعيين', 'Envoyer le lien')}
+          </Button>
+        </form>
+      )}
+
+      {currentScreen === 'reset-password' && (
+        <form onSubmit={handleUpdatePassword} className="space-y-3">
+          <PasswordTextInput
+            id="auth-reset-password"
+            label={localize('New password', 'كلمة المرور الجديدة', 'Nouveau mot de passe')}
+            placeholder={localize('New password', 'كلمة المرور الجديدة', 'Nouveau mot de passe')}
+            autoComplete="new-password"
+            value={password}
+            visible={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            onChange={(value: string) => setPassword(value)}
+          />
+          <PasswordTextInput
+            id="auth-reset-confirm"
+            label={localize('Confirm password', 'تأكيد كلمة المرور', 'Confirmer le mot de passe')}
+            placeholder={localize('Confirm password', 'تأكيد كلمة المرور', 'Confirmer le mot de passe')}
+            autoComplete="new-password"
+            value={confirmPassword}
+            visible={showConfirmPassword}
+            onToggle={() => setShowConfirmPassword((value) => !value)}
+            onChange={(value: string) => setConfirmPassword(value)}
+          />
+          <ul className="space-y-1">
+            <li className={`flex items-center gap-1.5 text-caption ${password.length >= 6 ? 'font-bold text-positive' : 'text-muted'}`}>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {localize('At least 6 characters', '6 أحرف على الأقل', 'Au moins 6 caractères')}
+            </li>
+            <li className={`flex items-center gap-1.5 text-caption ${password && password === confirmPassword ? 'font-bold text-positive' : 'text-muted'}`}>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {localize('Passwords match', 'كلمتا المرور متطابقتان', 'Les mots de passe correspondent')}
+            </li>
+          </ul>
+          <Button type="submit" full disabled={isLoading} loading={isLoading}>
+            {localize('Update Password', 'تحديث كلمة المرور', 'Mettre à jour')}
+          </Button>
+        </form>
+      )}
+    </>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/75 p-0 backdrop-blur-md sm:p-4">
-      <div className="relative z-10 flex h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-slate-900 shadow-2xl sm:h-auto sm:min-h-[680px] sm:max-h-[92vh] sm:rounded-3xl">
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <img src={moroccoAuthBg} alt="Chefchaouen blue medina backdrop" className="h-full w-full object-cover object-center brightness-[0.82]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/25 via-slate-950/30 to-slate-950/75" />
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-scrim/70 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-heading">
+      <div
+        ref={panelRef}
+        dir={locale.isArabic ? 'rtl' : 'ltr'}
+        className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col overflow-hidden bg-surface shadow-lg sm:min-h-[38rem] sm:rounded-xl sm:border sm:border-line"
+      >
+        <div className="relative h-[168px] shrink-0 overflow-hidden bg-slate-900 sm:h-[196px]">
+          <img src={moroccoAuthBg} alt="" aria-hidden="true" className="h-full w-full object-cover object-center" />
+          <div className="sindbad-photo-scrim absolute inset-0" aria-hidden="true" />
+          <div className="sindbad-safe-top absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2.5 py-2.5">
+            <span className="flex h-9 w-9 items-center justify-center">
+              {currentScreen !== 'welcome' && (
+                <IconButton
+                  icon={<ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden="true" />}
+                  label={localize('Back', 'رجوع', 'Retour')}
+                  variant="onPhoto"
+                  onClick={handleBack}
+                />
+              )}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <LanguageFlagSelector currentLanguage={language} onSelectLanguage={(value) => onToggleLanguage?.(value)} variant="auth" />
+              <IconButton icon={<X className="h-4 w-4" aria-hidden="true" />} label={localize('Close', 'إغلاق', 'Fermer')} variant="onPhoto" onClick={onClose} />
+            </span>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 px-4 pb-3">
+            <BrandLogo size="md" showSlogan language={language} tone="onPhoto" />
+          </div>
         </div>
 
-        <header className="relative z-20 flex items-center justify-between px-4 py-3">
-          <div className="w-10">
-            {currentScreen !== 'welcome' && (
-              <button type="button" onClick={handleBack} aria-label={localize('Back', 'رجوع', 'Retour')} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-slate-950/55 text-white backdrop-blur">
-                <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <LanguageFlagSelector currentLanguage={language} onSelectLanguage={(value) => onToggleLanguage?.(value)} variant="auth" />
-            <button type="button" onClick={onClose} aria-label={localize('Close', 'إغلاق', 'Fermer')} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-slate-950/55 text-white backdrop-blur">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </header>
-
-        <main className="relative z-10 flex flex-1 flex-col overflow-y-auto px-5 pb-6" dir={isAr ? 'rtl' : 'ltr'}>
-          <div className="mx-auto mb-5 mt-1">
-            <BrandLogo size="lg" showSlogan={false} language={language} />
-          </div>
-
+        <div className="flex flex-1 flex-col justify-center px-4 pb-8 pt-5 sm:px-6">
           {statusMessage && (
-            <div className="mx-auto mb-4 w-full max-w-sm rounded-2xl border border-blue-300/30 bg-slate-950/75 px-4 py-3 text-center text-xs font-bold text-white backdrop-blur">
-              {statusMessage}
+            <div className="mb-4">
+              <Alert tone={statusKind}>{statusMessage}</Alert>
             </div>
           )}
 
           {!isSupabaseConfigured && (
-            <div className="mx-auto mb-4 w-full max-w-sm rounded-2xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-center text-xs font-bold text-amber-100 backdrop-blur">
-              {localize(
-                'Accounts are not configured on this deployment yet, so sign-in, saved trips, and reviews are unavailable. You can still search and browse.',
-                'لم يتم إعداد الحسابات على هذه النسخة بعد، لذا تسجيل الدخول والرحلات المحفوظة والمراجعات غير متاحة حالياً. يمكنك متابعة البحث والتصفح.',
-                "Les comptes ne sont pas encore configurés sur ce déploiement, la connexion, les voyages enregistrés et les avis sont indisponibles. Vous pouvez continuer à rechercher et parcourir.",
-              )}
+            <div className="mb-4">
+              <Alert tone="warning" title={localize('Accounts are not configured here', 'الحسابات غير مُعدّة في هذه النسخة', 'Les comptes ne sont pas configurés ici')}>
+                {localize(
+                  'Sign-in, saved trips, and reviews are unavailable. Searching and browsing still work.',
+                  'تسجيل الدخول والرحلات المحفوظة والمراجعات غير متاحة. البحث والتصفح يعملان.',
+                  'La connexion, les voyages enregistrés et les avis sont indisponibles. La recherche et la navigation fonctionnent.',
+                )}
+              </Alert>
             </div>
           )}
 
-          {currentScreen === 'welcome' && (
-            <section className="mx-auto my-auto w-full max-w-sm rounded-[30px] border border-white/30 bg-white/95 p-6 text-center shadow-2xl backdrop-blur-xl">
-              <h1 className="text-2xl font-black text-slate-900">{localize('Your trip starts here', 'رحلتك تبدأ من هنا', 'Votre voyage commence ici')}</h1>
-              <p className="mt-2 text-sm text-slate-600">{localize('Discover nearby places and plan your trip.', 'اكتشف الأماكن القريبة وخطّط رحلتك.', 'Découvrez les lieux proches et planifiez votre voyage.')}</p>
-              <button type="button" onClick={() => navigateTo('sign-in-method')} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-900/20">
-                {localize('Get Started', 'ابدأ الآن', 'Commencer')}
-                <ArrowRight className="h-4 w-4 rtl:rotate-180" />
-              </button>
-              <button type="button" onClick={() => navigateTo('sign-in-email')} className="mt-4 text-xs font-bold text-blue-700 underline underline-offset-4">
-                {localize('I already have an account', 'لدي حساب بالفعل', 'J’ai déjà un compte')}
-              </button>
-            </section>
-          )}
-
-          {currentScreen !== 'welcome' && (
-            <section className="mx-auto my-auto w-full max-w-sm rounded-[30px] border border-white/30 bg-white/95 p-5 shadow-2xl backdrop-blur-xl sm:p-6">
-              <div className="mb-5 text-center">
-                <h2 className="text-xl font-black text-slate-900">{panelTitle}</h2>
+          {currentScreen === 'welcome' ? (
+            <div className="space-y-5">
+              <div>
+                <h1 id="auth-dialog-heading" className="text-h1 font-extrabold tracking-tight text-ink">
+                  {localize('Your trip starts here', 'رحلتك تبدأ من هنا', 'Votre voyage commence ici')}
+                </h1>
+                <p className="mt-1.5 text-body text-muted">
+                  {localize('Discover nearby places and plan your trip.', 'اكتشف الأماكن القريبة وخطّط رحلتك.', 'Découvrez les lieux proches et planifiez votre voyage.')}
+                </p>
+              </div>
+              <div className="space-y-2.5">
+                <Button full data-autofocus onClick={() => navigateTo('sign-in-method')} trailingIcon={<ArrowRight className="h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />}>
+                  {localize('Get Started', 'ابدأ الآن', 'Commencer')}
+                </Button>
+                <Button full variant="secondary" onClick={() => navigateTo('sign-in-email')}>
+                  {localize('I already have an account', 'لدي حساب بالفعل', 'J’ai déjà un compte')}
+                </Button>
+                <Button full variant="quiet" onClick={() => navigateTo('create-account')}>
+                  {localize('Create an account', 'إنشاء حساب', 'Créer un compte')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <h1 id="auth-dialog-heading" className="text-h1 font-extrabold tracking-tight text-ink">
+                  {panelTitle}
+                </h1>
                 {currentScreen === 'sign-in-method' && (
-                  <p className="mt-1.5 text-sm text-slate-600">{localize('Discover your destination and plan your trip with ease.', 'اكتشف وجهتك وخطّط رحلتك بسهولة.', 'Découvrez votre destination et planifiez votre voyage facilement.')}</p>
+                  <p className="mt-1.5 text-body text-muted">
+                    {localize('Discover your destination and plan your trip with ease.', 'اكتشف وجهتك وخطّط رحلتك بسهولة.', 'Découvrez votre destination et planifiez votre voyage facilement.')}
+                  </p>
                 )}
               </div>
-
-              {currentScreen === 'sign-in-method' && (
-                <div className="space-y-3">
-                  <button type="button" disabled={isLoading} onClick={() => void handleGoogleAuth()} className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 disabled:opacity-50">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-sm font-black text-blue-600">G</span>
-                    {localize('Continue with Google', 'المتابعة عبر Google', 'Continuer avec Google')}
-                  </button>
-                  <button type="button" onClick={() => navigateTo('sign-in-email')} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white">
-                    <Mail className="h-4 w-4" />
-                    {localize('Continue with email', 'المتابعة بالبريد الإلكتروني', 'Continuer par e-mail')}
-                  </button>
-                  <button type="button" onClick={() => navigateTo('create-account')} className="w-full py-2 text-xs font-bold text-blue-700">
-                    {localize('Create an account', 'إنشاء حساب', 'Créer un compte')}
-                  </button>
-                </div>
-              )}
-
-              {currentScreen === 'sign-in-email' && (
-                <form onSubmit={handleEmailSignIn} className="space-y-3">
-                  <InputField icon={<Mail className="h-4 w-4" />} type="email" placeholder={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')} value={email} onChange={setEmail} />
-                  <PasswordField placeholder={localize('Password', 'كلمة المرور', 'Mot de passe')} value={password} onChange={setPassword} visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />
-                  <button type="button" onClick={() => navigateTo('forgot-password')} className="text-xs font-bold text-blue-700">{localize('Forgot password?', 'نسيت كلمة المرور؟', 'Mot de passe oublié ?')}</button>
-                  <button type="submit" disabled={isLoading} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">{localize('Sign In', 'تسجيل الدخول', 'Se connecter')}</button>
-                  <button type="button" onClick={() => navigateTo('create-account')} className="w-full py-1 text-xs font-bold text-slate-600">{localize('Create an account', 'إنشاء حساب', 'Créer un compte')}</button>
-                </form>
-              )}
-
-              {currentScreen === 'create-account' && (
-                <form onSubmit={handleCreateAccount} className="space-y-3">
-                  <InputField icon={<User className="h-4 w-4" />} placeholder={localize('Full name', 'الاسم الكامل', 'Nom complet')} value={fullName} onChange={setFullName} />
-                  <InputField icon={<Mail className="h-4 w-4" />} type="email" placeholder={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')} value={email} onChange={setEmail} />
-                  <InputField placeholder={localize('Country', 'البلد', 'Pays')} value={country} onChange={setCountry} />
-                  <PasswordField placeholder={localize('Password', 'كلمة المرور', 'Mot de passe')} value={password} onChange={setPassword} visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />
-                  <PasswordField placeholder={localize('Confirm password', 'تأكيد كلمة المرور', 'Confirmer le mot de passe')} value={confirmPassword} onChange={setConfirmPassword} visible={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
-                  <label className="flex cursor-pointer items-start gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-                    <input type="checkbox" checked={agreedToTerms} onChange={(event) => setAgreedToTerms(event.target.checked)} className="mt-0.5" />
-                    <span>{localize('I accept the Terms of Service and Privacy Policy.', 'أوافق على شروط الخدمة وسياسة الخصوصية.', 'J’accepte les conditions d’utilisation et la politique de confidentialité.')}</span>
-                  </label>
-                  <button type="submit" disabled={!agreedToTerms || isLoading} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:opacity-40">{localize('Create Account', 'إنشاء الحساب', 'Créer le compte')}</button>
-                </form>
-              )}
-
-              {currentScreen === 'forgot-password' && (
-                <form onSubmit={handleSendResetLink} className="space-y-3">
-                  <InputField icon={<Mail className="h-4 w-4" />} type="email" placeholder={localize('Email address', 'البريد الإلكتروني', 'Adresse e-mail')} value={email} onChange={setEmail} />
-                  <button type="submit" disabled={isLoading} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">{localize('Send reset link', 'إرسال رابط إعادة التعيين', 'Envoyer le lien')}</button>
-                </form>
-              )}
-
-              {currentScreen === 'reset-password' && (
-                <form onSubmit={handleUpdatePassword} className="space-y-3">
-                  <PasswordField placeholder={localize('New password', 'كلمة المرور الجديدة', 'Nouveau mot de passe')} value={password} onChange={setPassword} visible={showPassword} onToggle={() => setShowPassword((value) => !value)} />
-                  <PasswordField placeholder={localize('Confirm password', 'تأكيد كلمة المرور', 'Confirmer le mot de passe')} value={confirmPassword} onChange={setConfirmPassword} visible={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
-                  <div className="space-y-1 text-[11px] text-slate-500">
-                    <p className={password.length >= 6 ? 'text-emerald-600' : ''}><CheckCircle2 className="me-1 inline h-3 w-3" />{localize('At least 6 characters', '6 أحرف على الأقل', 'Au moins 6 caractères')}</p>
-                    <p className={password && password === confirmPassword ? 'text-emerald-600' : ''}><CheckCircle2 className="me-1 inline h-3 w-3" />{localize('Passwords match', 'كلمتا المرور متطابقتان', 'Les mots de passe correspondent')}</p>
-                  </div>
-                  <button type="submit" disabled={isLoading} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:opacity-50">{localize('Update Password', 'تحديث كلمة المرور', 'Mettre à jour')}</button>
-                </form>
-              )}
-            </section>
+              {fields}
+            </div>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );
 };
 
-const InputField: React.FC<{
-  icon?: React.ReactNode;
-  type?: string;
+interface PasswordTextInputProps {
+  id: string;
+  label: string;
   placeholder: string;
   value: string;
-  onChange: (value: string) => void;
-}> = ({ icon, type = 'text', placeholder, value, onChange }) => (
-  <label className="relative block">
-    {icon && <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span>}
-    <input
-      type={type}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      className={`w-full rounded-2xl border border-slate-200 bg-white py-3 pe-4 text-sm text-slate-800 outline-none focus:border-blue-500 ${icon ? 'ps-10' : 'ps-4'}`}
-    />
-  </label>
-);
-
-const PasswordField: React.FC<{
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
+  autoComplete?: string;
+  hint?: string;
   visible: boolean;
   onToggle: () => void;
-}> = ({ placeholder, value, onChange, visible, onToggle }) => (
-  <label className="relative block">
-    <Lock className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-    <input
-      type={visible ? 'text' : 'password'}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      className="w-full rounded-2xl border border-slate-200 bg-white py-3 ps-10 pe-11 text-sm text-slate-800 outline-none focus:border-blue-500"
-    />
-    <button type="button" onClick={onToggle} className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400" aria-label={visible ? 'Hide password' : 'Show password'}>
-      {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-    </button>
-  </label>
-);
+  onChange: (value: string) => void;
+}
+
+function PasswordTextInput({ id, label, placeholder, value, autoComplete, hint, visible, onToggle, onChange }: PasswordTextInputProps) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={id} className="text-label font-semibold text-muted">{label}</label>
+        {hint && <span className="text-micro text-muted">{hint}</span>}
+      </div>
+      <div className="relative mt-1">
+        <input
+          id={id}
+          type={visible ? 'text' : 'password'}
+          value={value}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-11 w-full rounded-lg border border-line-strong bg-surface px-3.5 pe-11 text-body text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={visible ? 'Hide password' : 'Show password'}
+          aria-pressed={visible}
+          className="absolute end-0.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-muted hover:text-ink"
+        >
+          {visible ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+        </button>
+      </div>
+    </div>
+  );
+}
