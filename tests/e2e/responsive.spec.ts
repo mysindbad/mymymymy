@@ -144,6 +144,19 @@ const PROBE = (options: ProbeOptions) => {
   const name = (el: Element) => `${el.tagName.toLowerCase()}${(el as HTMLElement).id ? '#' + (el as HTMLElement).id : ''} "${label(el)}"`;
   const interactive = 'a[href], button, [role="button"], input:not([type=hidden]), select, textarea, summary';
 
+  // Leaflet lays a tile grid wider than the viewport and slides it under a clipped container,
+  // so tiles outside the visible area are deliberately off-screen: measured at 390px with 2x
+  // text and 81 tiles requested, documentElement.scrollWidth stayed equal to innerWidth while
+  // 12 tile <img> boxes sat past the edges. Exempt exactly that - elements rendered inside a
+  // map pane whose container clips them. Controls, popups, attribution, and every application
+  // surface stay measured, and a map that ever stopped clipping would stop being exempt.
+  const clippedMapInternals = (el: Element) => {
+    const pane = el.closest('.leaflet-map-pane, .leaflet-tile-pane, .leaflet-tile-container');
+    if (!pane) return false;
+    const map = el.closest('.leaflet-container');
+    return !!map && /hidden|clip/.test(getComputedStyle(map).overflow);
+  };
+
   // Persistent chrome (sticky header row, fixed bottom bar) may overlay a control at the
   // current scroll offset. Top chrome is recoverable by scrolling; the bottom bar is not.
   const chromeBandCovering = (el: Element): 'top' | 'bottom' | 'other' | null => {
@@ -168,7 +181,7 @@ const PROBE = (options: ProbeOptions) => {
   if (opts.walk) for (const el of document.querySelectorAll('body *')) {
     if (!visible(el)) continue;
     const r = el.getBoundingClientRect();
-    if (r.width < window.innerWidth - 2 && (r.right > vw + 1.5 || r.left < -1.5) && !el.closest('.sindbad-scroll-x')) {
+    if (r.width < window.innerWidth - 2 && (r.right > vw + 1.5 || r.left < -1.5) && !el.closest('.sindbad-scroll-x') && !clippedMapInternals(el)) {
       overflowing.push(`${name(el)} ${Math.round(r.left)}→${Math.round(r.right)}`);
     }
     const node = el as HTMLElement;
