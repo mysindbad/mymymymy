@@ -98,7 +98,10 @@ test('the traveller sign-in flow still opens on the welcome screen and still off
   const context = await browser.newContext({ viewport: { width: 1280, height: 860 } });
   const page = await travellerApp(context);
 
-  await page.getByRole('button', { name: /^(sign in|تسجيل الدخول|se connecter)$/i }).first().click();
+  // The Profile screen carries a plainly-labelled Sign in control (the home header's control
+  // includes the avatar in its accessible name, which is not a stable thing to assert on).
+  await page.locator('#tab-profile').click();
+  await page.getByRole('button', { name: /^(sign in|تسجيل الدخول|se connecter)$/i }).click();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -112,12 +115,18 @@ test('the traveller sign-in flow still opens on the welcome screen and still off
   await context.close();
 });
 
-test('an anonymous visitor is still refused at /admin and can still leave for the app', async ({ browser }) => {
+test('an operator whose account is not on the roster can sign out or go back to the app', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await adminGate(context);
+  const store = createStore({});
+  await mockAdminApi(context, 'user', store);
+  const page = await context.newPage();
+  await page.goto('/admin');
+  await expect(page.locator('.sindbad-admin')).toBeVisible();
 
-  await expect(page.locator('body')).toContainText(/administrator sign-in/i);
-  // "Back to the app" is a real way out of the gate, not a dead control.
+  // The denial is stated, and the two ways out of it are real controls rather than dead ends.
+  await expect(page.locator('body')).toContainText(/not open to your account/i);
+  await expect(page.getByRole('button', { name: /^(switch account|تغيير الحساب|changer de compte)$/i })).toBeVisible();
+
   await page.getByRole('button', { name: /^(back to the app|العودة إلى التطبيق|retour à l’app)$/i }).click();
   await expect(page.locator('#tab-home')).toBeVisible({ timeout: 15_000 });
 
