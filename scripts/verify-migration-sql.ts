@@ -24,12 +24,13 @@
  *   Arm 2 - deterministic structural rules that hold even without the parser: dollar-quote
  *           delimiter collisions, `INSERT ... VALUES ... WHERE`, and migration-history drift.
  *
- * Migration-history alignment is part of the same gate because live Supabase recorded this
- * migration as version 20260917115914. A repository file under any other name would re-apply the
- * same schema under a second version, so the name is asserted, not documented.
+ * Migration history is part of the same gate because live Supabase recorded this migration as
+ * version 20260917115914: a repository file under any other name would re-apply the same schema
+ * under a second version, so the name is asserted, not documented. The assertion is about that
+ * identity only - a migration at a later timestamp is expected and allowed.
  */
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, parsePlPgSQL } from '@libpg-query/parser';
 
@@ -49,7 +50,6 @@ const OWNED_OBJECTS = [
 ];
 
 const RETIRED_NAMES: string[] = [RETIRED_MIGRATION];
-const RETIRED_VERSIONS: string[] = ['20260918090000'];
 
 /** Clauses PostgreSQL allows between a function's closing dollar quote and the `;`. */
 const FUNCTION_TAIL =
@@ -417,53 +417,73 @@ const MUST_PASS = [
 ];
 
 // --------------------------------------------------------------------- migration history
-function assertMigrationHistory(): string {
-  const files = readdirSync(MIGRATIONS_DIR).filter((name) => name.endsWith('.sql')).sort();
+type MigrationFile = { name: string; sql: string };
 
-  if (!files.includes(EXPECTED_MIGRATION)) {
-    throw new Error(
-      `${MIGRATIONS_DIR} must contain ${EXPECTED_MIGRATION}: live Supabase recorded this ` +
-        `migration under version ${EXPECTED_VERSION}, so any other name applies the same schema ` +
-        `again under a second version. Found: ${files.join(', ')}`,
+function readMigrationFiles(dir: string): MigrationFile[] {
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((name) => ({ name, sql: readFileSync(join(dir, name), 'utf8') }));
+}
+
+/**
+ * Migration-history rules, expressed over a list of files so the same code runs against the real
+ * migrations directory and against fixtures.
+ *
+ * These rules are about *this* migration's identity, never about ordering. An earlier version of
+ * this gate rejected any migration whose version was `>=` the admin migration's, on the theory that
+ * application order had to match live history. That is wrong: timestamps only ever move forward, so
+ * a later migration is the normal case, and the rule would have failed CI forever on the next
+ * legitimate one. What must not move is the Admin Control Center migration's own name and the
+ * objects it owns:
+ *
+ *   1. `20260917115914_admin_control_center.sql` stays exactly as named (the live version);
+ *   2. the retired `20260918090000_admin_control_center.sql` never returns;
+ *   3. no other migration redeclares the schema this one owns;
+ *   4. the admin migration is not renamed to another timestamp/version;
+ *   5. future migrations, at any later timestamp, are allowed.
+ */
+function historyErrors(files: MigrationFile[]): string[] {
+  const errors: string[] = [];
+  const names = files.map((file) => file.name);
+
+  // 1 + 4. The file live Supabase recorded, under that exact name. A renamed copy is a second
+  //        application of the same schema under a second version, so it fails here as well.
+  if (!names.includes(EXPECTED_MIGRATION)) {
+    errors.push(
+      `${MIGRATIONS_DIR} must contain ${EXPECTED_MIGRATION}: live Supabase recorded this migration ` +
+        `under version ${EXPECTED_VERSION}, so a different name applies the same schema again and ` +
+        `drifts from production history. Found: ${names.join(', ')}`,
     );
   }
 
-  const duplicates = files.filter((name) => name !== EXPECTED_MIGRATION && /admin_control_center/i.test(name));
-  if (duplicates.length > 0) {
-    throw new Error(`${MIGRATIONS_DIR} must not contain a second admin control centre migration: ${duplicates.join(', ')}`);
-  }
-
-  for (const retired of RETIRED_NAMES) {
-    if (existsSync(join(MIGRATIONS_DIR, retired))) {
-      throw new Error(`${MIGRATIONS_DIR}/${retired} was retired and must not come back`);
-    }
-  }
-
-  // The schema may be declared once, in the versioned file above and nowhere else.
-  for (const marker of OWNED_OBJECTS) {
-    const owners = files.filter((name) => readFileSync(join(MIGRATIONS_DIR, name), 'utf8').includes(marker));
-    if (owners.length !== 1 || owners[0] !== EXPECTED_MIGRATION) {
-      throw new Error(`"${marker}" must be declared only in ${EXPECTED_MIGRATION}; found it in: ${owners.join(', ') || 'nothing'}`);
-    }
-  }
-
-  // Supabase applies migrations in filename order, so the recorded version has to be the newest.
-  for (const name of files) {
+  // 2. The retired name, and any other second admin control centre migration.
+  for (const name of names) {
     if (name === EXPECTED_MIGRATION) continue;
-    const version = /^(\d+)/.exec(name)?.[1];
-    if (!version) throw new Error(`${MIGRATIONS_DIR}/${name} has no version prefix`);
-    if (version >= EXPECTED_VERSION) {
-      throw new Error(
-        `${MIGRATIONS_DIR}/${name} (${version}) sorts at or after ${EXPECTED_VERSION}; ` +
-          `${EXPECTED_MIGRATION} must stay the newest migration so application order matches live history`,
+    if (RETIRED_NAMES.includes(name)) {
+      errors.push(`${name} is the retired name of this migration and must never come back`);
+      continue;
+    }
+    if (/admin_control_center/i.test(name)) {
+      errors.push(
+        `${name} is a second admin control centre migration; there must be exactly one, named ${EXPECTED_MIGRATION}`,
       );
     }
-    if (RETIRED_VERSIONS.includes(version)) {
-      throw new Error(`${MIGRATIONS_DIR}/${name} reuses the retired version ${version}`);
+  }
+
+  // 3. The schema this migration owns is declared once, in that file and nowhere else - including
+  //    a later migration that redeclares it, which the ordering rule used to hide.
+  for (const marker of OWNED_OBJECTS) {
+    const owners = files.filter((file) => file.sql.includes(marker)).map((file) => file.name);
+    if (owners.length !== 1 || owners[0] !== EXPECTED_MIGRATION) {
+      errors.push(
+        `"${marker}" must be declared only in ${EXPECTED_MIGRATION}; found it in: ${owners.join(', ') || 'nothing'}`,
+      );
     }
   }
 
-  return join(MIGRATIONS_DIR, EXPECTED_MIGRATION);
+  // 5. Deliberately absent: no rule constrains a migration's version relative to this one.
+  return errors;
 }
 
 // --------------------------------------------------------------------- run
@@ -474,11 +494,20 @@ function report(label: string, errors: string[]) {
   process.exitCode = 1;
 }
 
-const migrationPath = assertMigrationHistory();
-const migrationSql = readFileSync(migrationPath, 'utf8');
+const realFiles = readMigrationFiles(MIGRATIONS_DIR);
+const adminFile = realFiles.find((file) => file.name === EXPECTED_MIGRATION);
+const migrationPath = join(MIGRATIONS_DIR, EXPECTED_MIGRATION);
+const migrationSql = adminFile?.sql ?? '';
 
-report(`${migrationPath} (structural rules)`, structuralErrors(migrationSql));
-report(`${migrationPath} (PostgreSQL grammar)`, await grammarErrors(migrationSql));
+report(`${MIGRATIONS_DIR} (migration history)`, historyErrors(realFiles));
+
+if (!adminFile) {
+  // Say what is wrong instead of throwing while opening a file that is not there.
+  report(`${migrationPath} (unreadable)`, [`${EXPECTED_MIGRATION} is missing, so its SQL could not be parsed`]);
+} else {
+  report(`${migrationPath} (structural rules)`, structuralErrors(migrationSql));
+  report(`${migrationPath} (PostgreSQL grammar)`, await grammarErrors(migrationSql));
+}
 
 for (const fixture of MUST_FAIL) {
   const structural = structuralErrors(fixture.sql);
@@ -502,11 +531,90 @@ for (const fixture of MUST_PASS) {
   ]);
 }
 
+// ------------------------------------------------- migration history: the future is not frozen
+// Timestamps only ever move forward, so a later migration is the normal case, not a violation.
+// This gate once rejected every version after 20260917115914, which would have failed CI on the
+// next legitimate migration forever; these fixtures are what stop that from coming back.
+
+const FUTURE_MIGRATION_SQL = `
+  create table if not exists public.traveller_badges (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references auth.users(id) on delete cascade,
+    badge text not null check (length(badge) between 2 and 40),
+    earned_at timestamptz not null default now()
+  );
+
+  create index if not exists traveller_badges_user_idx
+    on public.traveller_badges (user_id, earned_at desc);
+
+  create or replace function public.traveller_badge_count(p_user_id uuid)
+  returns integer
+  language sql
+  stable
+  set search_path = ''
+  as $$
+    select count(*)::integer from public.traveller_badges where user_id = p_user_id;
+  $$;
+
+  create or replace function public.award_traveller_badge(p_user_id uuid, p_badge text)
+  returns void
+  language plpgsql
+  set search_path = ''
+  as $$
+  begin
+    insert into public.traveller_badges (user_id, badge)
+    select p_user_id, p_badge
+    where nullif(trim(coalesce(p_badge, '')), '') is not null;
+  end;
+  $$;
+`;
+
+const FUTURE_MIGRATION: MigrationFile = { name: '20260919000000_future_feature.sql', sql: FUTURE_MIGRATION_SQL };
+
+// A later, unrelated migration must be accepted by the history rules and must be real SQL.
+report(
+  `gate self-check: a later, unrelated migration must be accepted (${FUTURE_MIGRATION.name})`,
+  historyErrors([...realFiles, FUTURE_MIGRATION]),
+);
+report(`gate self-check: ${FUTURE_MIGRATION.name} must be valid PostgreSQL`, await grammarErrors(FUTURE_MIGRATION.sql));
+report(
+  `gate self-check: ${FUTURE_MIGRATION.name} must satisfy the structural rules`,
+  structuralErrors(FUTURE_MIGRATION.sql),
+);
+
+// A later migration is welcome; a later migration that redeclares this schema is not.
+const FUTURE_DUPLICATE: MigrationFile = {
+  name: '20260919000000_future_feature.sql',
+  sql: `${FUTURE_MIGRATION_SQL}\ncreate table if not exists public.admin_accounts (user_id uuid primary key, role text not null);`,
+};
+if (historyErrors([...realFiles, FUTURE_DUPLICATE]).length === 0) {
+  report('gate self-check: a later migration redeclaring the admin schema must still be rejected', [
+    'the history rules accepted a second migration that declares admin-owned objects',
+  ]);
+}
+
+// Nor may the admin migration simply be renamed to a later timestamp.
+const RENAMED_ADMIN_MIGRATION: MigrationFile = { name: '20260919000000_admin_control_center.sql', sql: migrationSql };
+if (historyErrors([...realFiles, RENAMED_ADMIN_MIGRATION]).length === 0) {
+  report('gate self-check: renaming the admin migration to a later version must still be rejected', [
+    'the history rules accepted a renamed copy of the admin control centre migration',
+  ]);
+}
+
+// And the retired name stays retired.
+const RETURNED_RETIRED_MIGRATION: MigrationFile = { name: RETIRED_MIGRATION, sql: migrationSql };
+if (historyErrors([...realFiles, RETURNED_RETIRED_MIGRATION]).length === 0) {
+  report('gate self-check: the retired migration name must still be rejected', [
+    'the history rules accepted the retired 20260918090000_admin_control_center.sql',
+  ]);
+}
+
 if (process.exitCode) {
   console.error('Migration SQL verification failed');
 } else {
   console.log(
     `Migration SQL verification passed (${EXPECTED_MIGRATION}: real PostgreSQL grammar, ` +
-      'dollar-quote and INSERT/VALUES rules, and migration-history alignment, each proven against broken fixtures)',
+      'dollar-quote and INSERT/VALUES rules, migration-history identity, and a later unrelated ' +
+      'migration allowed - each arm proven against broken and valid fixtures)',
   );
 }
