@@ -80,6 +80,7 @@ export function EmptyState({
   action,
   tone = 'neutral',
   className = '',
+  titleAs = 'h3',
 }: {
   icon?: React.ReactNode;
   title: string;
@@ -87,7 +88,10 @@ export function EmptyState({
   action?: React.ReactNode;
   tone?: 'neutral' | 'dashed';
   className?: string;
+  /** Heading level so the component never creates a skipped heading rank inside a screen. */
+  titleAs?: 'h2' | 'h3';
 }) {
+  const Title = titleAs as 'h2';
   return (
     <div
       className={`${tone === 'dashed' ? 'border border-dashed border-line-strong' : ''} flex flex-col items-center justify-center gap-2 rounded-xl bg-surface-muted px-5 py-9 text-center ${className}`}
@@ -97,7 +101,7 @@ export function EmptyState({
           {icon}
         </span>
       )}
-      <h3 className="text-title font-bold text-ink">{title}</h3>
+      <Title className="text-title font-bold text-ink">{title}</Title>
       {description && <p className="max-w-sm text-caption leading-relaxed text-muted">{description}</p>}
       {action && <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{action}</div>}
     </div>

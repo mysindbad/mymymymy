@@ -118,7 +118,7 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
       />
 
       <div className="mx-auto w-full max-w-[44rem] px-4 pt-4 sm:px-6">
-        <section className="flex items-center gap-3.5">
+        <section className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
           <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} className="h-14 w-14" textClassName="text-h2" />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-h2 font-bold tracking-tight text-ink">
@@ -141,12 +141,12 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
           className="px-0 pb-2"
           title={t('Appearance', 'المظهر', 'Apparence')}
           action={appearance !== 'auto' ? (
-            <button type="button" onClick={() => chooseAppearance('auto')} className="text-caption font-bold text-brand-accent">
+            <button type="button" onClick={() => chooseAppearance('auto')} className="inline-flex min-h-11 items-center px-1 text-caption font-bold text-brand-accent">
               {t('Reset', 'إعادة ضبط', 'Réinitialiser')}
             </button>
           ) : undefined}
         />
-        <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="grid-cols-1 grid gap-2.5 sm:grid-cols-2">
           {appearanceOptions.map((option) => (
             <OptionCard
               key={option.value}

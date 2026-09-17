@@ -53,7 +53,7 @@ export const FlightsModal: React.FC<FlightsModalProps> = ({ isOpen, onClose, lan
           )}
         </Alert>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid-cols-1 grid gap-3 sm:grid-cols-2">
           <TextInput id="flight-from" label={t('From', 'من', 'De')} value={fromCity} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setFromCity(event.target.value)} />
           <TextInput id="flight-to" label={t('To', 'إلى', 'À')} value={toCity} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setToCity(event.target.value)} />
         </div>

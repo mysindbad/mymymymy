@@ -119,7 +119,7 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
                 type="button"
                 onClick={onClose}
                 aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-ink"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-muted hover:text-ink pointer-coarse:h-11 pointer-coarse:w-11"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

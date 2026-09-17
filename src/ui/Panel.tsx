@@ -99,7 +99,7 @@ export function Stat({
   const valueTone = tone === 'brand'
     ? 'text-brand-accent'
     : tone === 'warning'
-      ? 'text-caution'
+      ? 'text-caution-strong'
       : tone === 'positive'
         ? 'text-positive'
         : 'text-ink';

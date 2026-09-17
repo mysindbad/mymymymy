@@ -15,6 +15,7 @@ import {
   validateTripExpensePatchPayload,
   validateTripPatchPayload,
 } from './server/dal.ts';
+import { discoverNearbyPlaces } from './server/placeDiscovery.ts';
 
 declare global {
   namespace Express {
@@ -819,6 +820,24 @@ app.post('/api/ai/memory/insights', async (_req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+});
+
+// Same contract as the Vercel function in api/nearby-places.ts, so self-hosted
+// and dev servers keep nearby discovery working instead of falling through.
+app.get('/api/nearby-places', async (req, res, next) => {
+  try {
+    const { latitude, longitude } = validateLatitudeLongitude(req.query.lat, req.query.lng);
+    const places = await discoverNearbyPlaces([latitude, longitude]);
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200');
+    res.json({ places, total: places.length });
+  } catch (error) {
+    if (error instanceof DataValidationError) {
+      next(error);
+      return;
+    }
+    console.warn('nearby-places unavailable:', error instanceof Error ? error.message : error);
+    res.status(503).json({ error: 'Nearby discovery unavailable' });
   }
 });
 

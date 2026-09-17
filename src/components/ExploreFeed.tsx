@@ -156,7 +156,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onOpenPassiveModal} icon={<MapPin className="h-3.5 w-3.5" />}>
             {t('Location', 'الموقع', 'Localisation')}
           </Button>
@@ -204,6 +204,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
           className="mt-4"
           icon={<MapPin className="h-5 w-5" aria-hidden="true" />}
           title={t('Start where you are', 'ابدأ من حيث أنت', 'Commencez là où vous êtes')}
+          titleAs="h2"
           description={t(
             'Share your location or search for a destination.',
             'شارك موقعك أو ابحث عن وجهة.',
@@ -253,7 +254,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
       )}
 
       {!isLoading && visiblePlaces.length > 0 && (
-        <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+        <ul className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
           {visiblePlaces.map((place, index) => (
             <li key={place.id}>
               <PlaceCard

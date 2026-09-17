@@ -20,7 +20,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3 text-label',
+  sm: 'h-9 px-3 text-label pointer-coarse:min-h-11',
   md: 'h-11 px-4 text-body',
   lg: 'h-12 px-5 text-body',
 };
@@ -77,7 +77,7 @@ export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
 }
 
 const ICON_SIZES: Record<ButtonSize, string> = {
-  sm: 'h-9 w-9',
+  sm: 'h-9 w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
   md: 'h-11 w-11',
   lg: 'h-12 w-12',
 };

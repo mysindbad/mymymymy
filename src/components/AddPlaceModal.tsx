@@ -258,7 +258,7 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => setName(event.target.value)}
             placeholder={t('e.g. God’s Bridge viewpoint', 'مثال: نقطة مشاهدة جسر الله', 'Ex. Point de vue du Pont de Dieu')}
           />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid-cols-1 grid gap-3 sm:grid-cols-2">
             <TextInput
               id="add-place-name-ar"
               label={t('Name in Arabic', 'الاسم بالعربية', 'Nom en arabe')}
@@ -286,7 +286,7 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
               </Button>
             }
           />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid-cols-1 grid gap-3 sm:grid-cols-2">
             <TextInput
               id="add-place-region"
               label={t('Region', 'المنطقة', 'Région')}
@@ -371,7 +371,7 @@ export const AddPlaceModal: React.FC<AddPlaceModalProps> = ({
                 value={formationInfo}
                 onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setFormationInfo(event.target.value)}
               />
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid-cols-1 grid gap-3 sm:grid-cols-2">
                 <Select
                   id="add-place-price"
                   label={t('Price', 'السعر', 'Tarif')}

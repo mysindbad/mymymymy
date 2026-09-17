@@ -20,7 +20,7 @@ export function ScreenHeader({ title, subtitle, leading, actions, onBack, backLa
     <header
       className={`${sticky ? 'sticky top-0 z-30 lg:top-14' : ''} border-b border-line bg-surface/92 backdrop-blur-md ${className}`}
     >
-      <div className="sindbad-safe-top mx-auto flex min-h-14 items-center gap-2.5 px-2.5 py-2 sm:px-4">
+      <div className="sindbad-safe-top mx-auto flex min-h-14 flex-wrap items-center gap-x-2.5 gap-y-1 px-2.5 py-2 sm:px-4">
         {onBack && (
           <IconButton
             icon={<ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden="true" />}
@@ -29,11 +29,11 @@ export function ScreenHeader({ title, subtitle, leading, actions, onBack, backLa
           />
         )}
         {leading}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <h1 className="truncate text-title font-bold tracking-tight text-ink">{title}</h1>
           {subtitle && <p className="truncate text-micro font-medium text-muted">{subtitle}</p>}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+        {actions && <div className="ms-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>}
       </div>
     </header>
   );

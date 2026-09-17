@@ -227,8 +227,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <button
                 type="button"
                 onClick={() => (currentUser?.isLoggedIn ? onOpenAccount() : onOpenAuth?.('welcome'))}
-                className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 pe-3 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-                aria-label={localize('Account', 'الحساب', 'Compte')}
+                className="flex min-h-9 items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 pe-3 text-white backdrop-blur-sm transition-colors hover:bg-white/20 pointer-coarse:min-h-11"
               >
                 <UserAvatar name={currentUser?.name} avatarUrl={currentUser?.avatarUrl} className="h-7 w-7" textClassName="text-micro" />
                 <span className="max-w-24 truncate text-label font-bold">
@@ -254,7 +253,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           <form onSubmit={handleSearchSubmit} className="mt-4">
-            <div data-surface="card" className="flex items-center gap-1.5 rounded-full border border-line bg-surface p-1.5 shadow-lg transition-shadow focus-within:border-brand-500 focus-within:shadow-md">
+            <div data-surface="card" className="flex items-center gap-1.5 rounded-full border border-line bg-surface p-1.5 shadow-lg pointer-coarse:gap-2 pointer-coarse:p-2 transition-shadow focus-within:border-brand-500 focus-within:shadow-md">
               <Search className="ms-2 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
               <input
                 ref={searchRef}
@@ -263,20 +262,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder={localize('Search a city or place', 'ابحث عن مدينة أو مكان', 'Rechercher une ville ou un lieu')}
                 aria-label={localize('Search places', 'البحث عن أماكن', 'Rechercher des lieux')}
-                className="min-w-0 flex-1 bg-transparent py-2 text-body font-semibold text-ink outline-none placeholder:font-medium placeholder:text-muted"
+                className="min-w-0 flex-1 bg-transparent py-2 text-body font-semibold text-ink outline-none placeholder:font-medium placeholder:text-muted pointer-coarse:min-h-11"
               />
               <button
                 type="button"
                 onClick={handleMicClick}
                 aria-pressed={isListeningMic}
                 aria-label={localize('Voice assistant', 'المساعد الصوتي', 'Assistant vocal')}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors pointer-coarse:h-11 pointer-coarse:w-11 ${
                   isListeningMic ? 'bg-negative-fill text-negative-ink' : 'text-muted hover:bg-surface-sunken hover:text-ink'
                 }`}
               >
                 <Mic className={`h-4 w-4 ${isListeningMic ? 'animate-[sindbad-pulse_1.1s_ease-in-out_infinite]' : ''}`} aria-hidden="true" />
               </button>
-              <Button type="submit" size="sm" className="h-9 rounded-full px-3.5" icon={<ArrowUpRight className="h-4 w-4" />}>
+              <Button type="submit" size="sm" className="h-9 rounded-full px-3.5 pointer-coarse:h-11" icon={<ArrowUpRight className="h-4 w-4" />}>
                 <span className="sr-only sm:not-sr-only">{localize('Search', 'بحث', 'Chercher')}</span>
               </Button>
             </div>
@@ -312,7 +311,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             type="button"
             onClick={onOpenAIChat}
             id="home-ask-ai-btn"
-            className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-label font-bold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+            className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-label font-bold text-white backdrop-blur-sm transition-colors hover:bg-white/20 pointer-coarse:min-h-11 pointer-coarse:px-4"
           >
             <svg viewBox="0 0 28 28" className="h-4 w-4" aria-hidden="true">
               <path d="M14.6 3.2c3.9 2.7 6.4 6.7 7.2 11.5h-7.2z" fill="rgba(255,255,255,0.92)" />
@@ -366,7 +365,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               id="home-nearby-see-all"
               type="button"
               onClick={() => onNavigateTab('explore')}
-              className="shrink-0 rounded-lg px-2 py-1 text-label font-bold text-brand-accent transition-colors hover:bg-brand-soft"
+              className="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-label font-bold text-brand-accent transition-colors hover:bg-brand-soft pointer-coarse:min-h-11"
             >
               {localize('See all', 'عرض الكل', 'Tout voir')}
             </button>

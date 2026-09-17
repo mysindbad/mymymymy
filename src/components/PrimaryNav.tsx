@@ -78,13 +78,12 @@ export function PrimaryNav({ activeTab, language = 'en', onSelectTab, onOpenMenu
         <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
           <button
             type="button"
-            aria-label={t('Account', 'الحساب', 'Compte')}
             onClick={() => (isSignedIn ? onSelectTab('account') : onOpenAuth?.())}
             className="flex h-10 items-center gap-2 rounded-full border border-line px-2.5 text-label font-bold text-ink transition-colors hover:bg-surface-muted"
           >
             <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} className="h-6 w-6" textClassName="text-micro" />
             <span className="max-w-28 truncate">
-              {isSignedIn && authUser?.name ? authUser.name.split(' ')[0] : t('Sign in', 'تسجيل الدخول', 'Se connecter')}
+              {isSignedIn && authUser?.name ? authUser.name.split(' ')[0] : t('Account', 'الحساب', 'Compte')}
             </span>
           </button>
           <IconButton label={t('More', 'المزيد', 'Plus')} size="sm" variant="ghost" onClick={onOpenMenu}>

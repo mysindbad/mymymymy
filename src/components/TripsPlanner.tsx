@@ -541,7 +541,8 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
                       onClick={() => { if (done) { setPlanError(''); setStep(item.id); } }}
                       disabled={!done && !current}
                       aria-current={current ? 'step' : undefined}
-                      className={`flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors ${done ? 'hover:bg-brand-soft' : ''} disabled:cursor-default`}
+                      aria-label={item.label}
+                      className={`flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${done ? 'hover:bg-brand-soft' : ''} disabled:cursor-default`}
                     >
                       <span
                         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-micro font-bold ${
@@ -604,7 +605,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
                       )}
                     />
                   ) : (
-                    <ul className="grid max-h-80 gap-2 overflow-y-auto pe-0.5 sm:grid-cols-2">
+                    <ul className="grid-cols-1 grid max-h-80 gap-2 overflow-y-auto pe-0.5 sm:grid-cols-2">
                       {places.map((place) => {
                         const isCity = place.id.startsWith('city:');
                         const selected = form.destinationId === place.id;
@@ -627,7 +628,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
               )}
 
               {step === 2 && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid-cols-1 grid gap-4 sm:grid-cols-2">
                   <TextInput
                     id="trip-start-date"
                     type="date"
@@ -655,7 +656,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
               )}
 
               {step === 3 && (
-                <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
+                <div className="grid-cols-1 grid gap-4 sm:grid-cols-[1fr_9rem]">
                   <TextInput
                     id="trip-budget"
                     type="number"
@@ -700,7 +701,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
 
               {step === 5 && (
                 <div className="space-y-3">
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid-cols-1 grid gap-2 sm:grid-cols-2">
                     {preferenceOptions.map((preference) => (
                       <OptionCard
                         key={preference.value}
@@ -780,7 +781,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
               </div>
               <div className="shrink-0 text-end">
                 <p className="text-title font-extrabold text-ink tabular-nums">{plannedTotal.toFixed(2)} {form.currency}</p>
-                <p className={`text-micro font-semibold ${overBudget ? 'text-caution' : 'text-muted'}`}>
+                <p className={`text-micro font-semibold ${overBudget ? 'text-caution-strong' : 'text-muted'}`}>
                   {overBudget
                     ? l(`${(plannedTotal - budgetNumber).toFixed(0)} over`, `أعلى بـ ${(plannedTotal - budgetNumber).toFixed(0)}`, `${(plannedTotal - budgetNumber).toFixed(0)} en dessus`)
                     : l(`of ${budgetNumber.toFixed(0)} budget`, `من ميزانية ${budgetNumber.toFixed(0)}`, `sur un budget de ${budgetNumber.toFixed(0)}`)}
@@ -1008,7 +1009,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
                             )}
                             <div className="flex items-center justify-between border-t border-line pt-2.5 text-caption">
                               <span className="font-semibold text-muted">{l('Left to spend', 'المتبقي', 'Restant')}</span>
-                              <span className={`font-bold tabular-nums ${trip.budget - budget.spentTotal < 0 ? 'text-caution' : 'text-ink'}`}>
+                              <span className={`font-bold tabular-nums ${trip.budget - budget.spentTotal < 0 ? 'text-caution-strong' : 'text-ink'}`}>
                                 {(trip.budget - budget.spentTotal).toFixed(2)} {trip.currency}
                               </span>
                             </div>

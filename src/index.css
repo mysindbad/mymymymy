@@ -112,7 +112,7 @@
   --color-line-strong: #d2dae6;
   --color-ink: #0f1729;
   --color-ink-soft: #39445a;
-  --color-muted: #68748a;
+  --color-muted: #5b677d;
   --color-scrim: #0a1120;
 
   --color-positive: #0a7f59;
@@ -366,7 +366,7 @@ html.dark {
     display: none;
   }
 
-""  /* Small icon controls keep a compact visual size while the hit area grows to
+  /* Small icon controls keep a compact visual size while the hit area grows to
      the 44px minimum on touch devices. */
   .sindbad-hit-expand {
     position: relative;
@@ -528,6 +528,18 @@ html.dark .leaflet-container {
   border-color: var(--color-line) !important;
   font-size: 1.0625rem !important;
 }
+
+/* A map control has to be hittable with a thumb, not a cursor. */
+@media (pointer: coarse) {
+  .leaflet-control-zoom a,
+  .leaflet-touch .leaflet-control-zoom a {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    line-height: 2.7rem !important;
+    font-size: 1.375rem !important;
+  }
+}
+
 
 .leaflet-control-zoom a:hover {
   background: var(--color-surface-muted) !important;

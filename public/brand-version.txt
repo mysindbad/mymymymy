@@ -1,3 +1,3 @@
 MY_SINDBAD_BRAND_USER_V4
 source=directly-derived-from-user-supplied-logo-and-app-icon
-cache=my-sindbad-shell-v4
+cache=my-sindbad-shell-v8

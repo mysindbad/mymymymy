@@ -247,7 +247,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={onOpenMap}
-                  className="shrink-0 rounded-lg px-2 py-1 text-label font-bold text-brand-accent transition-colors hover:bg-brand-soft"
+                  className="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-label font-bold text-brand-accent transition-colors hover:bg-brand-soft pointer-coarse:min-h-11"
                 >
                   {t('Map', 'الخريطة', 'Carte')}
                 </button>

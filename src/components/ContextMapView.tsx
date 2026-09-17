@@ -227,7 +227,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('Filter on the map', 'تصفية على الخريطة', 'Filtrer sur la carte')}
             aria-label={t('Filter places on map', 'تصفية الأماكن على الخريطة', 'Filtrer les lieux sur la carte')}
-            className="h-9 min-w-0 flex-1 bg-transparent px-2 text-body font-medium text-ink outline-none placeholder:text-muted"
+            className="h-9 min-w-0 flex-1 bg-transparent px-2 text-body font-medium text-ink outline-none placeholder:text-muted pointer-coarse:min-h-11"
           />
         </div>
         {categories.length > 0 && (

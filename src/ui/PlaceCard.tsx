@@ -110,7 +110,7 @@ export function PlaceCard({
           className="absolute end-2.5 top-2.5"
         />
         <div className="flex min-w-0 flex-1 flex-col gap-2 p-3.5">
-          <button type="button" onClick={openPlace} className="min-w-0 text-start">
+          <button type="button" onClick={openPlace} className="min-w-0 text-start pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:flex-col pointer-coarse:justify-center">
             <h3 className="line-clamp-2 text-body font-bold leading-snug text-ink">{name}</h3>
             <p className="mt-1 truncate text-micro text-muted">{placeSubtitle(place)}</p>
           </button>
@@ -169,7 +169,7 @@ export function PlaceCard({
           size="sm"
         />
         {onRoute && (
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-micro" onClick={() => onRoute(place)} icon={<Navigation className="h-3.5 w-3.5" />}>
+          <Button size="sm" variant="ghost" className="px-2 text-micro" onClick={() => onRoute(place)} icon={<Navigation className="h-3.5 w-3.5" />}>
             {locale.t('Route', 'المسار', 'Itinéraire')}
           </Button>
         )}
