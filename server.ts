@@ -322,6 +322,16 @@ function addDistanceProjection(places: any[], userLocation?: [number, number]) {
     });
 }
 
+// Baseline response hardening. No CSP header here on purpose: the shell ships an
+// inline bootstrap that sets dir/theme before first paint, which would need nonces
+// threaded through the build; everything else is same-origin.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), display-capture=(), geolocation=(self), microphone=(self)');
+  next();
+});
+
 app.use(express.json({ limit: '256kb' }));
 app.use('/api', authMiddleware);
 

@@ -92,9 +92,9 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
         >
-          <motion.button
-            type="button"
-            aria-label={localize('Close menu', 'إغلاق القائمة', 'Fermer le menu')}
+          <motion.div
+            role="presentation"
+            aria-hidden="true"
             className="fixed inset-0 bg-scrim/50 backdrop-blur-[1px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
