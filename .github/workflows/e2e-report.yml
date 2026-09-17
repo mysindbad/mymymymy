@@ -1,0 +1,42 @@
+name: E2E failure report (debug)
+
+# Temporary diagnostic workflow. The agent sandbox cannot reach the Actions log
+# or artifact hosts, so failing test names and errors are echoed onto the PR.
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright with json reporter
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-results.json
+        run: npx playwright test --reporter=list,json
+      - name: Summarize failures
+        run: node scripts/e2e-failure-summary.mjs playwright-results.json summary.md
+      - name: Echo summary
+        run: cat summary.md
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file summary.md
