@@ -276,8 +276,8 @@ export function OptionCard({
     >
       {icon && <span className={`shrink-0 ${selected ? 'text-brand-accent' : 'text-muted'}`} aria-hidden="true">{icon}</span>}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-body font-bold">{label}</span>
-        {description && <span className="block truncate text-micro text-muted">{description}</span>}
+        <span className="block text-body font-bold [text-wrap:balance]">{label}</span>
+        {description && <span className="block text-micro text-muted [text-wrap:balance]">{description}</span>}
       </span>
       <span
         aria-hidden="true"

@@ -123,6 +123,8 @@ const OPEN: Record<ScreenKey, (page: Page) => Promise<void>> = {
 
 const CORE_SCREENS: ScreenKey[] = ['home', 'explore', 'map', 'trips', 'account'];
 const OVERLAY_SCREENS: ScreenKey[] = ['drawer', 'assistant', 'place detail', 'flights'];
+// Sheets and dialogs are the surfaces most likely to run out of room when text doubles.
+const LARGE_TEXT_OVERLAYS: ScreenKey[] = ['drawer', 'assistant', 'place detail'];
 
 const PROBE = () => {
   const vw = window.innerWidth;
@@ -166,10 +168,16 @@ const PROBE = () => {
     const node = el as HTMLElement;
     const cls = typeof node.className === 'string' ? node.className : '';
     const cs = getComputedStyle(node);
+    const textOverflow = node.scrollWidth > node.clientWidth + 2 || node.scrollHeight > node.clientHeight + 2;
+    // Only horizontal bleed is a layout defect when overflow is visible: a line box can
+    // round a couple of pixels shorter than its own glyph box without clipping anything.
+    const bleedsHorizontally = node.scrollWidth > node.clientWidth + 2;
     if (/hidden|clip/.test(cs.overflowX + cs.overflowY) && !/truncate|line-clamp/.test(cls) && !node.querySelector('img, svg') && (node.textContent || '').trim()) {
-      if (node.scrollWidth > node.clientWidth + 2 || node.scrollHeight > node.clientHeight + 2) {
-        clipped.push(`${name(node)} ${node.scrollWidth}>${node.clientWidth}`);
-      }
+      if (textOverflow) clipped.push(`${name(node)} ${node.scrollWidth}>${node.clientWidth}`);
+    } else if (!/hidden|clip/.test(cs.overflowX + cs.overflowY) && el.children.length === 0 && (node.textContent || '').trim() && !node.closest('.sindbad-scroll-x, button, a') && bleedsHorizontally) {
+      // Text that runs past its box without clipping is invisible to an overflow check:
+      // it stays inside the viewport yet bleeds over the neighbours it should have wrapped away from.
+      clipped.push(`${name(node)} ${node.scrollWidth}>${node.clientWidth} (runs past its box)`);
     }
   }
 
@@ -361,10 +369,12 @@ test('enlarged system text keeps core screens usable', async ({ page }) => {
   for (const width of NARROW) {
     await page.setViewportSize({ width, height: 800 });
     await page.addStyleTag({ content: 'html{font-size:200%!important}' });
-    for (const screen of CORE_SCREENS) {
+    for (const screen of [...CORE_SCREENS, ...LARGE_TEXT_OVERLAYS]) {
       await openScreen(page, screen);
       const result = await probe(page, `${screen} @ ${width} 2x`);
       expect(result.scrollWidth, `${result.label}: overflowing=${JSON.stringify(result.overflowing)}`).toBeLessThanOrEqual(result.vw + 1);
+      expect(result.overflowing, `${result.label}: overflowing`).toEqual([]);
+      expect(result.clipped, `${result.label}: clipped=${JSON.stringify(result.clipped)}`).toEqual([]);
     }
     await page.evaluate(() => [...document.querySelectorAll('style')].filter((node) => node.textContent?.includes('font-size:200%')).forEach((node) => node.remove()));
   }

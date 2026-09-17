@@ -120,11 +120,11 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
       <div className="mx-auto w-full max-w-[44rem] px-4 pt-4 sm:px-6">
         <section className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
           <UserAvatar name={authUser?.name} avatarUrl={authUser?.avatarUrl} className="h-14 w-14" textClassName="text-h2" />
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-h2 font-bold tracking-tight text-ink">
+          <div className="min-w-0 flex-1 basis-40">
+            <h2 className="text-h2 font-bold tracking-tight text-ink [text-wrap:balance]">
               {authed ? authUser?.name : t('Traveler', 'مسافر', 'Voyageur')}
             </h2>
-            <p className="mt-0.5 truncate text-caption text-muted">
+            <p className="mt-0.5 text-caption break-words text-muted">
               {authed && authUser?.email ? authUser.email : t('Not signed in', 'غير مسجّل الدخول', 'Non connecté')}
             </p>
           </div>
@@ -240,7 +240,7 @@ export const AccountProfilePage: React.FC<AccountProfilePageProps> = ({
                 {isPassiveOptedIn ? t('On', 'مفعّلة', 'Activée') : t('Off', 'متوقفة', 'Désactivée')}
               </span>
             </span>
-            <Button size="sm" variant="quiet" onClick={onOpenPassiveGps} className="shrink-0">
+            <Button size="sm" variant="quiet" onClick={onOpenPassiveGps} className="ms-auto shrink-0">
               {t('Manage', 'إدارة', 'Gérer')}
             </Button>
           </div>

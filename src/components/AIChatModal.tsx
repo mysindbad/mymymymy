@@ -297,7 +297,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
         onClick={toggleVoiceConversation}
         aria-pressed={voiceMode}
         aria-label={voiceMode ? localize('End voice call', 'إنهاء المحادثة الصوتية', 'Terminer l’appel vocal') : localize('Start voice call', 'بدء محادثة صوتية', 'Démarrer un appel vocal')}
-        className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-label font-bold transition-colors duration-150 pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-label font-bold transition-colors duration-150 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] ${
           voiceMode
             ? 'border-negative-line bg-negative-fill text-negative-ink'
             : 'border-line-strong bg-surface text-ink-soft hover:bg-surface-muted'

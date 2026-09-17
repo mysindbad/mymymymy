@@ -75,7 +75,7 @@ export const LanguageFlagSelector: React.FC<LanguageFlagSelectorProps> = ({
         aria-expanded={isOpen}
         aria-label={label || t('Language', 'اللغة', 'Langue')}
         onClick={() => setIsOpen((open) => !open)}
-        className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-label font-bold transition-colors pointer-coarse:min-h-11 ${
+        className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-label font-bold transition-colors pointer-coarse:min-h-[44px] ${
           onDark
             ? 'border-white/25 bg-scrim/45 text-white hover:bg-scrim/60'
             : 'border-line-strong bg-surface text-ink-soft hover:bg-surface-muted'

@@ -110,7 +110,7 @@ export function PlaceCard({
           className="absolute end-2.5 top-2.5"
         />
         <div className="flex min-w-0 flex-1 flex-col gap-2 p-3.5">
-          <button type="button" onClick={openPlace} className="min-w-0 text-start pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:flex-col pointer-coarse:justify-center">
+          <button type="button" onClick={openPlace} className="min-w-0 text-start pointer-coarse:flex pointer-coarse:min-h-[44px] pointer-coarse:flex-col pointer-coarse:justify-center">
             <h3 className="line-clamp-2 text-body font-bold leading-snug text-ink">{name}</h3>
             <p className="mt-1 truncate text-micro text-muted">{placeSubtitle(place)}</p>
           </button>

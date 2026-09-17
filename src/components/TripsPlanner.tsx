@@ -530,19 +530,19 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
 
         {isPlanning ? (
           <Panel padded="md" className="overflow-hidden">
-            <ol className="flex items-center gap-1.5 border-b border-line px-4 py-3" aria-label={l('Plan steps', 'خطوات التخطيط', 'Étapes du plan')}>
+            <ol className="sindbad-scroll-x flex items-center gap-1.5 border-b border-line px-4 py-3" aria-label={l('Plan steps', 'خطوات التخطيط', 'Étapes du plan')}>
               {STEPS.map((item, index) => {
                 const done = step > item.id;
                 const current = step === item.id;
                 return (
-                  <li key={item.id} className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <li key={item.id} className="flex flex-1 shrink-0 items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => { if (done) { setPlanError(''); setStep(item.id); } }}
                       disabled={!done && !current}
                       aria-current={current ? 'step' : undefined}
                       aria-label={item.label}
-                      className={`flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${done ? 'hover:bg-brand-soft' : ''} disabled:cursor-default`}
+                      className={`flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] ${done ? 'hover:bg-brand-soft' : ''} disabled:cursor-default`}
                     >
                       <span
                         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-micro font-bold ${
@@ -579,7 +579,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
                   />
 
                   {search.trim().length < 2 ? (
-                    <p className="rounded-lg bg-surface-muted px-3.5 py-4 text-center text-caption text-muted">
+                    <p className="rounded-lg bg-surface-muted px-3.5 py-4 text-center text-caption text-muted [text-wrap:balance]">
                       {l('Type at least 2 characters.', 'اكتب حرفين على الأقل.', 'Saisissez au moins 2 caractères.')}
                     </p>
                   ) : placesLoading ? (
@@ -752,16 +752,16 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
 
               <Divider className="my-4" />
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                 <Button variant="ghost" onClick={() => { setPlanError(''); setStep((current) => Math.max(1, current - 1)); }} disabled={step === 1}>
                   {l('Back', 'السابق', 'Retour')}
                 </Button>
                 {step < 5 ? (
-                  <Button onClick={nextStep}>
+                  <Button className="ms-auto" onClick={nextStep}>
                     {l('Next', 'التالي', 'Suivant')}
                   </Button>
                 ) : (
-                  <Button onClick={() => void runPlan()} loading={planning}>
+                  <Button className="ms-auto" onClick={() => void runPlan()} loading={planning}>
                     {l('Create Plan', 'إنشاء الخطة', 'Créer le plan')}
                   </Button>
                 )}
@@ -772,7 +772,7 @@ export const TripsPlanner: React.FC<TripsPlannerProps> = ({
           <Panel padded="none" className="overflow-hidden">
             <div className="flex items-start justify-between gap-3 border-b border-line p-4 sm:p-5">
               <div className="min-w-0">
-                <h2 className="truncate text-h2 font-bold tracking-tight text-ink">
+                <h2 className="text-h2 font-bold tracking-tight text-ink [text-wrap:balance]">
                   {itinerary.destinationName || (selectedPlace ? placeDisplayName(selectedPlace, locale.language) : l('Your plan', 'خطتك', 'Votre plan'))}
                 </h2>
                 <p className="mt-0.5 truncate text-micro text-muted">

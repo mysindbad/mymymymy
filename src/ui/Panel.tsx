@@ -58,8 +58,8 @@ export function SectionHeading({
 }) {
   const titleClass = size === 'lg' ? 'text-h1' : size === 'sm' ? 'text-body' : 'text-h2';
   return (
-    <div className={`flex items-end justify-between gap-4 ${className}`}>
-      <div className="min-w-0">
+    <div className={`flex flex-wrap items-end justify-between gap-x-4 gap-y-1.5 ${className}`}>
+      <div className="min-w-0 flex-1 basis-40">
         {eyebrow && (
           <p className="mb-1 text-label font-bold uppercase tracking-[0.08em] text-muted">{eyebrow}</p>
         )}
@@ -107,7 +107,7 @@ export function Stat({
     <div className={`min-w-0 ${className}`}>
       <p className="text-micro font-semibold uppercase tracking-[0.06em] text-muted">{label}</p>
       <p className={`mt-0.5 truncate text-title font-extrabold tabular-nums ${valueTone}`}>{value}</p>
-      {hint && <p className="mt-0.5 truncate text-micro text-muted">{hint}</p>}
+      {hint && <p className="mt-0.5 line-clamp-2 text-micro text-muted">{hint}</p>}
     </div>
   );
 }
