@@ -31,7 +31,25 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run Playwright core flows
-        run: npm run test:e2e
+        id: playwright
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee playwright.log
+      - name: Post the failure digest where it can be read
+        if: always() && steps.playwright.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          case "$GITHUB_REF" in
+            refs/pull/*) pr="${GITHUB_REF#refs/pull/}"; pr="${pr%/merge}" ;;
+            *) pr=$(gh pr list --head "${GITHUB_REF#refs/heads/}" --state open --json number --jq '.[0].number' || true) ;;
+          esac
+          [ -z "$pr" ] && { echo "no PR to comment on"; exit 0; }
+          body=$(printf 'E2E failure digest for `%s`\n\n```\n%s\n```' "$GITHUB_SHA" \
+            "$(grep -aE '✘|✗|[0-9]+\) |Error:|Expected|Received|Timed out|expect\(|strict mode violation' playwright.log | head -60 | cut -c1-280)")
+          gh pr comment "$pr" --body "$body" || echo "comment failed"
+          exit 0
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
