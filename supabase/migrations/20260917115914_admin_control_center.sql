@@ -345,15 +345,19 @@ language sql
 security definer
 set search_path = ''
 as $$
+  -- PostgreSQL has no WHERE after VALUES: an INSERT ... VALUES clause cannot filter itself out.
+  -- The guard is therefore expressed as INSERT ... SELECT, whose WHERE sees the same row the
+  -- VALUES clause would have produced. One row passes for a known service AND a known outcome
+  -- (exactly one insert), and no row passes otherwise (no insert, rather than a null row that
+  -- would break the service/outcome checks). The value shaping is untouched.
   insert into public.service_events (service, outcome, endpoint, latency_ms, status_class, detail)
-  values (
+  select
     case when p_service in ('ai', 'weather', 'place_discovery', 'tiles') then p_service else null end,
     case when p_outcome in ('ok', 'error', 'unavailable', 'rate_limited', 'rejected') then p_outcome else null end,
     left(nullif(trim(coalesce(p_endpoint, '')), ''), 96),
     greatest(0, least(coalesce(p_latency_ms, 0), 3600000)),
     case when p_status_class between 100 and 599 then p_status_class else null end,
     left(nullif(trim(coalesce(p_detail, '')), ''), 240)
-  )
   where p_service in ('ai', 'weather', 'place_discovery', 'tiles')
     and p_outcome in ('ok', 'error', 'unavailable', 'rate_limited', 'rejected');
 $$;
@@ -455,7 +459,10 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $$
+-- The body quotes the price levels '$', '$$', '$$$' and '$$$$' literally, so this function
+-- needs a tagged dollar quote: an untagged $$ body is terminated by the first '$$' price
+-- string, and everything after it would be parsed as stray SQL.
+as $admin_curation$
 declare
   v_role text;
   v_field_count integer;
@@ -550,7 +557,7 @@ begin
 
   return jsonb_build_object('id', v_row.id, 'name', v_row.name, 'updatedAt', v_row.updated_at);
 end;
-$$;
+$admin_curation$;
 
 create or replace function public.admin_set_review_moderation(
   p_admin_user_id uuid,

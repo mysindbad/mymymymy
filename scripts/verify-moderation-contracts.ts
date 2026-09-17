@@ -21,7 +21,7 @@
 
 import { readFileSync } from 'node:fs';
 
-const MIGRATION = 'supabase/migrations/20260918090000_admin_control_center.sql';
+const MIGRATION = 'supabase/migrations/20260917115914_admin_control_center.sql';
 
 /** Collapse whitespace so contract patterns can be written on one line. */
 function flat(path: string) {

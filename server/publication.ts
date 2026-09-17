@@ -2,7 +2,7 @@
  * Publication is a database fact, not a UI convention.
  *
  * A row in `public.places` or `public.reviews` is published exactly when moderation has approved
- * it. `supabase/migrations/20260918090000_admin_control_center.sql` enforces the same rule at the
+ * it. `supabase/migrations/20260917115914_admin_control_center.sql` enforces the same rule at the
  * row-security layer, and this module is where the API server applies it to the reads it performs
  * with a privileged client - RLS does not bind `service_role`, so without this half of the rule an
  * unpublished submission would still be reachable through `/api/places`.

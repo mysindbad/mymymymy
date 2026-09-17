@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
  * Publication is enforced where consumers actually read from: the API server queries Supabase with
  * a privileged client (which row-level security does not bind), so the read filters and the
  * submission state are the enforceable half of the rule next to the policies in
- * supabase/migrations/20260918090000_admin_control_center.sql.
+ * supabase/migrations/20260917115914_admin_control_center.sql.
  *
  * These tests drive the real data-access layer against a stubbed PostgREST endpoint and assert on
  * the requests it makes and the records it returns - behaviour, not source text.

@@ -47,7 +47,7 @@ bundle, the admin DTOs or the audit log.
 
 **Wiring it to a real project**
 
-1. Apply `supabase/migrations/20260918090000_admin_control_center.sql` — additive only: moderation
+1. Apply `supabase/migrations/20260917115914_admin_control_center.sql` — additive only: moderation
    columns with defaults, `admin_accounts`, `admin_audit_events`, `service_events`, and the admin
    RPCs. The three new tables get `enable row level security` with **zero policies**, plus
    `revoke ... from public, anon, authenticated`, so only `service_role` can touch them.
