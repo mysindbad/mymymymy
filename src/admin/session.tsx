@@ -107,6 +107,12 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
         <Suspense fallback={null}>
           <AuthFlowModal
             isOpen
+            // An operator who clicked "Sign in" has already decided to authenticate: opening on
+            // the welcome screen made them click "Get Started" first, which hid the Google option
+            // behind an onboarding step that is meaningless for staff. Land on the method screen
+            // so Continue with Google / email / create account are visible immediately. The
+            // traveller onboarding flow is unaffected - it still opens on 'welcome'.
+            initialScreen="sign-in-method"
             language={language}
             onClose={() => setSignInOpen(false)}
             onAuthSuccess={() => {
