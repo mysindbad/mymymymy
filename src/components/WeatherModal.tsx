@@ -1,9 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CloudSun, Loader2, MapPin, RefreshCw, Wind, X } from 'lucide-react';
+import { CloudSun, MapPin } from 'lucide-react';
 import { SupportedLanguage } from '../data/translations';
 import { getWeather, WeatherData } from '../services/api';
 import type { UserLocation } from '../hooks/useGeolocation';
 import type { Place } from '../types';
+import { useLocale } from '../lib/i18n';
+import { placeDisplayName } from '../lib/placeView';
+import { Sheet } from '../ui/Sheet';
+import { Select } from '../ui/Field';
+import { Button } from '../ui/Button';
+import { ErrorState, Skeleton } from '../ui/Feedback';
+import { Divider, Stat } from '../ui/Panel';
 
 interface WeatherModalProps {
   isOpen: boolean;
@@ -11,10 +18,11 @@ interface WeatherModalProps {
   language?: SupportedLanguage;
   userLocation?: UserLocation | null;
   tripDestination?: Place | null;
+  places?: Place[];
 }
 
-// Manual fallback list used only when the traveler has no shared location and
-// no active trip destination yet. This is explicit, not a hidden default.
+// Manual fallback list used only when the traveler has no shared location, no
+// active trip and no loaded places. This is explicit, not a hidden default.
 const knownPlaces = [
   { id: 'chefchaouen', label: 'Chefchaouen, Morocco', coordinates: [35.1695, -5.2625] as [number, number] },
   { id: 'akchour', label: 'Akchour Cascades, Morocco', coordinates: [35.2415, -5.1742] as [number, number] },
@@ -36,18 +44,23 @@ export function weatherCodeToLabel(code: number, isAr = false): string {
   return isAr ? 'غير معروف' : 'Unknown';
 }
 
+type LocationOption = {
+  id: string;
+  label: string;
+  coordinates: [number, number];
+  source: 'my-location' | 'trip' | 'place' | 'known';
+};
+
 export const WeatherModal: React.FC<WeatherModalProps> = ({
   isOpen,
   onClose,
   language = 'en',
   userLocation = null,
   tripDestination = null,
+  places = [],
 }) => {
-  const isAr = language === 'ar';
-  const isFr = language === 'fr';
-  const t = (en: string, ar: string, fr: string) => (isAr ? ar : isFr ? fr : en);
-
-  type LocationOption = { id: string; label: string; coordinates: [number, number]; source: 'my-location' | 'trip' | 'known' };
+  const locale = useLocale(language);
+  const t = locale.t;
 
   const options = useMemo<LocationOption[]>(() => {
     const list: LocationOption[] = [];
@@ -60,17 +73,23 @@ export const WeatherModal: React.FC<WeatherModalProps> = ({
       });
     }
     if (tripDestination) {
-      const name = isAr && tripDestination.arabicName ? tripDestination.arabicName : isFr && tripDestination.frenchName ? tripDestination.frenchName : tripDestination.name;
       list.push({
         id: `trip-${tripDestination.id}`,
-        label: t(`Trip: ${name}`, `الرحلة: ${name}`, `Voyage : ${name}`),
+        label: t(`Trip: ${placeDisplayName(tripDestination, locale.language)}`, `الرحلة: ${placeDisplayName(tripDestination, locale.language)}`, `Voyage : ${placeDisplayName(tripDestination, locale.language)}`),
         coordinates: tripDestination.coordinates,
         source: 'trip',
       });
     }
-    knownPlaces.forEach((place) => list.push({ ...place, source: 'known' }));
+    const seen = new Set(list.map((item) => item.label));
+    places.forEach((place) => {
+      const label = placeDisplayName(place, locale.language);
+      if (seen.has(label)) return;
+      seen.add(label);
+      list.push({ id: `place-${place.id}`, label, coordinates: place.coordinates, source: 'place' });
+    });
+    if (list.length === 0) knownPlaces.forEach((place) => list.push({ ...place, source: 'known' }));
     return list;
-  }, [userLocation?.latitude, userLocation?.longitude, tripDestination?.id, language]);
+  }, [userLocation?.latitude, userLocation?.longitude, tripDestination?.id, places.length, language]);
 
   const [selectedId, setSelectedId] = useState(() => options[0]?.id || knownPlaces[0].id);
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -84,16 +103,19 @@ export const WeatherModal: React.FC<WeatherModalProps> = ({
     setSelectedId(options[0]?.id || knownPlaces[0].id);
   }, [isOpen]);
 
-  const selected = options.find((option) => option.id === selectedId) || options[0] || { ...knownPlaces[0], source: 'known' as const };
+  const selected = options.find((option) => option.id === selectedId) || options[0];
 
-  const loadWeather = async (target: LocationOption) => {
+  const loadWeather = async (target: LocationOption | undefined) => {
+    if (!target) return;
     setIsLoading(true);
     setError(null);
     try {
       setWeather(await getWeather(target.coordinates[0], target.coordinates[1]));
     } catch (loadError) {
       setWeather(null);
-      setError(loadError instanceof Error ? loadError.message : t('Weather service temporarily unavailable', 'خدمة الطقس غير متاحة مؤقتاً', 'Service météo temporairement indisponible'));
+      setError(loadError instanceof Error
+        ? loadError.message
+        : t('Weather service temporarily unavailable.', 'خدمة الطقس غير متاحة مؤقتاً.', 'Service météo temporairement indisponible.'));
     } finally {
       setIsLoading(false);
     }
@@ -103,86 +125,89 @@ export const WeatherModal: React.FC<WeatherModalProps> = ({
     if (isOpen && selected) void loadWeather(selected);
   }, [isOpen, selected?.id]);
 
-  if (!isOpen) return null;
+  const observed = weather?.observedAt ? new Date(weather.observedAt) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
-        <div className="p-4 sm:p-5 bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
-              <CloudSun className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base">{t('Weather', 'الطقس', 'Météo')}</h3>
-              <p className="text-xs text-cyan-100">{t('Live conditions for your location or trip', 'حالة الطقس الحية لموقعك أو رحلتك', 'Conditions en direct pour votre position ou voyage')}</p>
-            </div>
+    <Sheet
+      open={isOpen}
+      onClose={onClose}
+      title={t('Weather', 'الطقس', 'Météo')}
+      subtitle={t('Current conditions', 'الظروف الحالية', 'Conditions actuelles')}
+      size="sm"
+      language={language}
+    >
+      <div className="space-y-4 px-4 pb-6 pt-3 sm:px-5">
+        <Select
+          id="weather-place"
+          label={t('Place', 'المكان', 'Lieu')}
+          value={selectedId}
+          onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setSelectedId(event.target.value)}
+        >
+          {options.map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </Select>
+
+        {!userLocation && (
+          <p className="flex items-start gap-2 rounded-lg bg-surface-muted px-3 py-2 text-micro leading-snug text-muted">
+            <MapPin className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {t('Share your location for weather where you actually are.', 'شارك موقعك لعرض الطقس في مكانك الفعلي.', 'Partagez votre position pour voir la météo là où vous êtes.')}
+          </p>
+        )}
+
+        {isLoading && (
+          <div className="space-y-2.5 rounded-xl border border-line p-4" aria-busy="true">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="h-3.5 w-full" />
+            <p className="sr-only">{t('Loading weather…', 'جارٍ تحميل الطقس…', 'Chargement de la météo…')}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('Close', 'إغلاق', 'Fermer')} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        )}
 
-        <div className="p-5 space-y-4 text-xs">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
-            <select
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              aria-label={t('Choose a place', 'اختر مكاناً', 'Choisir un lieu')}
-              className="flex-1 p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs outline-none"
-            >
-              {options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </select>
+        {error && !isLoading && (
+          <ErrorState
+            title={t('Weather is unavailable.', 'الطقس غير متاح.', 'La météo est indisponible.')}
+            description={error}
+            retryLabel={t('Retry', 'إعادة المحاولة', 'Réessayer')}
+            onRetry={() => void loadWeather(selected)}
+          />
+        )}
+
+        {weather && !isLoading && !error && (
+          <div className="overflow-hidden rounded-xl border border-line">
+            <div className="flex items-end justify-between gap-3 px-4 pb-3.5 pt-4">
+              <div className="min-w-0">
+                <p className="text-display font-extrabold leading-none tabular-nums text-ink">
+                  {typeof weather.temperatureC === 'number' ? `${Math.round(weather.temperatureC)}°` : '—'}
+                </p>
+                <p className="mt-1 text-body font-bold text-brand-accent">
+                  {weatherCodeToLabel(weather.weatherCode, locale.isArabic)}
+                </p>
+              </div>
+              <CloudSun className="h-10 w-10 shrink-0 text-sand-400" aria-hidden="true" />
+            </div>
+            <Divider />
+            <div className="grid grid-cols-2 gap-3 px-4 py-3">
+              <Stat
+                label={t('Wind', 'الرياح', 'Vent')}
+                value={typeof weather.windSpeedKmh === 'number' ? `${Math.round(weather.windSpeedKmh)} km/h` : '—'}
+              />
+              <Stat
+                label={t('Observed', 'آخر تحديث', 'Observé')}
+                value={observed ? observed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                hint={observed ? observed.toLocaleDateString([], { day: 'numeric', month: 'short' }) : undefined}
+              />
+            </div>
+            <p className="border-t border-line bg-surface-muted px-4 py-2 text-micro text-muted">{selected?.label}</p>
           </div>
+        )}
 
-          {!userLocation && (
-            <p className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-[11px] text-slate-500">
-              {t('Share your location for weather where you actually are.', 'شارك موقعك لعرض الطقس في مكانك الفعلي.', 'Partagez votre position pour voir la météo là où vous êtes.')}
-            </p>
-          )}
-
-          {isLoading && (
-            <div className="p-8 rounded-3xl bg-slate-50 border border-slate-200 flex items-center justify-center gap-2 text-slate-500">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              <span>{t('Loading weather…', 'جارٍ تحميل الطقس…', 'Chargement de la météo…')}</span>
-            </div>
-          )}
-          {error && !isLoading && (
-            <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between gap-3">
-              <span>{t('Weather service temporarily unavailable.', 'خدمة الطقس غير متاحة مؤقتاً.', 'Service météo temporairement indisponible.')}</span>
-              <button type="button" onClick={() => void loadWeather(selected)} className="rounded-lg bg-rose-600 px-3 py-1.5 text-white font-bold flex items-center gap-1 shrink-0">
-                <RefreshCw className="w-3 h-3" />
-                {t('Retry', 'إعادة', 'Réessayer')}
-              </button>
-            </div>
-          )}
-          {weather && !isLoading && !error && (
-            <>
-              <div className="p-5 rounded-3xl bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-100 flex items-center justify-between">
-                <div>
-                  <span className="text-3xl font-black text-slate-900">{typeof weather.temperatureC === 'number' ? `${Math.round(weather.temperatureC)}°C` : '—'}</span>
-                  <p className="text-xs font-bold text-blue-600 mt-0.5">{weatherCodeToLabel(weather.weatherCode, isAr)}</p>
-                  {weather.observedAt && (
-                    <span className="text-[11px] text-slate-500">
-                      {t('Observed', 'آخر تحديث', 'Observé')}: {new Date(weather.observedAt).toLocaleString(language)}
-                    </span>
-                  )}
-                </div>
-                <CloudSun className="w-12 h-12 text-blue-500" />
-              </div>
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-center">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">{t('Wind speed', 'سرعة الرياح', 'Vitesse du vent')}</span>
-                <span className="text-sm font-bold text-slate-800 flex items-center justify-center gap-1 mt-0.5">
-                  <Wind className="w-3.5 h-3.5 text-blue-600" />
-                  {typeof weather.windSpeedKmh === 'number' ? `${Math.round(weather.windSpeedKmh)} km/h` : '—'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">{selected.label}</p>
-            </>
-          )}
-        </div>
+        {!isOpen ? null : (
+          <Button variant="quiet" size="sm" className="w-full" onClick={() => void loadWeather(selected)} loading={isLoading}>
+            {t('Refresh', 'تحديث', 'Actualiser')}
+          </Button>
+        )}
       </div>
-    </div>
+    </Sheet>
   );
 };

@@ -1,59 +1,75 @@
 import React, { useEffect, useState } from 'react';
-import { ImageOff, MapPin } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
 import type { Place } from '../types';
 import type { SupportedLanguage } from '../data/translations';
+import { categoryMeta, placeDisplayName } from '../lib/placeView';
 
 interface PlaceVisualProps {
   place: Place;
   language?: SupportedLanguage;
+  /** Frame classes — the caller owns the box, this component fills it. */
   className?: string;
   imageClassName?: string;
   eager?: boolean;
+  /** Overlay text is normally painted by the card, so the fallback stays quiet. */
   showFallbackLabel?: boolean;
+  /** Which entry of `place.photos` to paint (detail gallery). */
+  photoIndex?: number;
 }
 
+/**
+ * Single image treatment for places: lazy-loaded, fade-in, contour fallback when
+ * no usable photo exists, and never a fabricated image.
+ */
 export const PlaceVisual: React.FC<PlaceVisualProps> = ({
   place,
   language = 'en',
   className = 'h-full w-full',
-  imageClassName = 'h-full w-full object-cover',
+  imageClassName = 'object-cover',
   eager = false,
-  showFallbackLabel = true,
+  showFallbackLabel = false,
+  photoIndex = 0,
 }) => {
-  const [failed, setFailed] = useState(false);
-  const photo = place.photos?.[0] || '';
-  const isAr = language === 'ar';
-  const isFr = language === 'fr';
-  const displayName = isAr && place.arabicName
-    ? place.arabicName
-    : isFr && place.frenchName
-      ? place.frenchName
-      : place.name;
+  const photo = place.photos?.[photoIndex] || place.photos?.[0] || '';
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>(photo ? 'loading' : 'failed');
+  const displayName = placeDisplayName(place, language);
+  const CategoryIcon = categoryMeta(place.category).icon;
 
-  useEffect(() => setFailed(false), [place.id, photo]);
+  useEffect(() => {
+    setStatus(photo ? 'loading' : 'failed');
+  }, [photo, place.id]);
 
-  if (photo && !failed) {
+  if (!photo || status === 'failed') {
     return (
+      <div
+        className={`sindbad-photo-fallback relative flex items-center justify-center overflow-hidden ${className}`}
+        data-place-photo-fallback="true"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface/90 text-brand-accent shadow-xs">
+          {photo ? <ImageOff className="h-4 w-4" aria-hidden="true" /> : <CategoryIcon className="h-4 w-4" aria-hidden="true" />}
+        </span>
+        {showFallbackLabel && (
+          <span className="absolute inset-x-2 bottom-2 truncate text-center text-micro font-bold text-muted">
+            {displayName}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative overflow-hidden bg-surface-sunken ${className}`}>
+      {status === 'loading' && <span className="sindbad-photo-fallback absolute inset-0" aria-hidden="true" />}
       <img
         src={photo}
         alt={displayName}
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         fetchPriority={eager ? 'high' : 'auto'}
-        onError={() => setFailed(true)}
-        className={`${className} ${imageClassName}`}
+        onLoad={() => setStatus('ready')}
+        onError={() => setStatus('failed')}
+        className={`h-full w-full ${imageClassName} transition-opacity duration-300 ${status === 'ready' ? 'opacity-100' : 'opacity-0'}`}
       />
-    );
-  }
-
-  return (
-    <div className={`${className} flex items-center justify-center bg-gradient-to-br from-slate-200 via-slate-100 to-blue-100 p-4 text-center dark:from-slate-800 dark:via-slate-900 dark:to-blue-950`} data-place-photo-fallback="true">
-      <div className="max-w-full text-slate-600 dark:text-slate-300">
-        <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/70 shadow-sm dark:bg-slate-800/80">
-          {photo ? <ImageOff className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
-        </span>
-        {showFallbackLabel && <><strong className="block truncate text-xs">{displayName}</strong><span className="mt-1 block truncate text-[10px] opacity-75">{place.subCategory || place.category.replace('_', ' ')}</span></>}
-      </div>
     </div>
   );
 };

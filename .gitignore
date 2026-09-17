@@ -9,3 +9,5 @@ coverage/
 *.temp
 .env*
 !.env.example
+test-results/
+playwright-report/

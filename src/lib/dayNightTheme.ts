@@ -13,11 +13,14 @@ export function themeForHour(hour: number): DayNightTheme {
 function applyTheme(theme: DayNightTheme) {
   const root = document.documentElement;
   root.classList.toggle('dark', theme === 'dark');
+  // `theme-dark` is also set on <html> so the pre-bundle stylesheet can paint the
+  // right background before React mounts (no white flash at night).
+  root.classList.toggle('theme-dark', theme === 'dark');
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
 
   const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (themeColor) themeColor.content = theme === 'dark' ? '#020617' : '#2563eb';
+  if (themeColor) themeColor.content = theme === 'dark' ? '#020617' : '#f4f6fa';
 }
 
 export function getThemePreference(): ThemePreference {

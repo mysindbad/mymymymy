@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
-import { Compass, Home as HomeIcon, Loader2, ShoppingBag, User } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Place } from './types';
 import { SupportedLanguage } from './data/translations';
 import { fetchPlaces, sendChatMessage } from './services/api';
@@ -7,7 +7,11 @@ import { AUTH_CALLBACK_PATH, supabase } from './lib/supabase';
 import { signOut, useAuthSession } from './lib/authSession';
 import { HomeScreen } from './components/HomeScreen';
 import type { AuthScreenType } from './components/AuthFlowModal';
-import { AIIcon } from './components/AIIcon';
+import { ScreenHeader } from './ui/ScreenHeader';
+import { PrimaryNav, PrimaryNavTab } from './components/PrimaryNav';
+import { Button, IconButton } from './ui/Button';
+import { ToastRegion } from './ui/toast';
+import { Alert } from './ui/Feedback';
 import { hasCompletedOnboarding } from './components/OnboardingModal';
 import { useGeolocation } from './hooks/useGeolocation';
 import { usePwaInstall } from './hooks/usePwaInstall';
@@ -100,7 +104,7 @@ export default function App() {
   const { canInstall, promptInstall, showIosHint: showIosInstallHint, dismissIosHint: dismissIosInstallHint } = usePwaInstall();
   const isAr = language === 'ar';
   const isFr = language === 'fr';
-  const shellText = (en: string, ar: string, fr: string) => isAr ? ar : isFr ? fr : en;
+  const shellText = (en: string, ar: string, fr: string) => (isAr ? ar : isFr ? fr : en);
 
   const handlePassiveOptInChange = (optedIn: boolean) => {
     setIsPassiveOptedIn(optedIn);
@@ -199,11 +203,7 @@ export default function App() {
     setActiveTab('explore');
   };
 
-  const handleTripCreated = async (destination: Place) => {
-    setTripDestination(destination);
-    setExploreQuery('');
-    setExploreCategory('All');
-    setExploreView('feed');
+  const loadTripPlaces = async (destination: Place) => {
     setPlacesLoading(true);
     setPlacesError(null);
     try {
@@ -214,8 +214,25 @@ export default function App() {
       setPlacesError(error instanceof Error ? error.message : 'Failed to load trip places');
     } finally {
       setPlacesLoading(false);
-      setActiveTab('explore');
     }
+  };
+
+  const handleTripCreated = async (destination: Place) => {
+    setTripDestination(destination);
+    setExploreQuery('');
+    setExploreCategory('All');
+    setExploreView('feed');
+    await loadTripPlaces(destination);
+    setActiveTab('explore');
+  };
+
+  // The banner must always offer the recovery it promises, whichever request failed.
+  const retryPlacesLoad = async () => {
+    if (tripDestination) {
+      await loadTripPlaces(tripDestination);
+      return;
+    }
+    await loadNearbyPlaces();
   };
 
   const handleOpenAuth = (screen: AuthScreenType = 'welcome') => {
@@ -279,7 +296,7 @@ export default function App() {
     return { text, actions: [] };
   };
 
-  const navigatePrimary = (tab: 'home' | 'explore' | 'map' | 'trips' | 'community') => {
+  const navigatePrimary = (tab: 'home' | 'explore' | 'map' | 'trips' | 'community' | 'account') => {
     if (tab === 'map') {
       setExploreView('map');
       setActiveTab('explore');
@@ -291,109 +308,206 @@ export default function App() {
     }
   };
 
-  const topBar = (title: string) => (
-    <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
-      <button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button>
-      <h2 className="text-sm font-black text-slate-900">{title}</h2><div className="w-16" />
-    </div>
-  );
+  /** Saved places live on the home screen, so the account page jumps there. */
+  const handleOpenSavedPlaces = () => {
+    navigatePrimary('home');
+    window.setTimeout(() => {
+      document.getElementById('home-saved-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 90);
+  };
+
+  const handleNavSelect = (tab: PrimaryNavTab) => {
+    if (tab === 'assistant') {
+      setIsAIChatOpen(true);
+      return;
+    }
+    navigatePrimary(tab);
+  };
+
+  const navActiveTab: PrimaryNavTab = activeTab === 'explore' && exploreView === 'map' ? 'explore' : activeTab;
+  // The map paints its own chrome-aware height, so it must not inherit the nav clearance.
+  const isMapSurface = activeTab === 'explore' && exploreView === 'map';
 
   const loadingFallback = (
-    <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-slate-500">
-      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-      {shellText('Loading…', 'جارٍ التحميل…', 'Chargement…')}
+    <div className="px-3 py-6 sm:px-5">
+      <div className="mx-auto max-w-2xl space-y-3">
+        <span className="sindbad-skeleton block h-6 w-40 rounded-md" />
+        <span className="sindbad-skeleton block h-24 w-full rounded-xl" />
+        <span className="sindbad-skeleton block h-24 w-full rounded-xl" />
+      </div>
     </div>
   );
 
   return (
-    <div className={`flex min-h-screen flex-col bg-slate-100 font-sans ${isAr ? 'rtl' : 'ltr'}`}>
-      {placesLoading && <div className="fixed left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg">{shellText('Loading places…', 'جارٍ تحميل الأماكن…', 'Chargement des lieux…')}</div>}
-      {placesError && <div className="fixed left-1/2 top-3 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-800 shadow-lg"><span>{shellText('Could not load places', 'تعذر تحميل الأماكن', 'Impossible de charger les lieux')}</span>{userLocation && !tripDestination && <button type="button" onClick={() => void loadNearbyPlaces()} className="rounded-lg bg-rose-600 px-2.5 py-1 text-white">{shellText('Retry', 'إعادة', 'Réessayer')}</button>}</div>}
+    <div className="min-h-dvh bg-canvas text-ink-soft">
+      <a
+        href="#sindbad-main"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-3 focus:top-3 focus:z-[70] focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2 focus:text-label focus:font-bold focus:text-ink focus:shadow-lg"
+      >
+        {shellText('Skip to content', 'تخطَّ إلى المحتوى', 'Aller au contenu')}
+      </a>
 
-      <main className="relative flex-1 overflow-hidden">
-        {activeTab === 'home' && <HomeScreen
-          onOpenAIChat={() => setIsAIChatOpen(true)}
-          onNavigateTab={navigatePrimary}
-          onSelectCategory={(category) => { setTripDestination(null); setExploreQuery(''); setExploreCategory(category); setExploreView('map'); setActiveTab('explore'); }}
-          onSelectDestination={handleDestinationSelect}
-          onOpenFlights={() => setIsFlightsOpen(true)}
-          onOpenWeather={() => setIsWeatherOpen(true)}
-          onOpenSideMenu={() => setIsSideMenuOpen(true)}
-          onOpenAccount={() => setActiveTab('account')}
-          onSelectPlace={setSelectedPlace}
-          onToggleSave={handleToggleSave}
-          onVoiceCommand={handleVoiceCommand}
-          onVoiceAction={handleAppAction}
-          onRequestLocation={requestPermission}
-          places={places}
-          savedPlaceIds={savedPlaceIds}
-          hasLocation={Boolean(userLocation)}
-          locationPermission={permission}
-          language={language}
-          onOpenAuth={handleOpenAuth}
-          currentUser={currentUser}
-        />}
+      <PrimaryNav
+        activeTab={navActiveTab}
+        language={language}
+        onSelectTab={handleNavSelect}
+        onOpenMenu={() => setIsSideMenuOpen(true)}
+        authUser={authUser}
+        isSignedIn={currentUser.isLoggedIn}
+        onOpenAuth={() => handleOpenAuth('welcome')}
+      />
 
-        <Suspense fallback={loadingFallback}>
-          {activeTab === 'explore' && <div className="h-full w-full overflow-y-auto">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2.5"><button type="button" onClick={() => setActiveTab('home')} className="rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">← {shellText('Home', 'الرئيسية', 'Accueil')}</button><h2 className="truncate text-sm font-black text-slate-900">{exploreView === 'feed' ? shellText('Explore', 'استكشف', 'Explorer') : shellText('Map', 'الخريطة', 'Carte')}</h2><button type="button" onClick={() => setExploreView((current) => current === 'feed' ? 'map' : 'feed')} className="rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700">{exploreView === 'feed' ? shellText('Map', 'الخريطة', 'Carte') : shellText('List', 'القائمة', 'Liste')}</button></div>
-            {exploreView === 'feed' ? <ExploreFeed
-              initialQuery={exploreQuery}
-              onSelectPlace={setSelectedPlace}
-              onStartRoute={setActiveNavDestination}
-              onOpenAddModal={() => setIsAddPlaceOpen(true)}
-              onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
-              savedPlaceIds={savedPlaceIds}
-              onToggleSave={handleToggleSave}
-              language={language}
-              currency={currency}
-              userLocation={userLocation}
-              tripDestination={tripDestination}
-              onPlacesLoaded={setPlaces}
-            /> : <ContextMapView
-              places={places}
-              initialQuery={exploreQuery}
-              initialCategory={exploreCategory}
-              onSelectPlace={setSelectedPlace}
-              onStartRoute={setActiveNavDestination}
-              language={language}
-              userLocation={userLocation}
-            />}
-          </div>}
+      <div className="flex min-h-dvh w-full min-w-0 flex-col">
+        {placesLoading && (
+          <div
+            className="fixed inset-x-0 top-0 z-[55] h-0.5 overflow-hidden bg-brand-soft"
+            role="progressbar"
+            aria-label={shellText('Loading places', 'جارٍ تحميل الأماكن', 'Chargement des lieux')}
+          >
+            <span className="block h-full w-1/3 animate-[sindbad-progress_1.1s_var(--ease-glide)_infinite] bg-brand-fill" />
+          </div>
+        )}
 
-          {activeTab === 'trips' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('My Trips', 'رحلاتي', 'Mes voyages'))}<TripsPlanner language={language} authStatus={authStatus} onOpenAuth={() => handleOpenAuth('welcome')} onTripCreated={(destination) => void handleTripCreated(destination)} initialDestinationQuery={tripInitialQuery} /></div>}
+        <main
+          id="sindbad-main"
+          className={`relative min-w-0 flex-1 ${isMapSurface ? '' : 'pb-[calc(var(--sindbad-chrome-h)+env(safe-area-inset-bottom,0px))] lg:pb-0'}`}
+        >
+          {placesError && (
+            <div className="mx-auto w-full max-w-6xl px-3 pt-3 sm:px-5">
+              <Alert
+                tone="error"
+                action={
+                  <Button size="sm" variant="secondary" onClick={() => void retryPlacesLoad()}>
+                    {shellText('Retry', 'إعادة المحاولة', 'Réessayer')}
+                  </Button>
+                }
+              >
+                {shellText(
+                  'Places around you could not be loaded. Check your connection and try again.',
+                  'تعذر تحميل الأماكن القريبة. تحقق من الاتصال وأعد المحاولة.',
+                  'Impossible de charger les lieux à proximité. Vérifiez votre connexion puis réessayez.',
+                )}
+              </Alert>
+            </div>
+          )}
 
-          {activeTab === 'community' && <div className="h-full w-full overflow-y-auto">{topBar(shellText('Community', 'المجتمع', 'Communauté'))}<CommunityHub onOpenAddModal={() => setIsAddPlaceOpen(true)} onOpenPassiveModal={() => setIsPassiveModalOpen(true)} isPassiveOptedIn={isPassiveOptedIn} language={language} /></div>}
-
-          {activeTab === 'account' && <div className="h-full w-full overflow-y-auto"><AccountProfilePage
-            language={language}
-            onLanguageChange={setLanguage}
-            authStatus={authStatus}
-            authUser={authUser}
-            userLocation={userLocation}
-            locationPermission={permission}
+          {activeTab === 'home' && <HomeScreen
+            onOpenAIChat={() => setIsAIChatOpen(true)}
+            onNavigateTab={navigatePrimary}
+            onSelectCategory={(category) => { setTripDestination(null); setExploreQuery(''); setExploreCategory(category); setExploreView('map'); setActiveTab('explore'); }}
+            onSelectDestination={handleDestinationSelect}
+            onOpenFlights={() => setIsFlightsOpen(true)}
+            onOpenWeather={() => setIsWeatherOpen(true)}
+            onOpenSideMenu={() => setIsSideMenuOpen(true)}
+            onOpenAccount={() => setActiveTab('account')}
+            onSelectPlace={setSelectedPlace}
+            onToggleSave={handleToggleSave}
+            onVoiceCommand={handleVoiceCommand}
+            onVoiceAction={handleAppAction}
             onRequestLocation={requestPermission}
-            isPassiveOptedIn={isPassiveOptedIn}
-            onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
-            savedPlacesCount={savedPlaceIds.length}
-            canInstall={canInstall}
-            onInstall={() => { void promptInstall(); }}
-            onOpenAuth={() => handleOpenAuth('welcome')}
-            onSignOut={async () => { await signOut(); setActiveTab('home'); }}
-            onBack={() => setActiveTab('home')}
-          /></div>}
-        </Suspense>
-      </main>
+            places={places}
+            savedPlaceIds={savedPlaceIds}
+            hasLocation={Boolean(userLocation)}
+            locationPermission={permission}
+            language={language}
+            onOpenAuth={handleOpenAuth}
+            currentUser={currentUser}
+            placesLoading={placesLoading}
+            tripDestination={tripDestination}
+          />}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-2 shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-xl">
-        <div className="relative mx-auto flex max-w-md items-end justify-between px-2">
-          <BottomTab id="tab-home" active={activeTab === 'home'} label={shellText('Home', 'الرئيسية', 'Accueil')} icon={<HomeIcon className="h-5 w-5" />} onClick={() => setActiveTab('home')} />
-          <BottomTab id="tab-explore" active={activeTab === 'explore'} label={shellText('Explore', 'استكشف', 'Explorer')} icon={<Compass className="h-5 w-5" />} onClick={() => { setExploreView('feed'); setActiveTab('explore'); }} />
-          <button id="tab-ai-assistant" type="button" onClick={() => setIsAIChatOpen(true)} className="flex flex-col items-center gap-1 px-3 py-0.5 text-blue-600"><AIIcon size={22} variant="badge" /><span className="text-[11px] font-extrabold">AI</span></button>
-          <BottomTab id="tab-trips" active={activeTab === 'trips'} label={shellText('Trips', 'رحلاتي', 'Voyages')} icon={<ShoppingBag className="h-5 w-5" />} onClick={() => setActiveTab('trips')} />
-          <BottomTab id="tab-profile" active={activeTab === 'account'} label={shellText('Profile', 'حسابي', 'Compte')} icon={<User className="h-5 w-5" />} onClick={() => setActiveTab('account')} />
-        </div>
-      </nav>
+          <Suspense fallback={loadingFallback}>
+            {activeTab === 'explore' && (
+              <div className="flex h-full w-full flex-col">
+                <ScreenHeader
+                  title={exploreView === 'feed'
+                    ? shellText('Explore', 'استكشف', 'Explorer')
+                    : shellText('Map', 'الخريطة', 'Carte')}
+                  subtitle={tripDestination
+                    ? shellText(`Places around ${tripDestination.name}`, `أماكن حول ${tripDestination.arabicName || tripDestination.name}`, `Lieux autour de ${tripDestination.frenchName || tripDestination.name}`)
+                    : undefined}
+                  actions={
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setExploreView((current) => (current === 'feed' ? 'map' : 'feed'))}
+                      >
+                        {exploreView === 'feed' ? shellText('Map', 'الخريطة', 'Carte') : shellText('List', 'القائمة', 'Liste')}
+                      </Button>
+                      <IconButton
+                        label={shellText('Menu', 'القائمة', 'Menu')}
+                        size="sm"
+                        variant="ghost"
+                        className="lg:hidden"
+                        onClick={() => setIsSideMenuOpen(true)}
+                      >
+                        <Menu className="h-4 w-4" />
+                      </IconButton>
+                    </>
+                  }
+                />
+                {exploreView === 'feed' ? <ExploreFeed
+                  initialQuery={exploreQuery}
+                  onSelectPlace={setSelectedPlace}
+                  onStartRoute={setActiveNavDestination}
+                  onOpenAddModal={() => setIsAddPlaceOpen(true)}
+                  onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
+                  savedPlaceIds={savedPlaceIds}
+                  onToggleSave={handleToggleSave}
+                  language={language}
+                  currency={currency}
+                  userLocation={userLocation}
+                  tripDestination={tripDestination}
+                  onPlacesLoaded={setPlaces}
+                  onSwitchToMap={() => setExploreView('map')}
+                  globalPlaces={places}
+                /> : <ContextMapView
+                  places={places}
+                  isLoading={placesLoading}
+                  initialQuery={exploreQuery}
+                  initialCategory={exploreCategory}
+                  onSelectPlace={setSelectedPlace}
+                  onStartRoute={setActiveNavDestination}
+                  language={language}
+                  userLocation={userLocation}
+                />}
+              </div>
+            )}
+
+            {activeTab === 'trips' && <TripsPlanner language={language} authStatus={authStatus} onOpenAuth={() => handleOpenAuth('welcome')} onTripCreated={(destination) => void handleTripCreated(destination)} initialDestinationQuery={tripInitialQuery} />}
+
+            {activeTab === 'community' && (
+              <CommunityHub
+                onOpenAddModal={() => setIsAddPlaceOpen(true)}
+                onOpenPassiveModal={() => setIsPassiveModalOpen(true)}
+                isPassiveOptedIn={isPassiveOptedIn}
+                language={language}
+                onExploreRegion={() => navigatePrimary('map')}
+              />
+            )}
+
+            {activeTab === 'account' && <div className="min-h-dvh"><AccountProfilePage
+              language={language}
+              onLanguageChange={setLanguage}
+              authStatus={authStatus}
+              authUser={authUser}
+              userLocation={userLocation}
+              locationPermission={permission}
+              onRequestLocation={requestPermission}
+              isPassiveOptedIn={isPassiveOptedIn}
+              onOpenPassiveGps={() => setIsPassiveModalOpen(true)}
+              savedPlacesCount={savedPlaceIds.length}
+              onOpenSaved={handleOpenSavedPlaces}
+              canInstall={canInstall}
+              onInstall={() => { void promptInstall(); }}
+              onOpenAuth={() => handleOpenAuth('welcome')}
+              onSignOut={async () => { await signOut(); setActiveTab('home'); }}
+              onBack={() => setActiveTab('home')}
+            /></div>}
+          </Suspense>
+        </main>
+      </div>
 
       <Suspense fallback={null}>
         <SideMenuDrawer
@@ -416,20 +530,38 @@ export default function App() {
         <AuthFlowModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} initialScreen={authInitialScreen} language={language} onToggleLanguage={setLanguage} onAuthSuccess={() => {}} />
         {isOnboardingOpen && authStatus === 'authed' && currentUser.id && <OnboardingModal userId={currentUser.id} language={language} onLanguageChange={setLanguage} userLocation={userLocation} permission={permission} requestPermission={requestPermission} onComplete={() => setIsOnboardingOpen(false)} />}
         <FlightsModal isOpen={isFlightsOpen} onClose={() => setIsFlightsOpen(false)} language={language} />
-        <WeatherModal isOpen={isWeatherOpen} onClose={() => setIsWeatherOpen(false)} language={language} userLocation={userLocation} tripDestination={tripDestination} />
+        <WeatherModal isOpen={isWeatherOpen} onClose={() => setIsWeatherOpen(false)} language={language} userLocation={userLocation} tripDestination={tripDestination} places={places} />
 
         {activeNavDestination && <NavigationFlow destination={activeNavDestination} onClose={() => setActiveNavDestination(null)} onArrivedExplore={(place) => { setActiveNavDestination(null); setSelectedPlace(place); }} onSavePlace={handleToggleSave} isSaved={savedPlaceIds.includes(activeNavDestination.id)} language={language} />}
 
-        <PlaceDetailModal place={selectedPlace} onClose={() => setSelectedPlace(null)} onStartNavigation={(place) => { setSelectedPlace(null); setActiveNavDestination(place); }} onSaveToggle={handleToggleSave} isSaved={selectedPlace ? savedPlaceIds.includes(selectedPlace.id) : false} onPlaceUpdated={(updated) => { setPlaces((current) => current.map((place) => place.id === updated.id ? updated : place)); setSelectedPlace(updated); }} language={language} currency={currency} />
+        <PlaceDetailModal place={selectedPlace} onClose={() => setSelectedPlace(null)} onStartNavigation={(place) => { setSelectedPlace(null); setActiveNavDestination(place); }} onSaveToggle={handleToggleSave} isSaved={selectedPlace ? savedPlaceIds.includes(selectedPlace.id) : false} onPlaceUpdated={(updated) => { setPlaces((current) => current.map((place) => place.id === updated.id ? updated : place)); setSelectedPlace(updated); }} language={language} currency={currency} onOpenMap={() => { setSelectedPlace(null); setExploreView('map'); setActiveTab('explore'); }} />
 
         <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} destination={shellText('Travel and destinations', 'السفر والوجهات', 'Voyages et destinations')} onNavigateApp={handleAppAction} language={language} />
-        <AddPlaceModal isOpen={isAddPlaceOpen} onClose={() => setIsAddPlaceOpen(false)} onPlaceAdded={handlePlaceAdded} language={language} />
-        <PassiveDataModal isOpen={isPassiveModalOpen} onClose={() => setIsPassiveModalOpen(false)} isOptedIn={isPassiveOptedIn} onToggleOptIn={handlePassiveOptInChange} language={language} />
+        <AddPlaceModal
+          isOpen={isAddPlaceOpen}
+          onClose={() => setIsAddPlaceOpen(false)}
+          onPlaceAdded={handlePlaceAdded}
+          language={language}
+          onOpenAuth={() => {
+            setIsAddPlaceOpen(false);
+            handleOpenAuth('welcome');
+          }}
+        />
+        <PassiveDataModal
+          isOpen={isPassiveModalOpen}
+          onClose={() => setIsPassiveModalOpen(false)}
+          isOptedIn={isPassiveOptedIn}
+          onToggleOptIn={handlePassiveOptInChange}
+          language={language}
+          onOpenAuth={() => {
+            setIsPassiveModalOpen(false);
+            handleOpenAuth('welcome');
+          }}
+        />
       </Suspense>
+
+      <ToastRegion />
     </div>
   );
 }
 
-const BottomTab: React.FC<{ id: string; active: boolean; label: string; icon: React.ReactNode; onClick: () => void }> = ({ id, active, label, icon, onClick }) => (
-  <button id={id} type="button" onClick={onClick} className={`flex flex-col items-center gap-1 px-3 py-0.5 transition ${active ? 'font-bold text-blue-600' : 'font-medium text-slate-400 hover:text-slate-600'}`}>{icon}<span className="text-[11px] leading-none">{label}</span></button>
-);

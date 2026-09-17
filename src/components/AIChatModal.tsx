@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, Phone, PhoneOff, Send, X } from 'lucide-react';
-import { MascotSindbad } from './MascotSindbad';
+import { Loader2, Mic, PhoneOff, Send, X } from 'lucide-react';
+import { SindbadMark } from './BrandLogo';
 import { ApiAuthenticationError, sendChatMessage } from '../services/api';
 import { useAuthSession } from '../lib/authSession';
 import { SupportedLanguage, TRANSLATIONS } from '../data/translations';
 import { AppNavigationAction, resolveAppNavigationHelp } from '../lib/appNavigation';
+import { useLocale } from '../lib/i18n';
+import { Sheet } from '../ui/Sheet';
+import { Button, IconButton } from '../ui/Button';
+import { Alert } from '../ui/Feedback';
 
 interface AIChatModalProps {
   isOpen: boolean;
@@ -45,26 +49,27 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   language = 'en',
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-  const isAr = language === 'ar';
-  const isFr = language === 'fr';
+  const locale = useLocale(language);
+  const localize = locale.t;
   const { status: authStatus } = useAuthSession();
-  const localize = (english: string, arabic: string, french: string) => isAr ? arabic : isFr ? french : english;
   const welcome = localize(
     'Hi, I’m Sindbad. Where would you like to go?',
     'أهلاً، أنا سندباد. إلى أين تريد أن تذهب؟',
     'Bonjour, je suis Sindbad. Où souhaitez-vous aller ?'
   );
-  const nowLabel = isAr ? 'الآن' : isFr ? "À l'instant" : 'Now';
+  const nowLabel = locale.isArabic ? 'الآن' : locale.isFrench ? "À l'instant" : 'Now';
   const [messages, setMessages] = useState<Message[]>([{ id: 'welcome', sender: 'sindbad', text: welcome, timestamp: nowLabel }]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [serviceNotice, setServiceNotice] = useState<string | null>(null);
+  const [retryText, setRetryText] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceModeRef = useRef(false);
   const processingVoiceRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setMessages((current) => current.length <= 1
@@ -73,8 +78,12 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   }, [language]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (isOpen) window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 260);
+  }, [isOpen]);
 
   useEffect(() => () => {
     voiceModeRef.current = false;
@@ -86,8 +95,6 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   useEffect(() => {
     if (!isOpen && voiceModeRef.current) stopVoiceConversation();
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const addAssistantMessage = (text: string, actions?: AppNavigationAction[]) => {
     setMessages((current) => current.concat({
@@ -128,7 +135,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
 
     try {
       const recognition = new Recognition();
-      recognition.lang = isAr ? 'ar-MA' : isFr ? 'fr-FR' : 'en-US';
+      recognition.lang = locale.isArabic ? 'ar-MA' : locale.isFrench ? 'fr-FR' : 'en-US';
       recognition.interimResults = false;
       recognition.continuous = false;
       recognition.onstart = () => {
@@ -178,7 +185,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ''));
-    utterance.lang = isAr ? 'ar-MA' : isFr ? 'fr-FR' : 'en-US';
+    utterance.lang = locale.isArabic ? 'ar-MA' : locale.isFrench ? 'fr-FR' : 'en-US';
     utterance.rate = 1;
     utterance.onend = () => {
       if (voiceModeRef.current) window.setTimeout(startRecognition, 250);
@@ -221,8 +228,10 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
       const history = messages.slice(-6).map((message) => ({ sender: message.sender, text: message.text }));
       const reply = await sendChatMessage(text, destination, language, history);
       addAssistantMessage(reply);
+      setRetryText(null);
       if (fromVoice) speakAndContinue(reply);
     } catch (error) {
+      setRetryText(text);
       const notice = error instanceof ApiAuthenticationError
         ? localize('Your session ended. Sign in again.', 'انتهت جلسة الدخول. سجّل الدخول مجدداً.', 'Votre session a expiré. Reconnectez-vous.')
         : localize('Sindbad is temporarily unavailable.', 'سندباد غير متاح مؤقتاً.', 'Sindbad est temporairement indisponible.');
@@ -261,65 +270,169 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2 backdrop-blur-sm sm:p-4" dir={isAr ? 'rtl' : 'ltr'}>
-      <div className="flex h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <header className="flex shrink-0 items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white">
-          <div className="flex min-w-0 items-center gap-3">
-            <MascotSindbad size="sm" mood={voiceMode ? 'thinking' : 'happy'} />
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-black">{t.sindbadAiCompanion}</h2>
-              <p className="truncate text-xs text-blue-100">{voiceMode ? localize(isListening ? 'Listening…' : 'Voice call active', isListening ? 'أستمع إليك…' : 'المحادثة الصوتية مفعّلة', isListening ? 'Écoute…' : 'Conversation vocale active') : destination}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button id="ai-voice-call-btn" type="button" onClick={toggleVoiceConversation} className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition ${voiceMode ? 'bg-rose-500 text-white' : 'bg-white/15 text-white hover:bg-white/25'}`} aria-pressed={voiceMode} aria-label={voiceMode ? localize('End voice call', 'إنهاء المحادثة الصوتية', 'Terminer l’appel vocal') : localize('Start voice call', 'بدء محادثة صوتية', 'Démarrer un appel vocal')}>
-              {voiceMode ? <PhoneOff className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
-              <span className="hidden sm:inline">{voiceMode ? localize('End', 'إنهاء', 'Terminer') : localize('Voice', 'صوت', 'Voix')}</span>
-            </button>
-            <button type="button" onClick={closeChat} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15" aria-label={localize('Close', 'إغلاق', 'Fermer')}><X className="h-4 w-4" /></button>
-          </div>
-        </header>
+  const followUp = (action: AppNavigationAction) => {
+    onNavigateApp(action);
+    closeChat();
+  };
 
-        <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/60 p-4">
-          {serviceNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs font-bold text-amber-900">{serviceNotice}</div>}
+  const header = (
+    <div className="flex shrink-0 items-center gap-3 border-b border-line px-3 py-2.5">
+      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-fill text-on-brand">
+        <SindbadMark className="h-5 w-5" tone="onDark" />
+        {voiceMode && (
+          <span className="absolute inset-0 rounded-full ring-2 ring-positive animate-[sindbad-pulse_1.8s_ease-in-out_infinite]" aria-hidden="true" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-title font-bold tracking-tight text-ink">{t.sindbadAiCompanion}</h2>
+        <p className="truncate text-micro text-muted">
+          {voiceMode
+            ? localize(isListening ? 'Listening…' : 'Voice call active', isListening ? 'أستمع إليك…' : 'المحادثة الصوتية مفعّلة', isListening ? 'Écoute…' : 'Conversation vocale active')
+            : destination}
+        </p>
+      </div>
+      <button
+        id="ai-voice-call-btn"
+        type="button"
+        onClick={toggleVoiceConversation}
+        aria-pressed={voiceMode}
+        aria-label={voiceMode ? localize('End voice call', 'إنهاء المحادثة الصوتية', 'Terminer l’appel vocal') : localize('Start voice call', 'بدء محادثة صوتية', 'Démarrer un appel vocal')}
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-label font-bold transition-colors duration-150 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px] ${
+          voiceMode
+            ? 'border-negative-line bg-negative-fill text-negative-ink'
+            : 'border-line-strong bg-surface text-ink-soft hover:bg-surface-muted'
+        }`}
+      >
+        {voiceMode ? <PhoneOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+        <span className="hidden sm:inline">{voiceMode ? localize('End', 'إنهاء', 'Terminer') : localize('Voice', 'صوت', 'Voix')}</span>
+      </button>
+      <IconButton label={localize('Close', 'إغلاق', 'Fermer')} onClick={closeChat} size="sm" variant="ghost">
+        <X className="h-4 w-4" />
+      </IconButton>
+    </div>
+  );
+
+  const composer = (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void sendMessage(inputValue);
+      }}
+      className="flex items-center gap-2"
+    >
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={(event) => setInputValue(event.target.value)}
+        placeholder={localize('Write a message', 'اكتب رسالتك', 'Écrivez un message')}
+        aria-label={localize('Message for Sindbad', 'رسالة إلى سندباد', 'Message pour Sindbad')}
+        className="h-11 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3.5 text-body text-ink outline-none transition-colors placeholder:text-muted focus:border-brand-500 focus:ring-3 focus:ring-brand-soft"
+      />
+      <button
+        id="send-ai-chat-btn"
+        type="submit"
+        disabled={!inputValue.trim() || isLoading}
+        aria-label={localize('Send message', 'إرسال الرسالة', 'Envoyer le message')}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-fill text-on-brand transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-sunken disabled:text-muted"
+      >
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4 sindbad-mirror" aria-hidden="true" />}
+      </button>
+    </form>
+  );
+
+  return (
+    <Sheet
+      open={isOpen}
+      onClose={closeChat}
+      size="lg"
+      header={header}
+      footer={composer}
+      language={language}
+      className="h-[92dvh] sm:h-[82vh] sm:max-h-[82vh]"
+      bodyClassName="bg-canvas"
+    >
+      <div className="px-3 py-4 sm:px-5">
+        {serviceNotice && (
+          <Alert
+            tone="warning"
+            className="mb-3"
+            action={authStatus !== 'authed' ? (
+              <Button size="sm" variant="secondary" onClick={() => followUp({ target: 'account', label: localize('Sign in', 'تسجيل الدخول', 'Se connecter') })}>
+                {localize('Sign in', 'تسجيل الدخول', 'Se connecter')}
+              </Button>
+            ) : retryText ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const failedText = retryText;
+                  setRetryText(null);
+                  void sendMessage(failedText);
+                }}
+              >
+                {localize('Try again', 'إعادة المحاولة', 'Réessayer')}
+              </Button>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => setServiceNotice(null)}>
+                {localize('Dismiss', 'إخفاء', 'Ignorer')}
+              </Button>
+            )}
+          >
+            {serviceNotice}
+          </Alert>
+        )}
+
+        <ul className="space-y-4">
           {messages.map((message) => (
-            <div key={message.id} className={`flex gap-3 text-xs sm:text-sm ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {message.sender === 'sindbad' && <div className="mt-1 shrink-0"><MascotSindbad size="sm" mood="happy" /></div>}
-              <div className={`max-w-[85%] rounded-2xl p-3.5 leading-relaxed shadow-xs sm:p-4 ${message.sender === 'user' ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-800'}`}>
-                <div className="whitespace-pre-line">{message.text.replace(/\*\*/g, '')}</div>
+            <li key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'gap-2.5'}`}>
+              {message.sender === 'sindbad' && (
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-accent">
+                  <SindbadMark className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <div className={`min-w-0 ${message.sender === 'user' ? 'max-w-[85%]' : 'flex-1'}`}>
+                <div
+                  className={
+                    message.sender === 'user'
+                      ? 'whitespace-pre-line rounded-xl rounded-ee-sm bg-brand-fill px-3.5 py-2.5 text-caption leading-relaxed font-medium text-on-brand'
+                      : 'whitespace-pre-line text-body leading-relaxed text-ink-soft'
+                  }
+                >
+                  {message.text.replace(/\*\*/g, '')}
+                </div>
                 {message.actions && message.actions.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {message.actions.map((action) => (
-                      <button key={`${message.id}-${action.target}-${action.label}`} type="button" onClick={() => { onNavigateApp(action); closeChat(); }} className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100">
+                      <Button key={`${message.id}-${action.target}-${action.label}`} size="sm" variant="secondary" onClick={() => followUp(action)}>
                         {action.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
-                <div className={`mt-1 text-end text-[10px] ${message.sender === 'user' ? 'text-blue-200' : 'text-slate-400'}`}>{message.timestamp}</div>
+                <p className={`mt-1 text-micro text-muted tabular-nums ${message.sender === 'user' ? 'text-end' : ''}`}>{message.timestamp}</p>
               </div>
-            </div>
+            </li>
           ))}
-          {isLoading && <div className="flex items-center gap-3 text-xs text-slate-500"><MascotSindbad size="sm" mood="thinking" /><div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3"><Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />{t.thinking}</div></div>}
-          <div ref={chatEndRef} />
-        </div>
+        </ul>
 
-        <div className="flex shrink-0 items-center gap-2 border-t border-slate-200 bg-white p-3">
-          <button type="button" onClick={toggleVoiceConversation} className={`rounded-2xl p-2.5 transition ${voiceMode ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} aria-label={voiceMode ? localize('End voice call', 'إنهاء المحادثة الصوتية', 'Terminer l’appel vocal') : localize('Start voice call', 'بدء محادثة صوتية', 'Démarrer un appel vocal')}>
-            <Mic className={`h-4 w-4 ${isListening ? 'animate-pulse' : ''}`} />
-          </button>
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(event) => setInputValue(event.target.value)}
-            onKeyDown={(event) => { if (event.key === 'Enter') void sendMessage(inputValue); }}
-            placeholder={localize('Write a message', 'اكتب رسالتك', 'Écrivez un message')}
-            className="flex-1 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-          />
-          <button id="send-ai-chat-btn" type="button" onClick={() => void sendMessage(inputValue)} disabled={!inputValue.trim() || isLoading} className="rounded-2xl bg-blue-600 p-2.5 text-white disabled:opacity-40"><Send className="h-4 w-4 rtl:rotate-180" /></button>
-        </div>
+        {isLoading && (
+          <div className="mt-4 flex items-center gap-2.5 text-caption text-muted">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-accent">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            </span>
+            <span className="flex items-center gap-1.5">
+              {t.thinking}
+              <span className="sindbad-typing inline-flex items-end gap-0.5" aria-hidden="true">
+                <span className="h-1 w-1 rounded-full bg-muted" />
+                <span className="h-1 w-1 rounded-full bg-muted" />
+                <span className="h-1 w-1 rounded-full bg-muted" />
+              </span>
+            </span>
+          </div>
+        )}
+        <div ref={chatEndRef} />
       </div>
-    </div>
+    </Sheet>
   );
 };

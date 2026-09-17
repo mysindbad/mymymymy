@@ -15,6 +15,7 @@ import {
   validateTripExpensePatchPayload,
   validateTripPatchPayload,
 } from './server/dal.ts';
+import { discoverNearbyPlaces } from './server/placeDiscovery.ts';
 
 declare global {
   namespace Express {
@@ -178,7 +179,13 @@ function getUserSupabaseClient(accessToken: string) {
 
 async function consumeRateLimit(scope: string, identity: string, limit: number, windowSeconds: number) {
   if (!supabaseAdmin) {
-    if (process.env.NODE_ENV === 'production') throw new Error('Rate limiting is unavailable');
+    if (process.env.NODE_ENV === 'production') {
+      // Fail closed, but say so honestly: a 503 the client can present as a retry
+      // rather than a 500 that reads like a crash.
+      const unavailable = new Error('Rate limiting is unavailable') as Error & { status?: number };
+      unavailable.status = 503;
+      throw unavailable;
+    }
     return { allowed: true, retryAfterSeconds: 0 };
   }
   const salt = process.env.RATE_LIMIT_SALT || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -280,11 +287,12 @@ function appErrorHandler(error: any, req: Request, res: Response, _next: NextFun
   const code = isAuthError ? (error?.code || 'TOKEN_INVALID') : (typeof error?.code === 'string' ? error.code : undefined);
   const ar = isAuthError
     ? (code === 'TOKEN_MISSING' ? 'جلسة غير موجودة' : 'انتهت الجلسة، سجل الدخول مجدداً')
-    : (status >= 500 ? 'خطأ داخلي في الخادم' : error?.message || 'تعذر تنفيذ الطلب');
+    : (status === 503 ? 'الخدمة غير متاحة مؤقتاً' : status >= 500 ? 'خطأ داخلي في الخادم' : error?.message || 'تعذر تنفيذ الطلب');
   const en = isAuthError
     ? (code === 'TOKEN_MISSING' ? 'No session' : 'Session expired')
-    : (status >= 500 ? 'Internal server error' : error?.message || 'Request failed');
-  if (status >= 500) console.error(error);
+    : (status === 503 ? 'Service temporarily unavailable' : status >= 500 ? 'Internal server error' : error?.message || 'Request failed');
+  if (status >= 500 && status !== 503) console.error(error);
+  else if (status === 503) console.warn(`degraded ${req.method} ${req.path}: ${error?.message || 'unavailable'}`);
   res.status(status).json({ error: requestLanguage(req) === 'ar' ? ar : en, ...(code ? { code } : {}), ar, en });
 }
 
@@ -313,6 +321,16 @@ function addDistanceProjection(places: any[], userLocation?: [number, number]) {
       return distanceA - distanceB;
     });
 }
+
+// Baseline response hardening. No CSP header here on purpose: the shell ships an
+// inline bootstrap that sets dir/theme before first paint, which would need nonces
+// threaded through the build; everything else is same-origin.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), display-capture=(), geolocation=(self), microphone=(self)');
+  next();
+});
 
 app.use(express.json({ limit: '256kb' }));
 app.use('/api', authMiddleware);
@@ -822,6 +840,24 @@ app.post('/api/ai/memory/insights', async (_req, res, next) => {
   }
 });
 
+// Same contract as the Vercel function in api/nearby-places.ts, so self-hosted
+// and dev servers keep nearby discovery working instead of falling through.
+app.get('/api/nearby-places', async (req, res, next) => {
+  try {
+    const { latitude, longitude } = validateLatitudeLongitude(req.query.lat, req.query.lng);
+    const places = await discoverNearbyPlaces([latitude, longitude]);
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200');
+    res.json({ places, total: places.length });
+  } catch (error) {
+    if (error instanceof DataValidationError) {
+      next(error);
+      return;
+    }
+    console.warn('nearby-places unavailable:', error instanceof Error ? error.message : error);
+    res.status(503).json({ error: 'Nearby discovery unavailable' });
+  }
+});
+
 app.get('/api/weather', async (req, res, next) => {
   try {
     const { latitude, longitude } = validateLatitudeLongitude(req.query.lat, req.query.lng);
@@ -838,7 +874,13 @@ app.get('/api/weather', async (req, res, next) => {
       longitude,
     });
   } catch (error) {
-    next(error);
+    if (error instanceof DataValidationError) {
+      next(error);
+      return;
+    }
+    // The upstream is what failed here; report it as unavailable instead of a 500.
+    console.warn('weather unavailable:', error instanceof Error ? error.message : error);
+    res.status(503).json({ error: 'Weather service temporarily unavailable' });
   }
 });
 

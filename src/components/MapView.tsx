@@ -594,7 +594,6 @@ export const MapView: React.FC<MapViewProps> = ({
           onPlacesChange((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
           setActiveNearbyPlace(updated);
         }}
-        onUserEarnedXp={() => {}}
         language={language}
       />
     </div>

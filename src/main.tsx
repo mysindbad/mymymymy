@@ -1,6 +1,9 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+// Leaflet's stylesheet is bundled and imported before the app's own overrides, so
+// map styling never depends on a third-party CDN being reachable.
+import 'leaflet/dist/leaflet.css';
 import './index.css';
 import {startAutomaticDayNightTheme} from './lib/dayNightTheme';
 import {cleanOAuthErrorFromCurrentUrl} from './lib/authUrlRecovery';
