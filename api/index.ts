@@ -160,6 +160,7 @@ async function handleAiChat(req: any, res: any) {
     .from('places')
     .select('name, arabic_name, french_name, category, region, area, rating, seed_data, owner_verified')
     .or('seed_data.eq.true,owner_verified.eq.true')
+    .not('moderation_status', 'eq', 'rejected')
     .order('rating', { ascending: false })
     .limit(20);
   if (error) throw error;
@@ -233,6 +234,7 @@ async function handlePlanTrip(req: any, res: any) {
     .from('places')
     .select('id, name, arabic_name, french_name, category, region, area, address, rating, seed_data, owner_verified')
     .eq('id', destinationId)
+    .not('moderation_status', 'eq', 'rejected')
     .maybeSingle();
   if (error) throw error;
   if (!destination) return res.status(404).json({ error: 'Destination not found' });

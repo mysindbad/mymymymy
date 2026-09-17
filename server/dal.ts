@@ -634,7 +634,13 @@ export function createDal(accessToken?: string) {
         if (!supabaseAdmin) {
           return seedFallbackOrThrow('Supabase places unavailable', () => getSeedPlaces(filters));
         }
-        let query = getSupabaseAdmin().from('places').select('*, reviews(*)').order('created_at', { ascending: false });
+        let query = getSupabaseAdmin()
+          .from('places')
+          .select('*, reviews(*)')
+          // A rejected place stays in the database and stays visible to moderators, but it
+          // is no longer published: moderation hides, it never destroys.
+          .not('moderation_status', 'eq', 'rejected')
+          .order('created_at', { ascending: false });
         if (filters.category && filters.category !== 'All') query = query.eq('category', filters.category);
         if (filters.region && filters.region !== 'All') query = query.ilike('region', filters.region);
         if (filters.hiddenGemsOnly) query = query.eq('is_under_documented_gem', true);
@@ -653,7 +659,12 @@ export function createDal(accessToken?: string) {
         if (!supabaseAdmin) {
           return seedFallbackOrThrow('Supabase place unavailable', () => getSeedPlaces().find((place) => place.id === id) || null);
         }
-        const { data, error } = await getSupabaseAdmin().from('places').select('*, reviews(*)').eq('id', id).maybeSingle();
+        const { data, error } = await getSupabaseAdmin()
+          .from('places')
+          .select('*, reviews(*)')
+          .eq('id', id)
+          .not('moderation_status', 'eq', 'rejected')
+          .maybeSingle();
         if (error) {
           return seedFallbackOrThrow('Supabase place read failed', () => getSeedPlaces().find((place) => place.id === id) || null, error);
         }

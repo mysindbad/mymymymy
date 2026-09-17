@@ -16,6 +16,20 @@ import {
   validateTripPatchPayload,
 } from './server/dal.ts';
 import { discoverNearbyPlaces } from './server/placeDiscovery.ts';
+import {
+  AUDIT_LIST_SORTS,
+  PLACE_LIST_SORTS,
+  REVIEW_LIST_SORTS,
+  TRAVELER_LIST_SORTS,
+  createAdminService,
+  createServiceEventRecorder,
+  parseCurationPatch,
+  parseListQuery,
+  parseModerationDecision,
+  parseRoleChange,
+  requireAdminActor,
+  type AdminActor,
+} from './server/admin.ts';
 
 declare global {
   namespace Express {
@@ -156,6 +170,100 @@ function authMiddleware(req: Request, _res: Response, next: NextFunction) {
 function requireAuth(req: Request, _res: Response, next: NextFunction) {
   if (!req.user || !req.accessToken) return next(authenticationError(req));
   next();
+}
+
+// ---------------------------------------------------------------------------
+// Admin Control Center wiring.
+//
+// Two short-lived, single-flight caches exist for one reason only: a control-center
+// screen fans out to several endpoints per render, and without them every one of those
+// requests would re-verify the same bearer token and re-query the admin roster. Entries
+// are keyed by a hash of the access token, never by user id (so a re-login is a new key),
+// and they expire in seconds, so a revoked administrator keeps their previous session no
+// longer than the TTL. The cache is an optimization: the mutation RPCs re-check the role
+// in the database on their own.
+// ---------------------------------------------------------------------------
+
+const ADMIN_AUTH_TTL_MS = 5000;
+
+// The Supabase client structurally satisfies the narrower admin-client contract declared by
+// server/admin.ts. This single adapter is where that is asserted, so no admin route has to
+// re-unify the whole PostgREST builder surface (the compiler gives up on it as
+// "excessively deep"), and the service-role client still never leaves this file.
+type AdminClientHandle = Parameters<typeof requireAdminActor>[0]['client'];
+const adminClient: AdminClientHandle = supabaseAdmin as unknown as AdminClientHandle;
+const adminService = createAdminService(adminClient);
+const recordServiceEvent = createServiceEventRecorder(adminClient);
+
+const adminActorCache = new Map<string, { expiresAt: number; promise: Promise<AdminActor> }>();
+
+async function resolveAdminActor(req: Request, options: { superUser?: boolean } = {}): Promise<AdminActor> {
+  if (!req.user || !req.accessToken) {
+    const error = authenticationError(req) as Error & { code?: string };
+    error.code = req.authFailure || 'TOKEN_MISSING';
+    throw error;
+  }
+  const cacheKey = `${options.superUser ? 'super' : 'admin'}:${req.user.id}`;
+  const now = Date.now();
+  const cached = adminActorCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.promise;
+  const promise = requireAdminActor({ user: req.user, client: adminClient, superUser: options.superUser })
+    .catch((error) => {
+      adminActorCache.delete(cacheKey);
+      throw error;
+    });
+  // Denied lookups are cached too - but only for the same tiny window, so a grant
+  // takes effect on the next request rather than after a page reload.
+  adminActorCache.set(cacheKey, { promise, expiresAt: now + ADMIN_AUTH_TTL_MS });
+  return promise;
+}
+
+function adminListQuery(req: Request, sorts: readonly string[], defaultSort: string) {
+  return parseListQuery(req.query as Record<string, unknown>, { sorts, defaultSort });
+}
+
+function adminQueryValues(req: Request) {
+  return (req.query && typeof req.query === 'object' ? req.query : {}) as Record<string, unknown>;
+}
+
+function enumValue<T extends string>(raw: unknown, allowed: readonly T[]): T | '' {
+  const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return (allowed as readonly string[]).includes(value) ? (value as T) : '';
+}
+
+async function handleAdminRoute(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  work: (actor: AdminActor) => Promise<unknown>,
+  options: { superUser?: boolean; status?: number } = {},
+) {
+  try {
+    const actor = await resolveAdminActor(req, { superUser: options.superUser });
+    const payload = await work(actor);
+    res.status(options.status ?? 200).json(payload ?? { ok: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
+const ADMIN_MUTATION_LIMIT = 60;
+const ADMIN_MUTATION_WINDOW_SECONDS = 60;
+
+/**
+ * Privileged requests are limited by administrator identity. The rate-limit row is only
+ * consumed after the administrator has been authorized, so an unauthenticated probe
+ * cannot spend a legitimate administrator's budget.
+ */
+async function requireAdminMutationHeadroom(req: Request) {
+  const identity = createHmac('sha256', process.env.RATE_LIMIT_SALT || req.user?.id || 'admin').update(req.user?.id || 'anonymous').digest('hex');
+  const limit = await consumeRateLimit('admin-mutations', identity, ADMIN_MUTATION_LIMIT, ADMIN_MUTATION_WINDOW_SECONDS);
+  if (!limit.allowed) {
+    const error = new Error('Administrator request limit reached. Try again shortly.') as Error & { status?: number; retryAfterSeconds?: number };
+    error.status = 429;
+    error.retryAfterSeconds = limit.retryAfterSeconds;
+    throw error;
+  }
 }
 
 const AI_CHAT_MAX_CHARS = 2000;
@@ -334,6 +442,43 @@ app.use((_req, res, next) => {
 
 app.use(express.json({ limit: '256kb' }));
 app.use('/api', authMiddleware);
+
+/**
+ * Operational telemetry for the third-party dependencies the app calls on behalf of a
+ * user. Mounted once, keyed by path, and derived from the response the client received -
+ * so it cannot drift from the handlers, and it stores no request body, no prompt text,
+ * no coordinates and no identity. Latency is measured here, honestly, at the boundary.
+ */
+function observeDependency(service: 'ai' | 'weather' | 'place_discovery', mount: string) {
+  app.use(mount, (req: Request, res: Response, next: NextFunction) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      const status = res.statusCode;
+      const outcome = status < 400
+        ? 'ok'
+        : status === 429
+          ? 'rate_limited'
+          : status === 503
+            ? 'unavailable'
+            : status >= 400 && status < 500
+              ? 'rejected'
+              : 'error';
+      recordServiceEvent({
+        service,
+        outcome: outcome as 'ok' | 'error' | 'unavailable' | 'rate_limited' | 'rejected',
+        endpoint: `${mount.replace('/api/', '')}${req.url === '/' ? '' : req.url.split('?')[0]}`.slice(0, 96),
+        latencyMs: Date.now() - startedAt,
+        statusClass: status,
+        detail: null,
+      });
+    });
+    next();
+  });
+}
+
+observeDependency('weather', '/api/weather');
+observeDependency('place_discovery', '/api/nearby-places');
+observeDependency('ai', '/api/ai');
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -882,6 +1027,214 @@ app.get('/api/weather', async (req, res, next) => {
     console.warn('weather unavailable:', error instanceof Error ? error.message : error);
     res.status(503).json({ error: 'Weather service temporarily unavailable' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Admin Control Center API. Every route re-resolves the caller's role; nothing here
+// trusts a client-supplied flag, and every mutation goes to a database function that
+// checks the same roster again.
+// ---------------------------------------------------------------------------
+
+app.get('/api/admin/session', async (req, res, next) => {
+  try {
+    if (!req.user) {
+      res.json({ status: 'anonymous', isConfigured: Boolean(supabaseAdmin) });
+      return;
+    }
+    if (!supabaseAdmin) {
+      res.json({ status: 'unavailable', isConfigured: false });
+      return;
+    }
+    const actor = await requireAdminActor({ user: req.user, client: adminClient });
+    res.json({ status: 'granted', role: actor.role, isConfigured: true });
+  } catch (error) {
+    const code = (error as Error & { code?: string })?.code;
+    if (code === 'ADMIN_REQUIRED') {
+      res.json({ status: 'denied', isConfigured: true });
+      return;
+    }
+    next(error);
+  }
+});
+
+app.get('/api/admin/overview', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { overview: await adminService.overview() };
+  });
+});
+
+app.get('/api/admin/places', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    const query = adminListQuery(req, PLACE_LIST_SORTS, 'created_at');
+    const values = adminQueryValues(req);
+    return {
+      ...await adminService.places(query, {
+        status: enumValue(values.status, ['pending', 'approved', 'needs_changes', 'rejected']),
+        category: typeof values.category === 'string' ? values.category.trim().slice(0, 40) : '',
+        region: typeof values.region === 'string' ? values.region.trim().slice(0, 80) : '',
+        source: typeof values.source === 'string' ? values.source.trim().slice(0, 40) : '',
+        gem: values.gem === 'true',
+      }),
+    };
+  });
+});
+
+app.get('/api/admin/moderation/queue', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { queue: await adminService.moderationQueue(adminListQuery(req, PLACE_LIST_SORTS, 'created_at')) };
+  });
+});
+
+app.get('/api/admin/places/:id', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { detail: await adminService.place(String(req.params.id)) };
+  });
+});
+
+app.patch('/api/admin/places/:id', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    await requireAdminMutationHeadroom(req);
+    const { patch, changed } = parseCurationPatch(req.body);
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) || null : null;
+    const result = await adminService.updatePlaceCuration(actor, String(req.params.id), patch, reason);
+    return { updated: result.result, changedFields: changed, actorRole: actor.role };
+  }, { status: 200 });
+});
+
+app.post('/api/admin/places/:id/moderation', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    await requireAdminMutationHeadroom(req);
+    const decision = parseModerationDecision(req.body, 'place');
+    const result = await adminService.setPlaceModeration(actor, String(req.params.id), decision);
+    return { moderation: result.result, changedFields: ['moderation_status'], actorRole: actor.role };
+  });
+});
+
+app.get('/api/admin/reviews', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    const query = adminListQuery(req, REVIEW_LIST_SORTS, 'date');
+    const values = adminQueryValues(req);
+    return {
+      ...await adminService.reviews(query, {
+        status: enumValue(values.status, ['approved', 'pending', 'rejected']),
+      }),
+    };
+  });
+});
+
+app.post('/api/admin/reviews/:id/moderation', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    await requireAdminMutationHeadroom(req);
+    const decision = parseModerationDecision(req.body, 'review');
+    const result = await adminService.setReviewModeration(actor, String(req.params.id), decision);
+    return { moderation: result.result, actorRole: actor.role };
+  });
+});
+
+app.get('/api/admin/travelers', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { ...await adminService.travelers(adminListQuery(req, TRAVELER_LIST_SORTS, 'created_at')) };
+  });
+});
+
+app.get('/api/admin/travelers/:id', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { traveler: await adminService.traveler(String(req.params.id)) };
+  });
+});
+
+app.get('/api/admin/administrators', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { ...await adminService.roster() };
+  });
+});
+
+app.post('/api/admin/administrators/grant', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    await requireAdminMutationHeadroom(req);
+    const input = parseRoleChange(req.body, 'grant');
+    const result = await adminService.grantRole(actor, {
+      role: input.role as 'admin' | 'super_admin',
+      targetUserId: input.targetUserId as string,
+      reason: input.reason,
+    });
+    return { grant: result.result, actorRole: actor.role };
+  });
+});
+
+app.post('/api/admin/administrators/revoke', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    await requireAdminMutationHeadroom(req);
+    const input = parseRoleChange(req.body, 'revoke');
+    const result = await adminService.revokeRole(actor, { targetUserId: String((req.body as any)?.user_id ?? (req.body as any)?.userId ?? ''), reason: input.reason });
+    return { revoke: result.result, actorRole: actor.role };
+  });
+});
+
+app.get('/api/admin/audit-events', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    const values = adminQueryValues(req);
+    return {
+      ...await adminService.auditEvents(adminListQuery(req, AUDIT_LIST_SORTS, 'occurred_at'), {
+        targetType: typeof values.targetType === 'string' ? values.targetType.trim().slice(0, 20) : '',
+        targetId: typeof values.targetId === 'string' ? values.targetId.trim().slice(0, 64) : '',
+        action: typeof values.action === 'string' ? values.action.trim().slice(0, 64) : '',
+      }),
+    };
+  });
+});
+
+app.get('/api/admin/service-health', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { health: await adminService.serviceHealth(), configuration: { aiProvider: Boolean(getGeminiClient()), database: Boolean(supabaseAdmin) } };
+  });
+});
+
+app.post('/api/admin/service-health/probes', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    await requireAdminMutationHeadroom(req);
+    void actor;
+    return { probes: await adminService.serviceProbes(recordServiceEvent) };
+  });
+});
+
+app.get('/api/admin/ai-operations', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return {
+      ...await adminService.aiOperations(),
+      configuration: { provider: 'gemini', model: 'gemini-3.8-flash', keyConfigured: Boolean(getGeminiClient()) },
+    };
+  });
+});
+
+app.get('/api/admin/settings', async (req, res, next) => {
+  await handleAdminRoute(req, res, next, async (actor) => {
+    void actor;
+    return { settings: await adminService.settings(), role: actor.role };
+  });
+});
+
+// An admin path that is not a registered endpoint answers the way every other admin answer
+// does: JSON with a code. Left alone, Express would reply with an HTML "Cannot GET" page,
+// which an admin client cannot parse and which echoes framework internals.
+app.use('/api/admin', (_req, res) => {
+  res.status(404).json({
+    error: 'Unknown admin endpoint',
+    code: 'ADMIN_ROUTE_NOT_FOUND',
+    ar: 'نقطة وصول غير معروفة للوحة التحكم',
+    en: 'Unknown admin endpoint',
+  });
 });
 
 app.use(appErrorHandler);
