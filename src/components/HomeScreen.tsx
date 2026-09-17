@@ -254,7 +254,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           <form onSubmit={handleSearchSubmit} className="mt-4">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/15 bg-surface/95 p-1.5 shadow-lg backdrop-blur-sm transition-shadow focus-within:border-brand-500 focus-within:shadow-md">
+            <div data-surface="card" className="flex items-center gap-1.5 rounded-full border border-line bg-surface p-1.5 shadow-lg transition-shadow focus-within:border-brand-500 focus-within:shadow-md">
               <Search className="ms-2 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
               <input
                 ref={searchRef}

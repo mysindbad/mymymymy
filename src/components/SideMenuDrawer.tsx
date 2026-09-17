@@ -74,14 +74,23 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
     onClose();
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  // The portal must stay outside AnimatePresence: framer-motion clones its
+  // direct children, and cloning a portal drops its content.
+  return createPortal(
     <AnimatePresence>
-      {isOpen && typeof document !== 'undefined' && createPortal(
-        <div
+      {isOpen && (
+        <motion.div
+          key="side-menu-drawer"
           className={`fixed inset-0 z-[60] flex ${locale.isArabic ? 'justify-end' : 'justify-start'}`}
           role="dialog"
           aria-modal="true"
           aria-label={localize('Menu', 'القائمة', 'Menu')}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
         >
           <motion.button
             type="button"
@@ -194,9 +203,9 @@ export const SideMenuDrawer: React.FC<SideMenuDrawerProps> = ({
               </button>
             </footer>
           </motion.aside>
-        </div>,
-        document.body,
+        </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };

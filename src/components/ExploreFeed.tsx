@@ -253,12 +253,10 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
       )}
 
       {!isLoading && visiblePlaces.length > 0 && (
-        <>
-          {/* Mobile and tablet: one column of scannable rows. Desktop: two columns, then a map nudge. */}
-          <div className="mt-3 hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-3">
-            {visiblePlaces.map((place, index) => (
+        <ul className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+          {visiblePlaces.map((place, index) => (
+            <li key={place.id}>
               <PlaceCard
-                key={place.id}
                 place={place}
                 variant="grid"
                 language={locale.language}
@@ -268,27 +266,11 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                 onSelect={onSelectPlace}
                 onRoute={onStartRoute}
                 eager={index < 3}
+                className="h-full"
               />
-            ))}
-          </div>
-          <ul className="mt-3 space-y-2 sm:hidden">
-            {visiblePlaces.map((place, index) => (
-              <li key={place.id}>
-                <PlaceCard
-                  place={place}
-                  variant="row"
-                  language={locale.language}
-                  currency={currency}
-                  saved={savedPlaceIds.includes(place.id)}
-                  onToggleSave={onToggleSave}
-                  onSelect={onSelectPlace}
-                  onRoute={onStartRoute}
-                  eager={index < 3}
-                />
-              </li>
-            ))}
-          </ul>
-        </>
+            </li>
+          ))}
+        </ul>
       )}
 
       {hasOpenStreetMapData && (
