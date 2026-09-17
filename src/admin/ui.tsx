@@ -423,7 +423,7 @@ export function DataTable<Row>({
                 <th
                   key={column.id}
                   scope="col"
-                  style={{ textAlign: column.align ?? 'start', minWidth: column.width }}
+                  style={{ textAlign: column.align ?? 'start', width: column.width }}
                   aria-sort={isSorted ? (sort?.dir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   {sortable ? (
@@ -470,7 +470,7 @@ export function DataTable<Row>({
               return (
                 <tr key={key} data-active={activeKey === key ? 'true' : undefined}>
                   {columns.map((column, cellIndex) => (
-                    <td key={column.id} style={{ textAlign: column.align ?? 'start' }}>
+                    <td key={column.id} data-label={typeof column.label === 'string' ? column.label : undefined} style={{ textAlign: column.align ?? 'start' }}>
                       {cellIndex === 0 && onRowSelect ? (
                         <button type="button" className="adm-rowbtn" data-adm-row={index} onClick={() => onRowSelect(row)}>
                           {column.render(row)}
@@ -518,7 +518,7 @@ export function Pagination({
       <span className="adm-pager-count adm-num">
         {t(`Rows ${from}–${to} of ${n(total)}`, `الصفوف ${from}–${to} من ${n(total)}`, `Lignes ${from}–${to} sur ${n(total)}`)}
       </span>
-      <span style={{ marginInlineStart: 'auto', display: 'inline-flex', gap: '0.375rem', alignItems: 'center' }}>
+      <span className="adm-pager-actions">
         {onPageSize ? (
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
             <span>{t('Rows', 'عدد الصفوف', 'Lignes')}</span>
@@ -605,6 +605,7 @@ export function Modal({
         onClose();
         return;
       }
+      if (event.target instanceof Node && panel && !panel.contains(event.target as Node) && event.key !== 'Escape') return;
       if (event.key !== 'Tab') return;
       const items = focusable();
       if (items.length === 0) return;
@@ -618,15 +619,22 @@ export function Modal({
         first.focus();
       }
     };
-    panel?.addEventListener('keydown', onKeyDown);
+    // Escape is heard on the document, not on the panel: a dialog must be dismissible from
+    // wherever the focus happens to be, including the split second before the trap has moved
+    // focus inside. The Tab ring is deliberately kept on the panel.
+    document.addEventListener('keydown', onKeyDown);
     return () => {
-      panel?.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown);
       previous?.focus?.();
     };
   }, [onClose]);
 
+  // Portalled into the console's own root: the tokens and the tone live on .sindbad-admin, so a
+  // portal to document.body would find no custom properties and render a dialog as a panel of
+  // loose text over the grid. The body remains the fallback for anything mounted before the shell.
+  const host = typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('.sindbad-admin');
   return createPortal(
-    <div className="adm-scrim" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="adm-scrim adm-portal" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="adm-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panelRef} data-size={size}>
         <header>
           <h2 id={titleId}>{title}</h2>
@@ -643,7 +651,7 @@ export function Modal({
         {footer ? <footer>{footer}</footer> : null}
       </div>
     </div>,
-    document.body,
+    host ?? document.body,
   );
 }
 

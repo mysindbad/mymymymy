@@ -134,7 +134,7 @@ export interface FixtureStore {
 const now = new Date('2026-09-17T09:00:00.000Z').getTime();
 const iso = (hoursAgo: number) => new Date(now - hoursAgo * 3600_000).toISOString();
 
-export function createStore(): FixtureStore {
+export function createStore(options: { bulkPlaces?: number } = {}): FixtureStore {
   const rows = seed();
   const places: FixturePlace[] = rows.map((row, index) => {
     // A deterministic spread of moderation states so pagination and filters have something real
@@ -271,6 +271,24 @@ export function createStore(): FixtureStore {
     ],
     writes: [],
   };
+
+  // A grid is only worth paginating if there is something to paginate. The bulk fill repeats the
+  // shipped catalogue under fresh ids so page 2, page 3 and the "Rows x-y of z" arithmetic are
+  // exercised against records with a real shape. This is fixture volume, not invented operations
+  // data: nothing here pretends to be a metric or a trend.
+  const baseCount = store.places.length;
+  for (let index = 0; index < (options.bulkPlaces ?? 0); index += 1) {
+    const base = store.places[index % baseCount];
+    store.places.push({
+      ...base,
+      id: uuid(500 + index),
+      name: `${base.name} (bulk ${index + 1})`,
+      moderation: { ...base.moderation },
+      rating: { ...base.rating },
+      seed: { ...base.seed },
+    });
+  }
+
 
   return store;
 }

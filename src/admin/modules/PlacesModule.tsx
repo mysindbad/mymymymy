@@ -187,7 +187,7 @@ export default function PlacesModule({ placeId }: { placeId: string | null }) {
         <div className="adm-toolbar">
           <SearchBox
             label={t('Search places', 'البحث في الأماكن', 'Rechercher un lieu')}
-            placeholder={t('Name, area, description — press / to focus', 'الاسم، المنطقة، الوصف — اضغط / للتركيز', 'Nom, zone, description — / pour focus')}
+            placeholder={t('Name, area, description', 'الاسم، المنطقة، الوصف', 'Nom, zone, description')}
             value={searchInput}
             onChange={setSearchInput}
           />

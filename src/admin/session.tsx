@@ -83,7 +83,13 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(() => setSignInOpen(true), []);
 
   const signOut = useCallback(async () => {
-    await signOutOfAdmin();
+    try {
+      await signOutOfAdmin();
+    } catch {
+      // A provider that refuses the sign-out must still close the console: the privileged session
+      // is held by the server and expires on its own, and an unhandled rejection here would replace
+      // an honest "signed out" screen with a broken one.
+    }
     invalidateAdminCache();
     setOwnEmail(null);
     await probe();

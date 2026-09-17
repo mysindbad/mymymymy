@@ -146,13 +146,21 @@ export function PlaceInspector({ placeId, onClose, onOpenPlace }: { placeId: str
       });
       setForm((current) => (current ? { ...current, __reason: '' } : current));
       resource.reload();
-    } else if (curation.error) {
-      pushAdminToast({ tone: 'bad', title: t('The change was refused', 'رُفض التغيير', 'La modification a été refusée'), message: describeAdminError(curation.error) });
+    } else if (curation.errorRef.current) {
+      pushAdminToast({ tone: 'bad', title: t('The change was refused', 'رُفض التغيير', 'La modification a été refusée'), message: describeAdminError(curation.errorRef.current) });
     }
   }, [patch, validate, form, curation, resource, t]);
 
   const submitDecision = useCallback(async (next: CommittedDecision | null) => {
     if (!next) return;
+    // Hiding a record from the public catalogue is the one action on this screen that removes it
+    // from people's view, so it always passes the typed-name confirmation - including when the
+    // reason arrived through the inline form rather than straight from the button.
+    if (next.status === 'rejected' && !confirmReject) {
+      setDecision(next);
+      setConfirmReject(true);
+      return;
+    }
     const result = await moderation.run({ status: next.status, ...(next.reason ? { reason: next.reason } : {}) });
     setDecision(null);
     if (result) {
@@ -163,10 +171,10 @@ export function PlaceInspector({ placeId, onClose, onOpenPlace }: { placeId: str
       });
       setConfirmReject(false);
       resource.reload();
-    } else if (moderation.error) {
-      pushAdminToast({ tone: 'bad', title: t('The decision was refused', 'رُفض القرار', 'La décision a été refusée'), message: describeAdminError(moderation.error) });
+    } else if (moderation.errorRef.current) {
+      pushAdminToast({ tone: 'bad', title: t('The decision was refused', 'رُفض القرار', 'La décision a été refusée'), message: describeAdminError(moderation.errorRef.current) });
     }
-  }, [moderation, resource, t]);
+  }, [moderation, resource, t, confirmReject]);
 
   const requestDecision = useCallback((status: PlaceModerationStatus) => {
     if (!place) return;
@@ -194,6 +202,9 @@ export function PlaceInspector({ placeId, onClose, onOpenPlace }: { placeId: str
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.key === 'Escape') {
+      // A dialog owns the keyboard while it is open: escaping must dismiss the dialog in front,
+      // not the screen behind it.
+      if (document.querySelector('[role="dialog"]')) return;
       onClose();
       return;
     }

@@ -55,8 +55,8 @@ export default function AdministratorsModule() {
       setTargetId('');
       setParams({ target: null });
       roster.reload();
-    } else if (grant.error) {
-      setFormError(describeAdminError(grant.error));
+    } else if (grant.errorRef.current) {
+      setFormError(describeAdminError(grant.errorRef.current));
     }
   };
 
@@ -72,8 +72,8 @@ export default function AdministratorsModule() {
       setConfirmRevoke(null);
       setRevokeReason('');
       roster.reload();
-    } else if (revoke.error) {
-      pushAdminToast({ tone: 'bad', title: t('The revocation was refused', 'رُفض السحب', 'Révocation refusée'), message: describeAdminError(revoke.error) });
+    } else if (revoke.errorRef.current) {
+      pushAdminToast({ tone: 'bad', title: t('The revocation was refused', 'رُفض السحب', 'Révocation refusée'), message: describeAdminError(revoke.errorRef.current) });
     }
   };
 

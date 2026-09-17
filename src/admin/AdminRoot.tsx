@@ -245,7 +245,7 @@ function AdminShell() {
               const items = NAV.filter((item) => item.group === group);
               if (items.length === 0) return null;
               return (
-                <div key={group}>
+                <div key={group} className="adm-nav-group-block">
                   <p className="adm-nav-group">{t(GROUP_LABELS[group].en, GROUP_LABELS[group].ar, GROUP_LABELS[group].fr)}</p>
                   {items.map((item) => {
                     const Icon = item.icon;

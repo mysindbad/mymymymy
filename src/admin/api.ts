@@ -7,7 +7,7 @@
 //    "not allowed" (403) from "backend not configured" (503) from "bad input" (400);
 //  - no request is ever sent without a timeout and an abort signal, so a slow upstream
 //    cannot leave a screen spinning forever.
-import { getAccessToken, supabase } from '../lib/supabase';
+import { getAccessToken, isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getAdminLocale, type AdminLocale } from './locale';
 
 export type AdminErrorCode =
@@ -218,6 +218,10 @@ export async function adminFetch<T>(path: string, options: FetchOptions = {}): P
 /** Drops the local session without touching other tabs of the consumer app more than
  *  Supabase's own storage events already would. */
 export async function signOutOfAdmin() {
+  // With no Supabase client there is nothing here to revoke, and the caller clears the console's
+  // own session. Rejecting would put a console error on a screen that already says, truthfully,
+  // that the backend is not configured.
+  if (!isSupabaseConfigured) return;
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   if (error) throw new Error(error.message);
 }

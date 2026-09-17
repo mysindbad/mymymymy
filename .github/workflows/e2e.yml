@@ -4,9 +4,14 @@ on:
   push:
     branches:
       - 'audit/**'
+      # Work that stacks on an accepted-but-unmerged branch (the Admin Control Center PR targets
+      # the product branch, not main) must still be verified, or a delivery can land with no checks
+      # at all. The two patterns below only widen which refs are verified; nothing in the job relaxes.
+      - 'arena/**'
   pull_request:
     branches:
       - main
+      - 'arena/**'
 
 permissions:
   contents: read

@@ -94,7 +94,7 @@ export default function ServiceHealthModule() {
       setProbes({ services: result.probes.services.map((service) => service.key), checkedAt: result.probes.checkedAt });
       health.reload();
     } else {
-      setProbeError(describeAdminError(probeAction.error));
+      setProbeError(describeAdminError(probeAction.errorRef.current));
     }
     setProbing(false);
   }, [probeAction, health]);

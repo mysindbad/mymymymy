@@ -55,7 +55,7 @@ export function MapPreview({ latitude, longitude, title }: { latitude: number; l
   }, [latitude, longitude, title]);
 
   return (
-    <div dir="ltr" style={{ position: 'relative', border: '1px solid var(--adm-line)', borderRadius: 'var(--adm-radius)', overflow: 'clip', background: 'var(--adm-surface-sunken)' }}>
+    <div dir="ltr" className="adm-map-shell">
       <div ref={containerRef} style={{ blockSize: '11rem' }} role="img" aria-label={t(`Map preview of ${title}`, `معاينة خريطة لـ${title}`, `Aperçu cartographique de ${title}`)} />
       {state === 'loading' ? (
         <span className="adm-note" style={{ position: 'absolute', insetBlockStart: '0.375rem', insetInlineStart: '0.5rem', background: 'var(--adm-surface)', padding: '0.0625rem 0.375rem', borderRadius: '4px' }}>
