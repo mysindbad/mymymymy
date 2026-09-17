@@ -16,7 +16,7 @@
     "clean": "node -e \"const fs=require('node:fs'); for (const path of ['dist','playwright-report','test-results']) fs.rmSync(path,{recursive:true,force:true}); fs.rmSync('server.js',{force:true});\"",
     "lint": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
-    "test:contracts": "node --import tsx scripts/verify-user-truth-contracts.ts && node --import tsx scripts/verify-truthful-dal.ts && node --import tsx scripts/verify-moderation-contracts.ts && node --import tsx scripts/verify-migration-sql.ts",
+    "test:contracts": "node --import tsx scripts/verify-user-truth-contracts.ts && node --import tsx scripts/verify-truthful-dal.ts && node --import tsx scripts/verify-moderation-contracts.ts && node --import tsx scripts/verify-migration-sql.ts && node --import tsx scripts/verify-admin-auth-entry.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
