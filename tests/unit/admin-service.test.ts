@@ -527,3 +527,23 @@ test('a degraded upstream surfaces as an error the route can translate, not as a
   await assert.rejects(() => service.places(listQuery(), {}));
   await assert.rejects(() => service.overview());
 });
+
+test('a malformed privilege-change target is refused before any query or RPC is issued', async () => {
+  const actor = { userId: ADMIN_ID, role: 'super_admin' as const };
+  for (const target of ['', '   ', 'nope', '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b4', "1 OR 1=1", null, undefined, 42]) {
+    const db = fakeDb({ admin_accounts: [] });
+    const service = createAdminService(db.client);
+    await assert.rejects(
+      () => service.revokeRole(actor, { targetUserId: target as string, reason: 'left the team' }),
+      (error: unknown) => error instanceof DataValidationError && (error as DataValidationError & { status: number }).status === 400,
+      `revoke should reject ${JSON.stringify(target)}`,
+    );
+    await assert.rejects(
+      () => service.grantRole(actor, { role: 'admin', targetUserId: target as string, reason: 'on-call moderator' }),
+      (error: unknown) => error instanceof DataValidationError && (error as DataValidationError & { status: number }).status === 400,
+      `grant should reject ${JSON.stringify(target)}`,
+    );
+    assert.deepEqual(db.rpcs, [], 'no privileged function may run with an identifier Postgres cannot parse');
+    assert.deepEqual(db.queries, [], 'validation happens before the database is asked anything');
+  }
+});

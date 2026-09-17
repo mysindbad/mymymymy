@@ -19,8 +19,15 @@
 begin;
 
 -- ---------------------------------------------------------------------------
--- 1. Place moderation state. The default is 'approved', so every place that
---    exists today keeps behaving exactly as it does now.
+-- 1. Place moderation state.
+--
+--    The column is *added* with default 'approved' so that every row already in the
+--    table - the published catalogue, the curated seed import - is backfilled to the
+--    state it is effectively in today and keeps being published. The default for
+--    future writes is then deliberately flipped to 'pending': a traveller submission
+--    has to be decided on by a moderator instead of inheriting visibility from a
+--    schema accident. enforce_places_submission_state() below applies the same rule
+--    to writers that name a status explicitly, so no client can self-publish.
 -- ---------------------------------------------------------------------------
 alter table public.places
   add column if not exists moderation_status text not null default 'approved'
@@ -30,8 +37,15 @@ alter table public.places
   add column if not exists moderated_at timestamptz,
   add column if not exists moderated_by uuid references auth.users(id) on delete set null;
 
+-- New rows are a submission until a moderator says otherwise; existing rows are untouched.
+alter table public.places alter column moderation_status set default 'pending';
+
 create index if not exists places_moderation_created_idx
   on public.places (moderation_status, created_at desc);
+
+-- The author's own queued submission (RLS below) and "my submissions" style counts.
+create index if not exists places_author_moderation_idx
+  on public.places (created_by_user_id, moderation_status);
 
 -- The queue facets and the consumer filters both group on these.
 create index if not exists places_category_idx on public.places (category);
@@ -40,6 +54,13 @@ create index if not exists places_source_idx on public.places (source);
 
 -- ---------------------------------------------------------------------------
 -- 2. Review moderation state, and aggregates that follow it.
+--
+--    Reviews keep an 'approved' default on purpose: publishing a traveller's review at
+--    the moment they write it is the accepted product contract of this app (see the
+--    rating-truth constraints), and moderation is the after-the-fact tool that withdraws
+--    a review. Places are the opposite: they enter the catalogue through a queue. Both
+--    are protected by the same column lock below, so neither state can be edited away by
+--    whoever owns the row.
 -- ---------------------------------------------------------------------------
 alter table public.reviews
   add column if not exists moderation_status text not null default 'approved'
@@ -72,11 +93,21 @@ begin
     and r.seed_data = false
     and r.moderation_status = 'approved';
 
-  update public.places
+  update public.places p
   set rating = live_rating,
       review_count = live_review_count,
       rating_provenance = case when live_review_count > 0 then 'community' else 'unrated' end,
-      trust_level = case when live_review_count > 0 then 'community' else 'unverified' end
+      -- Review traffic describes what the crowd thinks of a place; it is not evidence about how
+      -- well documented the record is. A place an administrator verified against an official or
+      -- external source keeps that verification through review inserts, edits, moderation and
+      -- deletes - otherwise moderating one review would silently downgrade a verified record.
+      -- Aggregation may only lift an unverified record to 'community' and drop it back when the
+      -- real community reviews that justified it appear or disappear.
+      trust_level = case
+        when p.trust_level in ('external', 'official') then p.trust_level
+        when live_review_count > 0 then 'community'
+        else 'unverified'
+      end
   where id = target_place_id;
   return coalesce(new, old);
 end;
@@ -87,6 +118,102 @@ drop trigger if exists reviews_update_place_rating on public.reviews;
 create trigger reviews_update_place_rating
 after insert or update or delete on public.reviews
 for each row execute function public.update_place_rating_aggregate();
+
+-- ---------------------------------------------------------------------------
+-- 2b. The state machine, enforced here rather than in a caller.
+--
+--     app.allow_moderation_write is a transaction-local flag that only the moderation RPCs
+--     set. Without it: a new place is a submission, a new review keeps the accepted
+--     publish-on-write behaviour, and nobody - including the row's own author - may move a
+--     row in or out of publication by editing the moderation columns directly.
+-- ---------------------------------------------------------------------------
+create or replace function public.enforce_places_submission_state()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('app.allow_moderation_write', true), '') = 'on' then
+    return new;
+  end if;
+  if coalesce(new.seed_data, false) then
+    -- Curated baseline content (scripts/seed-supabase.ts and any future import that marks its
+    -- provenance) is published on arrival; it has already been through review off-platform.
+    new.moderation_status := 'approved';
+  else
+    new.moderation_status := 'pending';
+    new.moderation_note := null;
+    new.moderated_at := null;
+    new.moderated_by := null;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.enforce_reviews_submission_state()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('app.allow_moderation_write', true), '') = 'on' then
+    return new;
+  end if;
+  if not coalesce(new.seed_data, false) then
+    new.moderation_status := 'approved';
+    new.moderation_note := null;
+    new.moderated_at := null;
+    new.moderated_by := null;
+  end if;
+  return new;
+end;
+$$;
+
+-- Reads NEW and a GUC only, so clients legitimately need EXECUTE to fire them.
+grant execute on function public.enforce_places_submission_state() to anon, authenticated, service_role;
+grant execute on function public.enforce_reviews_submission_state() to anon, authenticated, service_role;
+
+drop trigger if exists places_enforce_submission_state on public.places;
+create trigger places_enforce_submission_state
+before insert on public.places
+for each row execute function public.enforce_places_submission_state();
+
+drop trigger if exists reviews_enforce_submission_state on public.reviews;
+create trigger reviews_enforce_submission_state
+before insert on public.reviews
+for each row execute function public.enforce_reviews_submission_state();
+
+create or replace function public.lock_moderation_columns()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('app.allow_moderation_write', true), '') = 'on' then
+    return new;
+  end if;
+  if new.moderation_status is distinct from old.moderation_status
+     or new.moderation_note is distinct from old.moderation_note
+     or new.moderated_at is distinct from old.moderated_at
+     or new.moderated_by is distinct from old.moderated_by then
+    raise exception 'moderation state can only be changed through the moderation workflow'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+grant execute on function public.lock_moderation_columns() to anon, authenticated, service_role;
+
+drop trigger if exists places_lock_moderation_columns on public.places;
+create trigger places_lock_moderation_columns
+before update on public.places
+for each row execute function public.lock_moderation_columns();
+
+drop trigger if exists reviews_lock_moderation_columns on public.reviews;
+create trigger reviews_lock_moderation_columns
+before update on public.reviews
+for each row execute function public.lock_moderation_columns();
 
 -- ---------------------------------------------------------------------------
 -- 3. Persistent admin authorization. Deliberately not a column on user_profiles
@@ -289,6 +416,10 @@ begin
     raise exception 'place not found' using errcode = 'P0002';
   end if;
 
+  -- Claim the moderation context for this transaction: the insert/update guards in section 2b
+  -- accept a moderation-state change only when the workflow that owns it is the one asking.
+  perform set_config('app.allow_moderation_write', 'on', true);
+
   update public.places
   set moderation_status = p_status,
       moderation_note = nullif(trim(coalesce(p_reason, '')), ''),
@@ -451,6 +582,10 @@ begin
   if v_previous is null then
     raise exception 'review not found' using errcode = 'P0002';
   end if;
+
+  -- Claim the moderation context for this transaction: the insert/update guards in section 2b
+  -- accept a moderation-state change only when the workflow that owns it is the one asking.
+  perform set_config('app.allow_moderation_write', 'on', true);
 
   -- The reviews trigger recomputes the place aggregate for this row.
   update public.reviews
@@ -832,10 +967,73 @@ $$;
 revoke all on function public.admin_operations_snapshot() from public, anon, authenticated;
 grant execute on function public.admin_operations_snapshot() to service_role;
 
+-- ---------------------------------------------------------------------------
+-- 10. Publication at the row-security boundary.
+--
+--     Places and reviews were readable by any client (`using (true)`), so moderation was a
+--     convention inside the API only: a direct PostgREST call with the anon key could still read
+--     a queued or rejected row. The rules below make publication a property of the database, the
+--     same rule server/publication.ts applies to the reads the API performs with a privileged
+--     client (service_role bypasses RLS by design, so the API half is not optional either).
+--
+--     Ownership protections are kept, never relaxed: the author predicates from the earlier
+--     migrations stay in every policy here, and an author's reach stops at publication - they can
+--     read and edit their own queued submission, but cannot mark it published.
+-- ---------------------------------------------------------------------------
+drop policy if exists places_public_select on public.places;
+create policy places_public_select on public.places
+for select to anon
+using (moderation_status = 'approved');
+
+drop policy if exists places_authenticated_select on public.places;
+create policy places_authenticated_select on public.places
+for select to authenticated
+using (
+  moderation_status = 'approved'
+  or created_by_user_id = (select auth.uid())
+);
+
+drop policy if exists places_authenticated_insert on public.places;
+create policy places_authenticated_insert on public.places
+for insert to authenticated
+with check (
+  created_by_user_id = (select auth.uid())
+  and moderation_status = 'pending'
+);
+
+drop policy if exists places_authenticated_update on public.places;
+create policy places_authenticated_update on public.places
+for update to authenticated
+using (
+  created_by_user_id = (select auth.uid())
+  and moderation_status <> 'approved'
+)
+with check (
+  created_by_user_id = (select auth.uid())
+  and moderation_status <> 'approved'
+);
+
+drop policy if exists reviews_public_select on public.reviews;
+create policy reviews_public_select on public.reviews
+for select to anon
+using (moderation_status = 'approved');
+
+drop policy if exists reviews_authenticated_select on public.reviews;
+create policy reviews_authenticated_select on public.reviews
+for select to authenticated
+using (
+  moderation_status = 'approved'
+  or author_user_id = (select auth.uid())
+);
+
+-- The accepted review write rules from 20260913232538 (own row, traveler role, never seed data)
+-- stay exactly as they were; no review policy is redefined here.
+
 comment on table public.admin_accounts is 'Persistent administrator roster. Server-side only; never exposed to clients.';
 comment on table public.admin_audit_events is 'Append-only record of administrative mutations.';
 comment on table public.service_events is 'Bounded operational telemetry. No user data, tokens, or request bodies.';
-comment on column public.places.moderation_status is 'Curation workflow state. rejected is excluded from consumer discovery; pending and needs_changes stay public.';
-comment on column public.reviews.moderation_status is 'Only approved, non-seed reviews are counted by update_place_rating_aggregate().';
+comment on column public.places.moderation_status is 'Publication state. Only ''approved'' is published; pending and needs_changes are queued, rejected stays stored and unpublished. Row-security policies and the API reads both apply it.';
+comment on column public.places.trust_level is 'Verification of the record, owned by curation. Review aggregation never lowers external/official; see update_place_rating_aggregate().';
+comment on column public.reviews.moderation_status is 'Only approved, non-seed reviews are counted by update_place_rating_aggregate() or readable through row-level security.';
 
 commit;

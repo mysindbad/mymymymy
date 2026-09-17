@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
+import { isPublished, PUBLISHED_MODERATION_STATUS, PENDING_MODERATION_STATUS, publishedForEveryone } from './publication.ts';
 import path from 'node:path';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -557,7 +558,10 @@ function mapPlace(row: any): any {
     lastActivityTimestamp: row.last_activity_timestamp,
     rankText: row.rank_text,
     distanceKm: null,
-    reviews: Array.isArray(row.reviews) ? row.reviews.map(mapReview) : [],
+    // The reviews embed arrives through a privileged client, which row-level security does not
+    // bind - so the published set is applied here as well. A moderated-away review stops showing
+    // up without ever being deleted.
+    reviews: publishedForEveryone(row.reviews).map(mapReview),
   };
 }
 
@@ -637,9 +641,10 @@ export function createDal(accessToken?: string) {
         let query = getSupabaseAdmin()
           .from('places')
           .select('*, reviews(*)')
-          // A rejected place stays in the database and stays visible to moderators, but it
-          // is no longer published: moderation hides, it never destroys.
-          .not('moderation_status', 'eq', 'rejected')
+          // Publication is the moderation state, not the absence of a rejection: pending and
+          // needs-changes submissions are queued, and rejected ones stay stored but unpublished.
+          // Moderators see every state through /api/admin/*, which is not filtered this way.
+          .eq('moderation_status', PUBLISHED_MODERATION_STATUS)
           .order('created_at', { ascending: false });
         if (filters.category && filters.category !== 'All') query = query.eq('category', filters.category);
         if (filters.region && filters.region !== 'All') query = query.ilike('region', filters.region);
@@ -663,12 +668,17 @@ export function createDal(accessToken?: string) {
           .from('places')
           .select('*, reviews(*)')
           .eq('id', id)
-          .not('moderation_status', 'eq', 'rejected')
           .maybeSingle();
         if (error) {
           return seedFallbackOrThrow('Supabase place read failed', () => getSeedPlaces().find((place) => place.id === id) || null, error);
         }
-        return data ? mapPlace(data) : null;
+        if (!data) return null;
+        if (isPublished(data, null)) return mapPlace(data);
+        // Not published. The only non-moderator who may still open this record is the account that
+        // submitted it, and deciding that costs a user lookup - paid only on this rare branch.
+        if (!accessToken) return null;
+        const viewer = await verifyUser().catch(() => null);
+        return viewer && isPublished(data, viewer.id) ? mapPlace(data) : null;
       },
       async create(input: unknown) {
         const user = await verifyUser();
@@ -706,6 +716,10 @@ export function createDal(accessToken?: string) {
           last_activity_timestamp: payload.lastActivityTimestamp,
           rank_text: null,
           created_by_user_id: user.id,
+          // Explicit, never inherited from a column default: a traveller-submitted place joins the
+          // moderation queue instead of appearing in the catalogue on its own. The database
+          // normalises this for any writer that forgets (see enforce_places_submission_state()).
+          moderation_status: PENDING_MODERATION_STATUS,
         };
         const { data, error } = await userClient!.from('places').insert(row).select('*, reviews(*)').single();
         if (error) throwMappedSupabaseError(error);
@@ -748,7 +762,7 @@ export function createDal(accessToken?: string) {
       async create(payload: TripCreatePayload) {
         const user = await verifyUser();
         if (payload.destinationId) {
-          const { data: destination, error: destinationError } = await getSupabaseAdmin().from('places').select('id').eq('id', payload.destinationId).maybeSingle();
+          const { data: destination, error: destinationError } = await getSupabaseAdmin().from('places').select('id').eq('id', payload.destinationId).eq('moderation_status', PUBLISHED_MODERATION_STATUS).maybeSingle();
           if (destinationError) throwMappedSupabaseError(destinationError);
           if (!destination) throw new DataValidationError('destinationId does not exist');
         }
@@ -912,7 +926,7 @@ export function createDal(accessToken?: string) {
         return seedFallbackOrThrow('Supabase summary unavailable', () => ({ totalPlaces: seedPlaces.length, totalTraces: seedTraces.length }));
       }
       const [places, traces] = await Promise.all([
-        getSupabaseAdmin().from('places').select('id', { count: 'exact', head: true }),
+        getSupabaseAdmin().from('places').select('id', { count: 'exact', head: true }).eq('moderation_status', PUBLISHED_MODERATION_STATUS),
         getSupabaseAdmin().from('traces').select('id', { count: 'exact', head: true }),
       ]);
       if (places.error || traces.error) {

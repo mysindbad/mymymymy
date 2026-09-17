@@ -177,11 +177,19 @@ function requireAuth(req: Request, _res: Response, next: NextFunction) {
 //
 // Two short-lived, single-flight caches exist for one reason only: a control-center
 // screen fans out to several endpoints per render, and without them every one of those
-// requests would re-verify the same bearer token and re-query the admin roster. Entries
-// are keyed by a hash of the access token, never by user id (so a re-login is a new key),
-// and they expire in seconds, so a revoked administrator keeps their previous session no
-// longer than the TTL. The cache is an optimization: the mutation RPCs re-check the role
-// in the database on their own.
+// requests would re-verify the same bearer token and re-query the admin roster.
+//
+// The admin-actor cache is keyed by (required scope, user id) - deliberately not by the token.
+// A role is a property of the account, not of one of its sessions, so a token-derived key would
+// multiply identical entries (one per tab, per refresh) for no security gain: a re-login by the
+// same account must get the same answer, and a different account cannot borrow a cached role
+// because the identity is re-resolved from the bearer on every request. The real cost of a
+// short TTL - a grant or revocation taking up to the TTL to land - is removed instead by
+// invalidating the affected account's entry in the same request that changes it
+// (invalidateAdminActorCache), so a role change is immediate for that user.
+//
+// A denied lookup is never left in the cache: the promise's rejection deletes the entry, so a
+// freshly granted administrator is authorized on their next request.
 // ---------------------------------------------------------------------------
 
 const ADMIN_AUTH_TTL_MS = 5000;
@@ -212,10 +220,14 @@ async function resolveAdminActor(req: Request, options: { superUser?: boolean } 
       adminActorCache.delete(cacheKey);
       throw error;
     });
-  // Denied lookups are cached too - but only for the same tiny window, so a grant
-  // takes effect on the next request rather than after a page reload.
   adminActorCache.set(cacheKey, { promise, expiresAt: now + ADMIN_AUTH_TTL_MS });
   return promise;
+}
+
+/** Drop both scope entries for one account, so a role change is visible on the next request. */
+function invalidateAdminActorCache(userId: string) {
+  adminActorCache.delete(`admin:${userId}`);
+  adminActorCache.delete(`super:${userId}`);
 }
 
 function adminListQuery(req: Request, sorts: readonly string[], defaultSort: string) {
@@ -1166,6 +1178,7 @@ app.post('/api/admin/administrators/grant', async (req, res, next) => {
       targetUserId: input.targetUserId as string,
       reason: input.reason,
     });
+    invalidateAdminActorCache(input.targetUserId as string);
     return { grant: result.result, actorRole: actor.role };
   });
 });
@@ -1174,7 +1187,10 @@ app.post('/api/admin/administrators/revoke', async (req, res, next) => {
   await handleAdminRoute(req, res, next, async (actor) => {
     await requireAdminMutationHeadroom(req);
     const input = parseRoleChange(req.body, 'revoke');
-    const result = await adminService.revokeRole(actor, { targetUserId: String((req.body as any)?.user_id ?? (req.body as any)?.userId ?? ''), reason: input.reason });
+    const result = await adminService.revokeRole(actor, { targetUserId: input.targetUserId as string, reason: input.reason });
+    // The revoked administrator's own entry goes with it: their next request is answered from
+    // the roster again, so a revocation is not something a stale 5-second cache can sit out.
+    invalidateAdminActorCache(input.targetUserId as string);
     return { revoke: result.result, actorRole: actor.role };
   });
 });

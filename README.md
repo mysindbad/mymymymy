@@ -27,7 +27,7 @@ app uses, so nothing on screen is invented for decoration.
 | --- | --- | --- |
 | `/admin` | counts, moderation backlog, distributions by category/source/region, ratings state, recent operational events, measured read latency | `admin_operations_snapshot()` over `places`, `reviews`, `place_checkins`, `traces`, plus the last 8 rows of `admin_audit_events` |
 | `/admin/places` | server-side search / filter / sort / paginate; inspector with coordinates, tri-lingual names, photos, rating provenance, curation edits, moderation decision, likely duplicates | `public.places`, `public.reviews`, `admin_place_duplicate_candidates()` |
-| `/admin/submissions` | pending → accepted / needs changes / rejected with the submitted evidence and a recorded moderator action | `places.moderation_*` |
+| `/admin/submissions` | the queue a traveller submission actually lands in (default `pending`), with the submitted evidence, and a recorded moderator action | `places.moderation_*` |
 | `/admin/reviews` | review moderation that cannot corrupt aggregates (the SQL trigger recomputes them from approved, non-seed reviews only) | `public.reviews` + `update_place_rating_aggregate()` |
 | `/admin/travelers` | profile metadata, language, activity counts, privilege state; presence of location data is reported as a boolean, values are never read | `public.user_profiles` |
 | `/admin/administrators` | grant / revoke `admin` and `super_admin`; refuses removing the last super admin | `public.admin_accounts` |
@@ -60,6 +60,33 @@ bundle, the admin DTOs or the audit log.
 
 If any step is missing the API answers `503 ADMIN_BACKEND_UNAVAILABLE` and the console says so
 plainly instead of rendering a sample dashboard.
+
+**Publication is a moderation state, enforced twice.** A place is published exactly when
+`places.moderation_status = 'approved'`. Rows that already existed (and anything imported with
+`seed_data = true`) were backfilled to `approved` by the column's own default, so the catalogue did
+not change overnight; the default for *future* rows is `pending`, and
+`enforce_places_submission_state()` rewrites the state for any writer that skips or forges it, while
+`lock_moderation_columns()` refuses moderation-column edits from anyone but the moderation RPCs
+(error `42501`). Reviews keep the accepted publish-on-write behaviour, with the same column lock,
+so a moderated-away review cannot be resurrected by its author.
+
+The same rule is applied twice on purpose: the row-security policies (`places_public_select`,
+`places_authenticated_select`, `reviews_public_select`, `reviews_authenticated_select`) bind any
+direct PostgREST client, and `server/publication.ts` binds the API server's own reads, which use a
+privileged client that RLS does not reach. The one exemption in both places is ownership: a signed-in
+account can read *its own* queued submission, because "your record disappeared" is not an honest
+answer to moderation. Discovery lists, AI context, trip destinations and route lookups stay
+approved-only for everybody.
+
+**Verification is not review traffic's to undo.** `update_place_rating_aggregate()` recomputes
+`rating`, `review_count` and `rating_provenance` from approved non-seed reviews, and may move
+`trust_level` between `unverified` and `community` - but it never lowers `external` or `official`,
+and it never writes `last_verified_at`. Those two columns belong to curation.
+
+**Role cache.** The administrator cache is keyed by `(scope, user id)` — a role is a property of the
+account, not of a session — and `invalidateAdminActorCache` drops the affected account's entry inside
+the same request that grants or revokes it, so a privilege change never has to wait out the 5-second
+window.
 
 **Keyboard, density, direction.** `/` focuses the search field, `j` / `k` move through table rows,
 `Enter` opens the selected record, `a` / `n` / `x` approve / request changes / reject inside a place

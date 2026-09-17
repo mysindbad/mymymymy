@@ -13,6 +13,10 @@ import type { BrowserContext, Route } from '@playwright/test';
 
 export type AdminPersona = 'admin' | 'super-admin' | 'user' | 'anonymous' | 'expired' | 'unconfigured';
 
+// Publication is decided by one implementation, shared with the API server (server/publication.ts),
+// so the consumer half of the moderation tests cannot drift into agreeing with itself.
+import { publishedRows, type PublicationRow } from '../../server/publication.ts';
+
 interface SeedPlace {
   id: string;
   seed_data?: boolean;
@@ -129,6 +133,8 @@ export interface FixtureStore {
   serviceEvents: Array<{ service: string; outcome: string; occurred_at: string; latency_ms: number }>;
   /** Every privileged write the UI attempted, so tests can assert on the payload the browser sent. */
   writes: Array<{ path: string; body: Record<string, unknown> }>;
+  /** Every consumer catalogue read, with the rows the publication rule let through. */
+  consumerReads: Array<{ viewer: string | null; ids: string[] }>;
 }
 
 const now = new Date('2026-09-17T09:00:00.000Z').getTime();
@@ -270,6 +276,7 @@ export function createStore(options: { bulkPlaces?: number } = {}): FixtureStore
       { service: 'ai', outcome: 'unavailable', occurred_at: iso(7), latency_ms: 300 },
     ],
     writes: [],
+    consumerReads: [],
   };
 
   // A grid is only worth paginating if there is something to paginate. The bulk fill repeats the
@@ -838,4 +845,36 @@ function recomputeAggregate(store: FixtureStore, placeId: string) {
     };
   }
   return { rating: place?.rating.value ?? null, reviewCount: approved.length };
+}
+
+/**
+ * The traveller-facing catalogue read, served from the same store the console mutates.
+ *
+ * `GET /api/places?viewer=<user id>` answers with what the app would publish right now: rows the
+ * publication rule considers live, plus a signed-in author's own queued submission. The rule is the
+ * one `server/dal.ts` and the row-security policies use, applied to the fixture rows here - so a
+ * moderation decision made in the console changes this response in the same page session.
+ */
+export async function mockConsumerPlaces(context: BrowserContext, store: FixtureStore) {
+  await context.route('**/api/places*', async (route) => {
+    const request = route.request();
+    if (request.method() !== 'GET') return route.fallback();
+    const url = new URL(request.url());
+    if (!/^\/api\/places\/?$/.test(url.pathname)) return route.fallback();
+    const viewer = url.searchParams.get('viewer');
+    // The fixture rows are re-shaped into the columns the rule reads, exactly as the table has them.
+    const rows: Array<FixturePlace & PublicationRow> = store.places.map((place) => Object.assign({}, place, {
+      moderation_status: place.moderation.status,
+      created_by_user_id: place.submittedBy,
+      author_user_id: null,
+    }));
+    const visible = publishedRows(rows, viewer).map((place) => ({
+      id: place.id,
+      name: place.name,
+      moderationStatus: place.moderation.status,
+      published: place.moderation.status === 'approved',
+    }));
+    store.consumerReads.push({ viewer: viewer ?? null, ids: visible.map((place) => place.id) });
+    return json(route, { places: visible, total: visible.length });
+  });
 }

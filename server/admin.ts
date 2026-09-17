@@ -490,10 +490,12 @@ export function parseRoleChange(body: unknown, action: 'grant' | 'revoke') {
   const reason = textParam(input.reason, 500);
   if (!reason) throw new DataValidationError('a reason is required to change administrator access');
   const out: { reason: string; role?: AdminRole; targetUserId?: string } = { reason };
+  // Both actions name an account, so both are validated the same way: a malformed identifier is
+  // refused here, before a single query or RPC, exactly like every other admin input.
+  out.targetUserId = requireUuid(input.user_id ?? input.userId, 'target account');
   if (action === 'grant') {
     out.role = enumParam(input.role, ADMIN_ROLES, '' as any) as AdminRole;
     if (!out.role) throw new DataValidationError(`role must be one of: ${ADMIN_ROLES.join(', ')}`);
-    out.targetUserId = requireUuid(input.user_id ?? input.userId, 'target account');
   }
   return out;
 }
@@ -964,9 +966,12 @@ export function createAdminService(client: AdminClientLike | null) {
     },
 
     async grantRole(actor: AdminActor, input: { role: AdminRole; targetUserId: string; reason: string }) {
+      // Validated here as well as at the edge: the service must never hand an unparseable
+      // identifier to Postgres, where it would fail as a syntax error instead of a 400.
+      const targetUserId = requireUuid(input.targetUserId, 'target account');
       const { data, error } = await db().rpc('admin_grant_role', {
         p_admin_user_id: actor.userId,
-        p_target_user_id: input.targetUserId,
+        p_target_user_id: targetUserId,
         p_role: input.role,
         p_reason: input.reason,
         p_request_id: null,
@@ -976,9 +981,10 @@ export function createAdminService(client: AdminClientLike | null) {
     },
 
     async revokeRole(actor: AdminActor, input: { targetUserId: string; reason: string }) {
+      const targetUserId = requireUuid(input.targetUserId, 'target account');
       const { data, error } = await db().rpc('admin_revoke_role', {
         p_admin_user_id: actor.userId,
-        p_target_user_id: input.targetUserId,
+        p_target_user_id: targetUserId,
         p_reason: input.reason,
         p_request_id: null,
       });

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
-import { createStore, mockAdminApi, type AdminPersona, type FixtureStore } from './admin-fixtures';
+import { createStore, mockAdminApi, mockConsumerPlaces, type AdminPersona, type FixtureStore } from './admin-fixtures';
 
 // The Admin Control Center's permanent browser suite.
 //
@@ -494,6 +494,60 @@ test('every module renders without an app console error or a stuck spinner', asy
     await expect(page.locator('.adm-skeleton'), `spinner stuck on ${route}`).toHaveCount(0, { timeout: 8_000 });
     await expect(page.locator('.adm-error-text')).toHaveCount(0);
   }
+  expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
+  await context.close();
+});
+
+test('publication follows the moderation decision: queued is hidden, approval publishes, rejection stores unpublished', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const { page, store, consoleErrors } = await harness(context, 'admin');
+  await mockConsumerPlaces(context, store);
+  const target = store.places.find((place) => place.moderation.status === 'pending')!;
+  const owner = target.submittedBy;
+  expect(owner, 'the fixture submission has an author').toBeTruthy();
+
+  const catalogue = () => page.evaluate(async () => {
+    const response = await fetch('/api/places');
+    return ((await response.json()) as { places: Array<{ id: string; published: boolean }> }).places;
+  });
+  const seesOwnSubmission = (viewer: string) => page.evaluate(async ({ id, viewer }) => {
+    const response = await fetch('/api/places?viewer=' + encodeURIComponent(viewer));
+    const payload = (await response.json()) as { places: Array<{ id: string }> };
+    return payload.places.some((row) => row.id === id);
+  }, { id: target.id, viewer });
+  await page.goto('/admin');
+  expect((await catalogue()).some((row) => row.id === target.id), 'a pending submission is stored but not published').toBe(false);
+  expect(await seesOwnSubmission(owner!), 'the author can still see the record they submitted');
+
+  await page.goto('/admin/moderation');
+  await expect(rowButtons(page).filter({ hasText: target.name }).first()).toBeVisible();
+
+  // Approving publishes it.
+  await page.goto(`/admin/places/${target.id}`);
+  await page.getByRole('button', { name: /Approve \/ keep live/ }).click();
+  await expect(page.locator('.adm-toasts')).toContainText(/decision recorded|تم تسجيل القرار|Décision enregistrée/i);
+  await expect.poll(() => store.places.find((place) => place.id === target.id)!.moderation.status).toBe('approved');
+  const published = await catalogue();
+  expect(published.find((row) => row.id === target.id)?.published, 'approved content is published').toBe(true);
+  expect(store.audit.some((event) => event.target_id === target.id)).toBe(true);
+
+  // Rejecting hides it again, and hides it from everybody - including its author's catalogue view.
+  // The inspector asks for the reason first, and only then does the destructive confirmation appear.
+  const inspector = page.locator('.adm-inspector');
+  await inspector.getByRole('button', { name: /Reject and hide/ }).click();
+  await inspector.getByRole('textbox', { name: /Reason/i }).fill('Duplicate of an approved record.');
+  await inspector.getByRole('button', { name: /Record this decision/ }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('textbox', { name: /Confirm by typing the name/i }).fill(target.name);
+  await dialog.getByRole('button', { name: /Reject and hide/ }).click();
+  await expect.poll(() => store.places.find((place) => place.id === target.id)!.moderation.status).toBe('rejected');
+  expect((await catalogue()).some((row) => row.id === target.id), 'a rejected place is not published').toBe(false);
+
+  // ...but it is still there: moderation is a state, never a delete.
+  await page.goto('/admin/places?status=rejected');
+  await expect(rowButtons(page).filter({ hasText: target.name }).first()).toBeVisible();
+  expect(store.places.some((place) => place.id === target.id)).toBe(true);
   expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
   await context.close();
 });

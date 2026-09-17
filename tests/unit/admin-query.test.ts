@@ -141,6 +141,14 @@ test('privilege changes always demand a reason and a real identifier', () => {
   assert.throws(() => parseRoleChange({ role: 'owner', user_id: '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b44', reason: 'needed' }, 'grant'), /role must be one of/);
   assert.throws(() => parseRoleChange({ role: 'admin', user_id: 'me', reason: 'needed' }, 'grant'), /target account/);
   assert.throws(() => parseRoleChange({ user_id: '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b44' }, 'revoke'), /a reason is required/);
+  // Revocation names an account too, so a malformed or missing identifier is refused here rather
+  // than reaching Postgres as an invalid-uuid syntax error.
+  assert.throws(() => parseRoleChange({ user_id: 'nope', reason: 'left the team' }, 'revoke'), /target account/);
+  assert.throws(() => parseRoleChange({ reason: 'left the team' }, 'revoke'), /target account/);
+  assert.deepEqual(
+    parseRoleChange({ user_id: '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b44', reason: 'left the team' }, 'revoke'),
+    { reason: 'left the team', targetUserId: '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b44' },
+  );
   assert.deepEqual(
     parseRoleChange({ role: 'super_admin', userId: '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b44', reason: ' rota coverage ' }, 'grant'),
     { reason: 'rota coverage', role: 'super_admin', targetUserId: '8f14e45f-ea2a-4b1a-9d5c-2f7a1e6c3b44' },
