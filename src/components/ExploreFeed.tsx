@@ -148,7 +148,7 @@ export const ExploreFeed: React.FC<ExploreFeedProps> = ({
                 type="button"
                 onClick={() => setSearchQuery('')}
                 aria-label={t('Clear search', 'مسح البحث', 'Effacer la recherche')}
-                className="rounded-md p-1 text-muted transition-colors hover:bg-surface-muted hover:text-ink"
+                className="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-surface-muted hover:text-ink pointer-coarse:h-11 pointer-coarse:w-11"
               >
                 <X className="h-4 w-4" />
               </button>

@@ -62,6 +62,7 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [serviceNotice, setServiceNotice] = useState<string | null>(null);
+  const [retryText, setRetryText] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -227,8 +228,10 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
       const history = messages.slice(-6).map((message) => ({ sender: message.sender, text: message.text }));
       const reply = await sendChatMessage(text, destination, language, history);
       addAssistantMessage(reply);
+      setRetryText(null);
       if (fromVoice) speakAndContinue(reply);
     } catch (error) {
+      setRetryText(text);
       const notice = error instanceof ApiAuthenticationError
         ? localize('Your session ended. Sign in again.', 'انتهت جلسة الدخول. سجّل الدخول مجدداً.', 'Votre session a expiré. Reconnectez-vous.')
         : localize('Sindbad is temporarily unavailable.', 'سندباد غير متاح مؤقتاً.', 'Sindbad est temporairement indisponible.');
@@ -357,6 +360,18 @@ export const AIChatModal: React.FC<AIChatModalProps> = ({
             action={authStatus !== 'authed' ? (
               <Button size="sm" variant="secondary" onClick={() => followUp({ target: 'account', label: localize('Sign in', 'تسجيل الدخول', 'Se connecter') })}>
                 {localize('Sign in', 'تسجيل الدخول', 'Se connecter')}
+              </Button>
+            ) : retryText ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const failedText = retryText;
+                  setRetryText(null);
+                  void sendMessage(failedText);
+                }}
+              >
+                {localize('Try again', 'إعادة المحاولة', 'Réessayer')}
               </Button>
             ) : (
               <Button size="sm" variant="ghost" onClick={() => setServiceNotice(null)}>

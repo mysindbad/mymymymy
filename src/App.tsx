@@ -203,11 +203,7 @@ export default function App() {
     setActiveTab('explore');
   };
 
-  const handleTripCreated = async (destination: Place) => {
-    setTripDestination(destination);
-    setExploreQuery('');
-    setExploreCategory('All');
-    setExploreView('feed');
+  const loadTripPlaces = async (destination: Place) => {
     setPlacesLoading(true);
     setPlacesError(null);
     try {
@@ -218,8 +214,25 @@ export default function App() {
       setPlacesError(error instanceof Error ? error.message : 'Failed to load trip places');
     } finally {
       setPlacesLoading(false);
-      setActiveTab('explore');
     }
+  };
+
+  const handleTripCreated = async (destination: Place) => {
+    setTripDestination(destination);
+    setExploreQuery('');
+    setExploreCategory('All');
+    setExploreView('feed');
+    await loadTripPlaces(destination);
+    setActiveTab('explore');
+  };
+
+  // The banner must always offer the recovery it promises, whichever request failed.
+  const retryPlacesLoad = async () => {
+    if (tripDestination) {
+      await loadTripPlaces(tripDestination);
+      return;
+    }
+    await loadNearbyPlaces();
   };
 
   const handleOpenAuth = (screen: AuthScreenType = 'welcome') => {
@@ -363,16 +376,16 @@ export default function App() {
             <div className="mx-auto w-full max-w-6xl px-3 pt-3 sm:px-5">
               <Alert
                 tone="error"
-                action={userLocation && !tripDestination ? (
-                  <Button size="sm" variant="secondary" onClick={() => void loadNearbyPlaces()}>
+                action={
+                  <Button size="sm" variant="secondary" onClick={() => void retryPlacesLoad()}>
                     {shellText('Retry', 'إعادة المحاولة', 'Réessayer')}
                   </Button>
-                ) : undefined}
+                }
               >
                 {shellText(
-                  'Places could not be loaded. Check your connection and try again.',
-                  'تعذر تحميل الأماكن. تحقق من الاتصال وأعد المحاولة.',
-                  'Impossible de charger les lieux. Vérifiez votre connexion puis réessayez.',
+                  'Places around you could not be loaded. Check your connection and try again.',
+                  'تعذر تحميل الأماكن القريبة. تحقق من الاتصال وأعد المحاولة.',
+                  'Impossible de charger les lieux à proximité. Vérifiez votre connexion puis réessayez.',
                 )}
               </Alert>
             </div>

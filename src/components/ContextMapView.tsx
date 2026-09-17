@@ -209,6 +209,7 @@ export const ContextMapView: React.FC<ContextMapViewProps> = ({
                 tone="dashed"
                 icon={<MapPin className="h-5 w-5" aria-hidden="true" />}
                 title={t('Nothing to plot yet', 'لا توجد أماكن لعرضها', 'Rien à afficher pour le moment')}
+                titleAs="h2"
                 description={t(
                   'Share your location or search for a destination first.',
                   'شارك موقعك أو ابحث عن وجهة أولاً.',
