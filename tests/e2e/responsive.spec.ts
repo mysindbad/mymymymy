@@ -126,7 +126,13 @@ const OVERLAY_SCREENS: ScreenKey[] = ['drawer', 'assistant', 'place detail', 'fl
 // Sheets and dialogs are the surfaces most likely to run out of room when text doubles.
 const LARGE_TEXT_OVERLAYS: ScreenKey[] = ['drawer', 'assistant', 'place detail'];
 
-const PROBE = () => {
+type ProbeOptions = { walk?: boolean; touch?: boolean; hitTest?: boolean; dialog?: boolean };
+
+// A full audit of a screen walks every element, every control and every layer; a test that
+// asserts one of those oracles should not pay for the rest, because the matrix is wide
+// enough that a 2-core runner needs the difference to stay inside its time budget.
+const PROBE = (options: ProbeOptions) => {
+  const opts = { walk: true, touch: true, hitTest: true, dialog: true, ...options };
   const vw = window.innerWidth;
   const visible = (el: Element) => {
     const cs = getComputedStyle(el);
@@ -159,7 +165,7 @@ const PROBE = () => {
   const clipped: string[] = [];
   const tiny: string[] = [];
 
-  for (const el of document.querySelectorAll('body *')) {
+  if (opts.walk) for (const el of document.querySelectorAll('body *')) {
     if (!visible(el)) continue;
     const r = el.getBoundingClientRect();
     if (r.width < window.innerWidth - 2 && (r.right > vw + 1.5 || r.left < -1.5) && !el.closest('.sindbad-scroll-x')) {
@@ -181,7 +187,7 @@ const PROBE = () => {
     }
   }
 
-  for (const el of document.querySelectorAll<HTMLElement>(interactive)) {
+  if (opts.touch) for (const el of document.querySelectorAll<HTMLElement>(interactive)) {
     if (!visible(el) || el.closest('.sindbad-hit-expand') || el.closest('.leaflet-control-attribution')) continue;
     const r = el.getBoundingClientRect();
     const smallest = Math.min(r.width, r.height);
@@ -192,7 +198,7 @@ const PROBE = () => {
   const panels = [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="alertdialog"], aside')];
   const panel = panels[panels.length - 1];
   let dialog: { cls: string; top: number; bottom: number; lowestAction: number; vh: number } | null = null;
-  if (panel) {
+  if (opts.dialog && panel) {
     const r = panel.getBoundingClientRect();
     const actions = [...panel.querySelectorAll<HTMLElement>('button, a[href], input, textarea')].map((node) => node.getBoundingClientRect());
     dialog = {
@@ -208,10 +214,12 @@ const PROBE = () => {
   // geometry alone both flags stacked layers that never steal a tap and misses
   // ones that do.
   const blocked: string[] = [];
-  const bar = [...document.querySelectorAll('nav')].find((node) => {
-    const r = node.getBoundingClientRect();
-    return Math.abs(r.bottom - window.innerHeight) < 6 && r.height > 8;
-  });
+  const bar = opts.hitTest
+    ? [...document.querySelectorAll('nav')].find((node) => {
+        const r = node.getBoundingClientRect();
+        return Math.abs(r.bottom - window.innerHeight) < 6 && r.height > 8;
+      })
+    : null;
   if (bar) {
     for (const el of document.querySelectorAll<HTMLElement>(interactive)) {
       if (!visible(el) || bar.contains(el)) continue;
@@ -242,8 +250,8 @@ const PROBE = () => {
   };
 };
 
-async function probe(page: Page, label: string) {
-  const result = await page.evaluate(PROBE);
+async function probe(page: Page, label: string, options: ProbeOptions = {}) {
+  const result = await page.evaluate(PROBE, options);
   return { ...result, label };
 }
 
@@ -284,25 +292,18 @@ async function boot(page: Page, language: 'en' | 'ar' | 'fr' = 'en') {
   await expect(page.locator('#tab-home')).toBeVisible();
 }
 
-test('no screen scrolls sideways at any supported width', async ({ page }) => {
+// Both oracles need the exact same walk of the exact same states, so they share one
+// traversal: halving the wall time of the widest test in the file without dropping a check.
+test('no screen scrolls sideways or clips its own text at any supported width', async ({ page }) => {
+  test.setTimeout(150_000); // 4 widths x 9 screens, measured, with headroom for a 2-core runner
   await boot(page);
   for (const width of LOOP_WIDTHS) {
     await page.setViewportSize({ width, height: 800 });
     for (const screen of [...CORE_SCREENS, ...OVERLAY_SCREENS]) {
       await openScreen(page, screen);
-      const result = await probe(page, `${screen} @ ${width}`);
+      const result = await probe(page, `${screen} @ ${width}`, { touch: false, hitTest: false, dialog: false });
       expect(result.scrollWidth, `${result.label}: document is ${result.scrollWidth}px wide, overflowing=${JSON.stringify(result.overflowing)}`).toBeLessThanOrEqual(result.vw + 1);
-    }
-  }
-});
-
-test('no screen clips its own text at any supported width', async ({ page }) => {
-  await boot(page);
-  for (const width of LOOP_WIDTHS) {
-    await page.setViewportSize({ width, height: 800 });
-    for (const screen of [...CORE_SCREENS, ...OVERLAY_SCREENS]) {
-      await openScreen(page, screen);
-      const result = await probe(page, `${screen} @ ${width}`);
+      expect(result.overflowing, `${result.label}: overflowing`).toEqual([]);
       expect(result.clipped, `${result.label}: clipped=${JSON.stringify(result.clipped)}`).toEqual([]);
     }
   }
@@ -314,13 +315,14 @@ test('touch pointers get 44px targets on every screen', async ({ browser }) => {
   await boot(page);
   for (const screen of [...CORE_SCREENS, ...OVERLAY_SCREENS]) {
     await openScreen(page, screen);
-    const result = await probe(page, screen);
+    const result = await probe(page, screen, { walk: false, hitTest: false, dialog: false });
     expect(result.tiny, `${result.label}: small targets=${JSON.stringify(result.tiny)}`).toEqual([]);
   }
   await context.close();
 });
 
 test('nothing important is hidden behind the persistent bar', async ({ page }) => {
+  test.setTimeout(150_000); // scrolls and hit-tests every screen at three widths
   await boot(page);
   for (const width of [320, 390, 768]) {
     await page.setViewportSize({ width, height: 720 });
@@ -329,7 +331,7 @@ test('nothing important is hidden behind the persistent bar', async ({ page }) =
       // Scroll to the end of the page so a bottom row cannot hide under the bar.
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       await page.waitForTimeout(150);
-      const result = await probe(page, `${screen} @ ${width} bottom`);
+      const result = await probe(page, `${screen} @ ${width} bottom`, { walk: false, touch: false, dialog: false });
       expect(result.blocked, `${result.label}: ${JSON.stringify(result.blocked)}`).toEqual([]);
     }
   }
@@ -341,7 +343,7 @@ test('desktop widths keep their rails and headers inside the viewport', async ({
     await page.setViewportSize({ width, height: 800 });
     for (const screen of ['home', 'explore', 'trips'] as ScreenKey[]) {
       await openScreen(page, screen);
-      const result = await probe(page, `${screen} @ ${width}`);
+      const result = await probe(page, `${screen} @ ${width}`, { touch: false, dialog: false });
       expect(result.overflowing, `${result.label}: ${JSON.stringify(result.overflowing)}`).toEqual([]);
       expect(result.clipped, `${result.label}: ${JSON.stringify(result.clipped)}`).toEqual([]);
       expect(result.blocked, `${result.label}: ${JSON.stringify(result.blocked)}`).toEqual([]);
@@ -350,12 +352,13 @@ test('desktop widths keep their rails and headers inside the viewport', async ({
 });
 
 test('sheets and dialogs stay inside the viewport with their actions reachable', async ({ page }) => {
+  test.setTimeout(120_000); // one animated open per width, then geometry
   await boot(page);
   for (const [width, height] of [[320, 640], [390, 700], [768, 900], [1280, 720]] as const) {
     await page.setViewportSize({ width, height });
     for (const screen of OVERLAY_SCREENS) {
       await openScreen(page, screen);
-      const result = await probe(page, `${screen} @ ${width}x${height}`);
+      const result = await probe(page, `${screen} @ ${width}x${height}`, { walk: false, touch: false, hitTest: false });
       expect(result.dialog, `${result.label}: no surface was rendered`).not.toBeNull();
       expect(result.dialog!.top, `${result.label}: escapes above the viewport (${result.dialog!.cls})`).toBeGreaterThanOrEqual(-1);
       expect(result.dialog!.bottom, `${result.label}: taller than the viewport (${result.dialog!.cls})`).toBeLessThanOrEqual(result.dialog!.vh + 1);
@@ -371,7 +374,7 @@ test('enlarged system text keeps core screens usable', async ({ page }) => {
     await page.addStyleTag({ content: 'html{font-size:200%!important}' });
     for (const screen of [...CORE_SCREENS, ...LARGE_TEXT_OVERLAYS]) {
       await openScreen(page, screen);
-      const result = await probe(page, `${screen} @ ${width} 2x`);
+      const result = await probe(page, `${screen} @ ${width} 2x`, { touch: false, hitTest: false, dialog: false });
       expect(result.scrollWidth, `${result.label}: overflowing=${JSON.stringify(result.overflowing)}`).toBeLessThanOrEqual(result.vw + 1);
       expect(result.overflowing, `${result.label}: overflowing`).toEqual([]);
       expect(result.clipped, `${result.label}: clipped=${JSON.stringify(result.clipped)}`).toEqual([]);
@@ -404,7 +407,7 @@ test('Arabic mirrors the shell but never the map', async ({ browser }) => {
   await expect(map).toBeVisible();
   expect(await map.evaluate((el) => getComputedStyle(el).direction), 'the map must not be mirrored').toBe('ltr');
   expect(await ar.locator('.leaflet-map-pane').evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
-  const result = await probe(ar, 'arabic map @ 390');
+  const result = await probe(ar, 'arabic map @ 390', { touch: false, hitTest: false, dialog: false });
   expect(result.scrollWidth, `arabic map overflow=${JSON.stringify(result.overflowing)}`).toBeLessThanOrEqual(result.vw + 1);
   await arContext.close();
 });
