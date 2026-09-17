@@ -165,6 +165,7 @@ export default async function handler(req: any, res: any) {
         .from('places')
         .select('id, name, arabic_name, french_name, category, region, area, address, coordinates, rating')
         .eq('id', destinationId)
+        .eq('moderation_status', 'approved')
         .maybeSingle();
       if (error) throw error;
       if (data) {

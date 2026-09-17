@@ -4,9 +4,14 @@ on:
   push:
     branches:
       - 'audit/**'
+      # Work that stacks on an accepted-but-unmerged branch (the Admin Control Center PR targets
+      # the product branch, not main) must still be verified, or a delivery can land with no checks
+      # at all. The two patterns below only widen which refs are verified; nothing in the job relaxes.
+      - 'arena/**'
   pull_request:
     branches:
       - main
+      - 'arena/**'
 
 permissions:
   contents: read
@@ -30,6 +35,11 @@ jobs:
         run: node --import tsx scripts/verify-truthful-dal.ts
       - name: Verify user-facing truth contracts
         run: node --import tsx scripts/verify-user-truth-contracts.ts
+      - name: Verify moderation, publication and migration SQL contracts
+        # Runs scripts/verify-moderation-contracts.ts and scripts/verify-migration-sql.ts as well.
+        # The migration gate parses every migration with the real PostgreSQL grammar, because this
+        # repository once reported green on a migration that PostgreSQL could not execute at all.
+        run: npm run test:contracts
       - run: npm run build
       - name: Verify Supabase URL bootstrap normalization
         run: |

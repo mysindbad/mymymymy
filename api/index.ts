@@ -160,6 +160,9 @@ async function handleAiChat(req: any, res: any) {
     .from('places')
     .select('name, arabic_name, french_name, category, region, area, rating, seed_data, owner_verified')
     .or('seed_data.eq.true,owner_verified.eq.true')
+    // Model context is public content only: a queued submission must not reach a prompt, and a
+    // moderated-away one must not come back through the assistant.
+    .eq('moderation_status', 'approved')
     .order('rating', { ascending: false })
     .limit(20);
   if (error) throw error;
@@ -233,6 +236,7 @@ async function handlePlanTrip(req: any, res: any) {
     .from('places')
     .select('id, name, arabic_name, french_name, category, region, area, address, rating, seed_data, owner_verified')
     .eq('id', destinationId)
+    .eq('moderation_status', 'approved')
     .maybeSingle();
   if (error) throw error;
   if (!destination) return res.status(404).json({ error: 'Destination not found' });
@@ -325,10 +329,11 @@ async function handlePlanTrip(req: any, res: any) {
 async function handleMemoryInsights(_req: any, res: any) {
   const admin = getAdminClient();
   const [allPlacesResult, organicPlacesResult, tracesResult, checkinsResult] = await Promise.all([
-    admin.from('places').select('id', { count: 'exact', head: true }),
+    admin.from('places').select('id', { count: 'exact', head: true }).eq('moderation_status', 'approved'),
     admin.from('places')
       .select('id, name, area, category, rating, review_count, ai_confidence_score, check_ins_count, is_under_documented_gem')
       .eq('seed_data', false)
+      .eq('moderation_status', 'approved')
       .order('rating', { ascending: false }),
     admin.from('traces').select('id', { count: 'exact', head: true }),
     admin.from('place_checkins').select('id', { count: 'exact', head: true }),

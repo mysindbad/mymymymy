@@ -16,7 +16,7 @@
     "clean": "node -e \"const fs=require('node:fs'); for (const path of ['dist','playwright-report','test-results']) fs.rmSync(path,{recursive:true,force:true}); fs.rmSync('server.js',{force:true});\"",
     "lint": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
-    "test:contracts": "node --import tsx scripts/verify-user-truth-contracts.ts && node --import tsx scripts/verify-truthful-dal.ts",
+    "test:contracts": "node --import tsx scripts/verify-user-truth-contracts.ts && node --import tsx scripts/verify-truthful-dal.ts && node --import tsx scripts/verify-moderation-contracts.ts && node --import tsx scripts/verify-migration-sql.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -37,6 +37,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@libpg-query/parser": "^17.6.10",
     "@playwright/test": "^1.63.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
